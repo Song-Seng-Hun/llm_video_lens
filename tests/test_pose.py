@@ -116,4 +116,17 @@ class Wording(unittest.TestCase):
         self.assertFalse(any(u['major'] for u in units))
 
 
+class Together(unittest.TestCase):
+    def feature(self, pid, start, end, direction, distance):
+        unit = dict(major=True, start_frame=start, end_frame=end, start_seconds=start/50, end_seconds=end/50,
+                    direction=direction, distance_px=distance)
+        return dict(point_id=pid, continuous_runs=[dict(strokes=dict(units=[unit]))])
+
+    def test_same_move_groups_and_different_moves_do_not(self):
+        report = dict(features=[self.feature('nose', 262, 274, 'left', 244.), self.feature('eye-l', 263, 274, 'left', 240.),
+                                self.feature('wrist-l', 262, 274, 'right', 240.), self.feature('hair', 262, 274, 'left', 90.)])
+        groups = motion_report.together(report)
+        self.assertEqual([g['points'] for g in groups], [['nose', 'eye-l']])
+
+
 if __name__ == '__main__': unittest.main()

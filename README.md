@@ -75,7 +75,7 @@ python -m image_lens --workspace W bind --queries s7.obs.json --tracks s7-head.t
 python -m image_lens --workspace W analyze --tracks s7-head.tracks.json --shots shots.json --report-bindings s7-head.bindings.json --start 215 --end 307 --format markdown --trajectory-dir s7-head-traj --pose pose.json --out s7-head.md
 ```
 
-With `--pose`, the trajectory view marks pose-trouble frames (orange on the timeline), tags change candidates near them, and groups warnings so one line names every big stroke that coincides with a candidate or a pose-trouble range. With more than two points, only major strokes are labelled. Pupils are not modelled; eye points follow the drawn eye area.
+With `--pose`, the trajectory view marks pose-trouble frames (orange on the timeline), tags change candidates near them, and groups warnings so one line names every big stroke that coincides with a candidate or a pose-trouble range. With more than two points, only major strokes are labelled, and the Markdown leads with a one-line-per-point summary plus "moved together" lines (major strokes of several points with the same direction, overlapping time and similar size); per-point speed windows, phases and span comparisons stay in the JSON. Pupils are not modelled; eye points follow the drawn eye area.
 
 Analysis help also exposes review selection, explicit feature bindings, source-color region reports and optional foreground inspection. Read [limitations](docs/limitations.md) before interpretation.
 
