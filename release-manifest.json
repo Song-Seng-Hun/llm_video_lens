@@ -5,7 +5,8 @@
   "authored_code_license": "not granted by this extraction; preserve owner decision",
   "vendor_licenses": {
     "PySceneDetect": "BSD-3-Clause plus embedded MIT notice",
-    "CoTracker": "CC-BY-NC-4.0"
+    "CoTracker": "CC-BY-NC-4.0",
+    "rtmlib-derived detector postprocess": "Apache-2.0 (pose.py ScoredYOLOX)"
   },
   "excluded": [
     "workspace",
@@ -18,8 +19,8 @@
     "historical experiment outputs"
   ],
   "manifest_self_excluded": true,
-  "file_count": 97,
-  "total_bytes": 942609,
+  "file_count": 100,
+  "total_bytes": 978758,
   "files": [
     {
       "path": ".gitattributes",
@@ -33,8 +34,8 @@
     },
     {
       "path": "README.md",
-      "bytes": 7338,
-      "sha256": "0741e9008f58b61d505dbd736337cd109bfda81d3925369f4a91459c07d04fb8"
+      "bytes": 9630,
+      "sha256": "f73e27b6d069672879c3e7bbe77e4ed7a7b3f1a95b5e12c36ba80c5574257976"
     },
     {
       "path": "docs/import-provenance.json",
@@ -48,8 +49,8 @@
     },
     {
       "path": "docs/limitations.md",
-      "bytes": 3104,
-      "sha256": "91f9a81157d15c9e500b04082c1d5fd6820d893a081406fb742b6b3471f89bdd"
+      "bytes": 3766,
+      "sha256": "21abe396cfa212f4550a589c90f31c8dc3f3065d7cbef447975f8f2b04a25650"
     },
     {
       "path": "docs/provenance.md",
@@ -73,8 +74,8 @@
     },
     {
       "path": "image_lens/analyze_motion.py",
-      "bytes": 31840,
-      "sha256": "bf52f2d708804f89d6523e119da40adfe8e7a2877e806d0c9de7f0f85599e82b"
+      "bytes": 32770,
+      "sha256": "4622c2369e6d6d916cea2fe8db0fc99697efd43486cac49a5cbfb46f0ac51e45"
     },
     {
       "path": "image_lens/appearance_inspection.py",
@@ -93,8 +94,8 @@
     },
     {
       "path": "image_lens/cli.py",
-      "bytes": 10897,
-      "sha256": "f5d5c64d9744f3da97b77b930cad8d803a412df510585217bf0dbb80bd33314f"
+      "bytes": 14339,
+      "sha256": "0a71a5da4ec5558c358b4b60e3d3425c7375843002d7e35930e2cbd2e1ba48e3"
     },
     {
       "path": "image_lens/foreground_regions.py",
@@ -108,13 +109,13 @@
     },
     {
       "path": "image_lens/motion_report.py",
-      "bytes": 28001,
-      "sha256": "f45e54b92cc47c283460d7caac7caaa6879a18bf36e6b2dde1fa9359654cb5d0"
+      "bytes": 29438,
+      "sha256": "b4158e6ddc730fd2fbc3000ca5908e826651444525295c074784530dfb1d29a5"
     },
     {
       "path": "image_lens/motion_view.py",
-      "bytes": 8590,
-      "sha256": "0a7667a740f613a1a8984afb979d18e15bfb7746a4bca95e4f842c490c857bdd"
+      "bytes": 10578,
+      "sha256": "bd73b304fba1fd1c30dc6a9c011264e137c04fe11c08c379f3926c58cbeefb35"
     },
     {
       "path": "image_lens/observations.py",
@@ -130,6 +131,11 @@
       "path": "image_lens/paths.py",
       "bytes": 2509,
       "sha256": "f502c36b5a83bcbc3554248c7f672749c30b2b7f0387acd01903068ee241b5d4"
+    },
+    {
+      "path": "image_lens/pose.py",
+      "bytes": 18685,
+      "sha256": "913415b00c861c6ebb652f190d4e3b20e9cfc169ab4844a8159c4535f692f7c8"
     },
     {
       "path": "image_lens/run_point_tracker.py",
@@ -478,8 +484,13 @@
     },
     {
       "path": "pyproject.toml",
-      "bytes": 877,
-      "sha256": "92442ebf5a425e756450dafa8db8f9cd0498a484044226203da3a1ff414f857d"
+      "bytes": 1020,
+      "sha256": "c1e00df0d267ba48e0091becd18c1f73ad9e538208d434ffc9bdb9edf88fdf22"
+    },
+    {
+      "path": "requirements-pose.txt",
+      "bytes": 196,
+      "sha256": "41ac47869841534abd02f74426ffae08457961d8c682c34dc384d50e67dda776"
     },
     {
       "path": "requirements-tracking.txt",
@@ -498,13 +509,18 @@
     },
     {
       "path": "tests/test_contracts.py",
-      "bytes": 17121,
-      "sha256": "3ea6df481faf35610de5e40c8ae443234a4bf7f0e6b1ca12e180380b7a7673fb"
+      "bytes": 17770,
+      "sha256": "baad7c5ac555f1997c4531c67bd6e52cb9aebba3817506b18708e53d5a8dd2d3"
     },
     {
       "path": "tests/test_motion_readability.py",
       "bytes": 3220,
       "sha256": "366e459e154809b46283acee3258366609af7db1e5454c50fca14f63a32e4928"
+    },
+    {
+      "path": "tests/test_pose.py",
+      "bytes": 5725,
+      "sha256": "934c8b8abae9a88cbe067fd40c2361e9d4352f4d05f358625711fcfbd8dbef1b"
     }
   ]
 }

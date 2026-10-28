@@ -20,7 +20,7 @@ def direction(dx,dy):
     if math.hypot(dx,dy)<RESOLUTION:return 'within_resolution'
     return DIRECTIONS[int(math.floor((math.degrees(math.atan2(dy,dx))+22.5)/45))%8]
 
-STROKE=dict(median_samples=5,simplify_px=12.,hold_px=10.,hold_step_px=.75,hold_min_samples=6,max_strokes=8)
+STROKE=dict(median_samples=5,simplify_px=12.,hold_px=10.,hold_step_px=.75,hold_min_samples=6,max_strokes=8,major_min_px=24.)
 
 def _simplify(xy,a,b,tolerance,keep):
     # Ramer-Douglas-Peucker on the median-filtered path; keeps the farthest corner above tolerance.
@@ -56,9 +56,9 @@ def strokes(fs,ts,xy):
     largest=max((u['distance_px'] for u in units if u['direction']!='hold'),default=0.)
     for u in units:
         elapsed=u['end_seconds']-u['start_seconds'];u['mean_speed_px_per_s']=u['distance_px']/elapsed if elapsed>0 else 0.
-        u['major']=u['direction']!='hold' and u['distance_px']>=largest/2
+        u['major']=u['direction']!='hold' and u['distance_px']>=max(largest/2,STROKE['major_min_px'])
     return dict(units=units[:STROKE['max_strokes']],omitted_unit_count=max(0,len(units)-STROKE['max_strokes']),params=STROKE,
-                basis='median-filtered screen path simplified to corners; major = at least half the largest unit; holds are small net travel, not proof of held drawings')
+                basis='median-filtered screen path simplified to corners; major = at least half the largest unit and 24 px; holds are small net travel, not proof of held drawings')
 
 def quote(value):
     # Code-span delimiter exceeds every embedded backtick run. JSON encodes literal newlines.
@@ -208,21 +208,39 @@ def markdown(report):
               f"표시 생략 단계 {omitted}개. 전체 수치근거는 JSON/원본 추적에 있다. 비어 있음은 정지의 증거가 아니다."]
     if report.get('evidence_contact'):lines.append(f"선택 이미지: {quote(report['evidence_contact']['path'])}")
     view=report.get('trajectory_view')
-    if view:
-        lines += ['','## 궤적 그림과 그림 변경 후보',f"궤적 그림(전체 화면, 파랑→빨강 시간순): {quote(view['path'])}"]
-        change=view['appearance_change']
-        if change['candidates']:
-            lines.append('그림·외형이 바뀌었을 수 있는 곳(자동 판정 아님, 움직임·효과·카메라도 원인일 수 있다):')
-            lines += [f"- f{c['after_frame']}→f{c['frame']} 차이 {c['mean_abs_diff']:.1f} (기준 {change['threshold']:.1f}); 확인: `compare --frames {c['after_frame']},{c['frame']}`" for c in change['candidates']]
-            if change['omitted_candidate_count']:lines.append(f"- 생략된 후보 {change['omitted_candidate_count']}개")
-            lines.append('후보 앞뒤로 그림이 바뀌었다면 그 사이 추적은 같은 부위라는 보장이 없다.')
-            for f in report['features']:
-                for run in f['continuous_runs']:
-                    for u in run['strokes']['units']:
-                        hits=[c['frame'] for c in change['candidates'] if u['major'] and u['start_frame']<=c['frame']<=u['end_frame']]
-                        if hits:lines.append(f"- 주의: {quote(f['point_id'])}의 큰 이동 f{u['start_frame']}..{u['end_frame']}이 후보 f{hits}와 겹친다. 실제 움직임이 아니라 잔상·그림 교체로 추적점이 튄 것일 수 있으니 원본을 먼저 비교한다.")
-        else:lines.append(f"기준 {change['threshold']:.1f} 이상인 그림 변경 후보 없음. 없다는 것이 같은 그림이라는 증거는 아니다.")
+    if view:lines += trajectory_lines(report,view)
     return '\n'.join(lines)+'\n'
+
+
+def trajectory_lines(report,view):
+    lines=[]
+    lines += ['','## 궤적 그림과 그림 변경 후보',f"궤적 그림(전체 화면, 파랑→빨강 시간순): {quote(view['path'])}"]
+    change=view['appearance_change']
+    if change['candidates']:
+        lines.append('그림·외형이 바뀌었을 수 있는 곳(자동 판정 아님, 움직임·효과·카메라도 원인일 수 있다):')
+        near=set((view.get('pose_flags') or {}).get('candidates_near_pose_flags',[]))
+        lines += [f"- f{c['after_frame']}→f{c['frame']} 차이 {c['mean_abs_diff']:.1f} (기준 {change['threshold']:.1f}){' · 포즈 겹침/튐 구간 근처' if c['frame'] in near else ''}; 확인: `compare --frames {c['after_frame']},{c['frame']}`" for c in change['candidates']]
+        if change['omitted_candidate_count']:lines.append(f"- 생략된 후보 {change['omitted_candidate_count']}개")
+        lines.append('후보 앞뒤로 그림이 바뀌었다면 그 사이 추적은 같은 부위라는 보장이 없다.')
+    else:lines.append(f"기준 {change['threshold']:.1f} 이상인 그림 변경 후보 없음. 없다는 것이 같은 그림이라는 증거는 아니다.")
+    pose=view.get('pose_flags');flagged=[r['frames'] for r in pose['ranges']] if pose else []
+    if pose and flagged:
+        lines.append('포즈 모델이 흔들린 구간(사람 상자 겹침 = 잔상·분신 가능, 뼈대 튐 = 관절 추정 불안정):')
+        lines += [f"- f{r['frames'][0]}..f{r['frames'][1]}: "+', '.join(x for x,on in (('겹침 최대 %d명'%r['max_people'],r['overlapping_people']),('뼈대 튐',r['skeleton_jump'])) if on) for r in pose['ranges']]
+    elif pose:lines.append('이 구간에서 포즈 겹침·뼈대 튐 표시 없음. 겹친 그림이 뼈대 하나로 합쳐지면 표시되지 않는다.')
+    # One warning line per cause: big strokes that coincide with change candidates and/or pose trouble.
+    groups={}
+    for f in report['features']:
+        for run in f['continuous_runs']:
+            for u in run['strokes']['units']:
+                if not u['major']:continue
+                hits=tuple(c['frame'] for c in change['candidates'] if u['start_frame']<=c['frame']<=u['end_frame'])
+                on_pose=any(a<=u['end_frame'] and u['start_frame']<=b for a,b in flagged)
+                if hits or on_pose:groups.setdefault((hits,on_pose),[]).append(f"{f['point_id']} f{u['start_frame']}..{u['end_frame']} {u['direction']} {u['distance_px']:.0f}px")
+    for (hits,on_pose),moves in groups.items():
+        causes=([f"그림 변경 후보 f{','.join(map(str,hits))}"] if hits else [])+(['포즈 겹침·튐 구간'] if on_pose else [])
+        lines.append(f"- 주의: 큰 이동 {quote(moves)}이 {' 및 '.join(causes)}과 겹친다. 실제 움직임이 아니라 잔상·겹친 그림 사이로 점이 옮겨 붙었을 수 있으니 원본을 먼저 비교한다.")
+    return lines
 
 def _source_video(report,root):
     video=Path(report['source_video']);source=video.resolve()

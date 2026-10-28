@@ -288,6 +288,7 @@ def main():
     ap.add_argument('--inspect-breaks',action='store_true',help='review mode: bounded source context for broken tracks; no motion inference')
     ap.add_argument('--region-report',action='store_true',help='explicit source-color region report with --report-bindings')
     ap.add_argument('--trajectory-dir',help='new task-local whole-frame path sheet plus appearance-change candidates; requires --report-bindings')
+    ap.add_argument('--pose',help='image-lens pose packet for the same source; marks pose overlap/jump frames on the trajectory view, requires --trajectory-dir')
     ap.add_argument('--foreground-extent',action='store_true',help='optional flat-background inspection mask, requires --region-report and --evidence-dir')
     args=ap.parse_args();out=Path(args.out).resolve()
     if not out.is_relative_to(workspace_root()) or out.exists() or out.is_symlink():raise ValueError('new task-local output required')
@@ -295,6 +296,7 @@ def main():
         raise ValueError('--foreground-extent requires --region-report, --report-bindings and --evidence-dir')
     if args.trajectory_dir and not args.report_bindings or args.trajectory_dir and args.region_report:
         raise ValueError('--trajectory-dir requires --report-bindings without --region-report')
+    if args.pose and not args.trajectory_dir:raise ValueError('--pose requires --trajectory-dir')
     evidence_frames=None
     if args.evidence_frames is not None:
         if not(args.region_report and args.report_bindings and args.evidence_dir):
@@ -385,7 +387,15 @@ def main():
         if args.trajectory_dir:
             spec=importlib.util.spec_from_file_location('motion_view',Path(__file__).with_name('motion_view.py'))
             view_module=importlib.util.module_from_spec(spec);spec.loader.exec_module(view_module)
-            result['trajectory_view']=view_module.render(result,packet,args.trajectory_dir,workspace_root(),report_module._source_video(result,workspace_root()))
+            pose_flags=None
+            if args.pose:
+                from image_lens import paths as lens_paths
+                pose_packet,pose_path=lens_paths.load(args.pose,max_bytes=64*1024*1024)
+                if pose_packet.get('schema')!='image-lens.pose/1' or pose_packet.get('source_sha256')!=result['source_video_sha256']:
+                    raise ValueError('pose packet for the same pinned source required')
+                pose_flags=dict(path=str(pose_path),sha256=lens_paths.sha(pose_path),native_range=pose_packet['native_range'],
+                                params=pose_packet['flags']['params'],frames=pose_packet['flags']['frames'])
+            result['trajectory_view']=view_module.render(result,packet,args.trajectory_dir,workspace_root(),report_module._source_video(result,workspace_root()),pose_flags)
             result['trajectory_view']['renderer_sha256']=hashlib.sha256(Path(view_module.__file__).read_bytes()).hexdigest()
         if region_module:result['region_reporter_sha256']=hashlib.sha256(Path(region_module.__file__).read_bytes()).hexdigest()
         if shot_context:result['shot_context']=shot_context

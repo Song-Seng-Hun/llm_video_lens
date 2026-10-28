@@ -5,7 +5,7 @@ from pathlib import Path
 import sys
 from image_lens import paths
 
-COMMANDS = ('scan', 'compare', 'brief', 'catalog', 'prepare', 'validate', 'track', 'analyze')
+COMMANDS = ('scan', 'compare', 'brief', 'catalog', 'pose', 'seed', 'bind', 'prepare', 'validate', 'track', 'analyze')
 
 
 def parser(command, description):
@@ -27,7 +27,7 @@ def analyze(arguments):
     if '--help' in arguments or '-h' in arguments:
         return selected_entry(analyze_motion, arguments)
     arguments = list(arguments)
-    path_flags = {'--tracks', '--shots', '--report-bindings', '--out', '--evidence-dir', '--trajectory-dir'}
+    path_flags = {'--tracks', '--shots', '--report-bindings', '--out', '--evidence-dir', '--trajectory-dir', '--pose'}
     parsed_paths = {}
     for i, token in enumerate(arguments):
         # One canonical spelling avoids ambiguous validation of --key=value.
@@ -38,7 +38,7 @@ def analyze(arguments):
                 raise ValueError('missing path argument')
             output = token in ('--out', '--evidence-dir', '--trajectory-dir')
             value = paths.confined(arguments[i+1], exists=not output, new=output,
-                                   max_bytes=None if output else 16*1024*1024)
+                                   max_bytes=None if output else 64*1024*1024 if token == '--pose' else 16*1024*1024)
             arguments[i+1] = str(value)
             parsed_paths[token] = value
     if '--tracks' not in parsed_paths or '--out' not in parsed_paths:
@@ -120,6 +120,49 @@ def dispatch(command, arguments):
         output = paths.write(a.out, brief.markdown(result)) if a.format == 'markdown' else paths.write_json(a.out, result)
         return dict(status='written', output=str(output), source_status=result['status'],
                     returned_shots=result['coverage']['returned_segments'], images_written=0, model_loaded=False)
+    if command == 'pose':
+        from image_lens import pose
+        ap = parser(command, 'Optional local whole-body pose (pinned user-supplied ONNX weights); per-shot track IDs and overlap flags.')
+        ap.add_argument('--shots', required=True); ap.add_argument('--detector', required=True)
+        ap.add_argument('--pose-model', required=True); ap.add_argument('--out', required=True)
+        ap.add_argument('--start', type=int, default=0); ap.add_argument('--end', type=int)
+        ap.add_argument('--max-seconds', type=int, default=300)
+        a = ap.parse_args(arguments)
+        paths.confined(a.out, new=True)
+        if not 1 <= a.max_seconds <= 1800:
+            raise ValueError('wall budget must be 1..1800 seconds')
+        import signal
+        if hasattr(signal, 'SIGALRM'):
+            signal.signal(signal.SIGALRM, lambda *_: (_ for _ in ()).throw(TimeoutError('pose wall budget exhausted')))
+            signal.alarm(a.max_seconds)
+        result = pose.run(str(paths.confined(a.shots, exists=True)), a.detector, a.pose_model, a.start, a.end)
+        output = paths.write_json(a.out, result)
+        return dict(status='written', output=str(output), frames=len(result['frames']), flagged_frames=len(result['flags']['frames']),
+                    elapsed_seconds=result['elapsed_seconds'], model_loaded=True, images_written=0)
+    if command == 'seed':
+        from image_lens import pose
+        ap = parser(command, 'Pose-derived seed queries (joints, eyes, hair geometry) for one shot job; candidates, not verified anatomy.')
+        ap.add_argument('--pose', required=True); ap.add_argument('--frame', type=int, required=True)
+        ap.add_argument('--job', required=True, help='job name prefix; one job per group: <job>-head, -arms, -legs')
+        ap.add_argument('--track'); ap.add_argument('--length', type=int, default=160)
+        ap.add_argument('--out', required=True); ap.add_argument('--evidence-dir', required=True, help='new dir for one marked crop per seed')
+        a = ap.parse_args(arguments)
+        paths.confined(a.out, new=True)
+        packet = pose.seed(str(paths.confined(a.pose, exists=True, max_bytes=64*1024*1024)), a.frame, a.job, a.evidence_dir, a.track, a.length)
+        return dict(status='written', output=str(paths.write_json(a.out, packet)),
+                    jobs={j['name']: [p['point_id'] for p in j['points']] for j in packet['jobs']},
+                    frames=[packet['jobs'][0]['start_frame'], packet['jobs'][0]['end_frame']],
+                    seed_frame_flagged=packet['seed_source']['seed_frame_flagged'], images_written=sum(len(j['points']) for j in packet['jobs']),
+                    model_loaded=False)
+    if command == 'bind':
+        from image_lens import pose
+        ap = parser(command, 'Report bindings for one pose seed job (<job>-head, -arms or -legs).')
+        ap.add_argument('--queries', required=True); ap.add_argument('--tracks', required=True)
+        ap.add_argument('--job', required=True); ap.add_argument('--out', required=True)
+        a = ap.parse_args(arguments)
+        paths.confined(a.out, new=True)
+        packet = pose.bindings(str(paths.confined(a.queries, exists=True)), str(paths.confined(a.tracks, exists=True)), a.job)
+        return dict(status='written', output=str(paths.write_json(a.out, packet)), features=len(packet['actors'][0]['features']))
     if command == 'prepare':
         from image_lens.jobs import prepare
         ap = parser(command, 'Freeze a new workspace query packet against a canonical full-source shot scan.')

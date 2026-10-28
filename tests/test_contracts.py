@@ -272,6 +272,16 @@ raise SystemExit(main(['--workspace', sys.argv[2], 'prepare', '--queries', 'quer
         self.assertIn('requires --report-bindings', result.stdout+result.stderr)
         self.assertFalse((self.root/'traj').exists() or (self.root/'timing.json').exists())
 
+    def test_pose_requires_trajectory_dir(self):
+        paths.write_json('tracks.json', self.observed_tracks())
+        paths.write_json('bindings.json', self.bindings())
+        paths.write_json('pose.json', dict(schema='image-lens.pose/1'))
+        result = self.cli('analyze', '--tracks', 'tracks.json', '--report-bindings', 'bindings.json',
+                          '--start', '0', '--end', '15', '--pose', 'pose.json', '--out', 'report.json')
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn('--pose requires --trajectory-dir', result.stdout+result.stderr)
+        self.assertFalse((self.root/'report.json').exists())
+
     def test_brief_carries_recomputed_strokes(self):
         paths.write_json('tracks.json', self.observed_tracks())
         paths.write_json('bindings.json', self.bindings())

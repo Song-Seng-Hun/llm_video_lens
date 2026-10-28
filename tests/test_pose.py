@@ -1,0 +1,102 @@
+"""Pose seed geometry, pose trouble flags and their report wording; synthetic, not pose-quality evidence."""
+from pathlib import Path
+import sys
+import unittest
+
+REPO = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(REPO))
+from image_lens import motion_report, motion_view, pose
+
+
+def track(track_id='shot-0000/1', box=(100., 100., 500., 900.), dx=0., score=.9):
+    k = [[0., 0.]]*133; s = [0.]*133
+    joints = dict(nose=(300, 260), eye_l=(330, 220), eye_r=(270, 220), ear_l=(360, 230), ear_r=(240, 230),
+                  shoulder_l=(380, 380), shoulder_r=(220, 380), elbow_l=(420, 500), elbow_r=(180, 500),
+                  wrist_l=(440, 600), wrist_r=(160, 600), hip_l=(340, 650), hip_r=(260, 650),
+                  knee_l=(340, 790), knee_r=(260, 790), ankle_l=(340, 1075), ankle_r=(260, 1075))
+    for name, (x, y) in joints.items():
+        k[pose.BODY[name]] = [x+dx, float(y)]; s[pose.BODY[name]] = score
+    return dict(track_id=track_id, bbox=[box[0]+dx, box[1], box[2]+dx, box[3]], keypoints=k, scores=s)
+
+
+class Seeds(unittest.TestCase):
+    def test_hair_sits_above_eyes_and_beside_them(self):
+        seeds = pose.seed_points(track(), 1440, 1080)
+        front, top = seeds['hair_front']['xy'], seeds['head_top']['xy']
+        self.assertAlmostEqual(front[0], 300., delta=.01); self.assertLess(front[1], 220.)
+        self.assertLess(top[1], front[1])
+        self.assertGreater(seeds['hair_side_l']['xy'][0], 330.); self.assertLess(seeds['hair_side_r']['xy'][0], 270.)
+
+    def test_head_frame_follows_a_tilted_head(self):
+        t = track()
+        t['keypoints'][pose.BODY['eye_l']] = [300., 190.]; t['keypoints'][pose.BODY['eye_r']] = [300., 250.]
+        t['keypoints'][pose.BODY['nose']] = [340., 220.]
+        front = pose.seed_points(t, 1440, 1080)['hair_front']['xy']
+        self.assertLess(front[0], 300.)  # up points away from the nose, here to the left
+
+    def test_edge_clamped_and_low_score_joints_are_dropped(self):
+        t = track(); t['scores'][pose.BODY['elbow_r']] = .1
+        seeds = pose.seed_points(t, 1440, 1080)
+        self.assertNotIn('ankle_l', seeds); self.assertNotIn('elbow_r', seeds); self.assertIn('knee_l', seeds)
+
+    def test_no_hair_without_both_eyes_and_nose(self):
+        t = track(); t['scores'][pose.BODY['eye_l']] = 0.
+        seeds = pose.seed_points(t, 1440, 1080)
+        self.assertFalse(any(n.startswith(('hair', 'head')) for n in seeds))
+        self.assertIn('nose', seeds)
+
+    def test_groups_fit_report_and_observation_caps(self):
+        self.assertTrue(all(len(names) <= 8 for names in pose.GROUPS.values()))
+
+
+class Flags(unittest.TestCase):
+    def frames(self, rows):
+        return [dict(frame=n, tracks=tracks) for n, tracks in rows]
+
+    def test_overlap_and_jump(self):
+        rows = [(0, [track()]), (1, [track(), track('shot-0000/2', dx=150.)]), (2, [track(dx=300.)]), (3, [track(dx=302.)])]
+        result = pose.flags(self.frames(rows))['frames']
+        self.assertEqual([r['frame'] for r in result], [1, 2])
+        self.assertTrue(result[0]['overlapping_people']); self.assertIsNone(result[0]['skeleton_jump'])
+        self.assertFalse(result[1]['overlapping_people']); self.assertEqual(result[1]['skeleton_jump']['track_id'], 'shot-0000/1')
+
+    def test_jump_needs_consecutive_frames_of_one_track(self):
+        rows = [(0, [track()]), (5, [track(dx=300.)]), (6, [track('shot-0000/9', dx=600.)])]
+        self.assertEqual(pose.flags(self.frames(rows))['frames'], [])
+
+    def test_overlay_ranges_and_nearby_candidates(self):
+        flags = dict(path='p', sha256='0'*64, native_range=[0, 99], params=pose.FLAGS,
+                     frames=[dict(frame=n, people=3, overlapping_people=True, skeleton_jump=None) for n in (40, 41, 42)])
+        candidates = [dict(frame=44), dict(frame=60)]
+        overlay = motion_view.pose_overlay(flags, 30, 70, candidates)
+        self.assertEqual(overlay['ranges'], [dict(frames=[40, 42], overlapping_people=True, skeleton_jump=False, max_people=3)])
+        self.assertEqual(overlay['candidates_near_pose_flags'], [44])
+        with self.assertRaisesRegex(ValueError, 'does not cover'):
+            motion_view.pose_overlay(flags, 50, 120, candidates)
+
+
+class Wording(unittest.TestCase):
+    def report(self, units, ranges):
+        feature = dict(point_id='hair-front', continuous_runs=[dict(strokes=dict(units=units))])
+        view = dict(path='t.png', appearance_change=dict(candidates=[dict(after_frame=63, frame=64, mean_abs_diff=50.)],
+                    threshold=16., omitted_candidate_count=0),
+                    pose_flags=dict(ranges=ranges, candidates_near_pose_flags=[64]))
+        return dict(features=[feature, dict(feature, point_id='nose')]), view
+
+    def test_one_grouped_warning_per_cause(self):
+        unit = dict(major=True, start_frame=62, end_frame=74, direction='left', distance_px=244.)
+        report, view = self.report([unit], [dict(frames=[32, 63], overlapping_people=True, skeleton_jump=False, max_people=3)])
+        text = motion_report.trajectory_lines(report, view)
+        warnings = [l for l in text if l.startswith('- 주의')]
+        self.assertEqual(len(warnings), 1)
+        self.assertIn('hair-front f62..74', warnings[0]); self.assertIn('nose f62..74', warnings[0])
+        self.assertIn('f64', warnings[0]); self.assertIn('포즈', warnings[0])
+        self.assertTrue(any('포즈 겹침/튐 구간 근처' in l for l in text))
+
+    def test_small_strokes_are_not_major(self):
+        fs = list(range(30)); ts = [n/50 for n in fs]; xy = [[100.+n*.6, 100.] for n in fs]
+        units = motion_report.strokes(fs, ts, xy)['units']
+        self.assertFalse(any(u['major'] for u in units))
+
+
+if __name__ == '__main__': unittest.main()
