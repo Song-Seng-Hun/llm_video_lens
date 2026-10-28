@@ -44,6 +44,18 @@ def windows(segment, pose_frames, flagged, length=LOOK['window_frames'], min_fra
     return result, skipped
 
 
+def lost(report, window, min_frames=LOOK['min_frames']):
+    """Points whose last usable run ends well before the window does. Several at once usually means the drawing changed (costume, wipe) or left the frame."""
+    if not window:
+        return None
+    ends = [max((r['frames'][1] for r in f['continuous_runs']), default=None) for f in report['features']]
+    gone = [e for e in ends if e is None or e < window['end']-min_frames]
+    if len(gone) < max(2, (len(ends)+1)//2):
+        return None
+    seen = [e for e in gone if e is not None]
+    return dict(count=len(gone), total=len(ends), after=max(seen) if seen else window['seed'])
+
+
 def _summary(report, window, group, md_path, traj):
     """Short per-group lines for look.md, built from the recomputed report JSON."""
     from image_lens import motion_report
@@ -58,10 +70,13 @@ def _summary(report, window, group, md_path, traj):
     warnings = [l for l in motion_report.trajectory_lines(report, view) if l.startswith('- 주의')] if view else []
     if warnings:
         lines.append(f"  - 경고 {len(warnings)}건: 큰 이동이 그림 변경 후보나 포즈 겹침 구간과 겹친다. 원본 비교 먼저.")
+    cut = lost(report, window)
+    if cut:
+        lines.append(f"  - f{cut['after']} 뒤로 점 {cut['count']}/{cut['total']}개 끊김(그림 바뀜·가려짐·화면 밖). 그 뒤는 정지가 아니라 모름.")
     if not moves and not any(f['continuous_runs'] for f in report['features']):
         lines = [f"- {names[group]}: 쓸 수 있는 연속 관측 없음(가려짐·화면 밖·추적 끊김). 정지가 아니라 모름."]
-    return (lines if moves or len(lines) == 1 and '모름' in lines[0] else []), dict(group=group, major_moves=moves, together=together, warnings=len(warnings),
-                       report=str(md_path), trajectory=str(traj))
+    return (lines if moves or cut or len(lines) == 1 and '모름' in lines[0] else []), dict(group=group, major_moves=moves, together=together, warnings=len(warnings),
+                       lost=cut, report=str(md_path), trajectory=str(traj))
 
 
 def run(video, detector, pose_model, checkpoint, out, max_shots=LOOK['max_shots'], max_seconds=1800):
