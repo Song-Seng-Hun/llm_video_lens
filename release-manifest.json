@@ -19,7 +19,7 @@
   ],
   "manifest_self_excluded": true,
   "file_count": 97,
-  "total_bytes": 941476,
+  "total_bytes": 942609,
   "files": [
     {
       "path": ".gitattributes",
@@ -108,13 +108,13 @@
     },
     {
       "path": "image_lens/motion_report.py",
-      "bytes": 27728,
-      "sha256": "2b37b4f31a7f3725030fefacdbf01986ce900c2b2283520b7ed1b32d56bec542"
+      "bytes": 28001,
+      "sha256": "f45e54b92cc47c283460d7caac7caaa6879a18bf36e6b2dde1fa9359654cb5d0"
     },
     {
       "path": "image_lens/motion_view.py",
-      "bytes": 8279,
-      "sha256": "fa0d9209cbf0209c87d7bc2271b047c18fee3882162855035586b97c6ba2e3aa"
+      "bytes": 8590,
+      "sha256": "0a7667a740f613a1a8984afb979d18e15bfb7746a4bca95e4f842c490c857bdd"
     },
     {
       "path": "image_lens/observations.py",
@@ -503,8 +503,8 @@
     },
     {
       "path": "tests/test_motion_readability.py",
-      "bytes": 2671,
-      "sha256": "3f1a210c4ed78a0ab844a427b17c17131d2bcb7cb31dcb1d3ea3eb45173c1a20"
+      "bytes": 3220,
+      "sha256": "366e459e154809b46283acee3258366609af7db1e5454c50fca14f63a32e4928"
     }
   ]
 }

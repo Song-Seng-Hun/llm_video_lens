@@ -32,6 +32,16 @@ class Strokes(unittest.TestCase):
         units = motion_report.strokes(fs, ts, xy)['units']
         self.assertEqual([u['direction'] for u in units], ['right'])
 
+    def test_straight_line_reversal_keeps_both_strokes(self):
+        fs, ts, xy = path((20, 5., 0.), (18, -5., 0.))
+        self.assertEqual([u['direction'] for u in motion_report.strokes(fs, ts, xy)['units']], ['right', 'left'])
+
+    def test_merged_slow_drift_is_not_a_hold(self):
+        legs = [(10, .5, 0.), (1, 2., 0.)]*6
+        fs, ts, xy = path(*legs)
+        units = motion_report.strokes(fs, ts, xy)['units']
+        self.assertFalse(any(u['direction'] == 'hold' and u['distance_px'] >= motion_report.STROKE['hold_px'] for u in units))
+
     def test_raw_coordinates_untouched_and_units_capped(self):
         legs = [(4, 0., 6.) if i % 2 == 0 else (4, 0., -6.) for i in range(14)]
         fs, ts, xy = path(*legs)

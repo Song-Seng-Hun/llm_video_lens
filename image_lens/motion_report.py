@@ -25,8 +25,11 @@ STROKE=dict(median_samples=5,simplify_px=12.,hold_px=10.,hold_step_px=.75,hold_m
 def _simplify(xy,a,b,tolerance,keep):
     # Ramer-Douglas-Peucker on the median-filtered path; keeps the farthest corner above tolerance.
     if b-a<2:return
-    (x0,y0),(x1,y1)=xy[a],xy[b];length=math.hypot(x1-x0,y1-y0)
-    def offset(p):return abs((x1-x0)*(y0-p[1])-(x0-p[0])*(y1-y0))/length if length else math.dist(p,xy[a])
+    (x0,y0),(x1,y1)=xy[a],xy[b];length2=(x1-x0)**2+(y1-y0)**2
+    def offset(p):
+        # Distance to the bounded segment, so a straight-line reversal still yields a corner.
+        u=0. if not length2 else min(1.,max(0.,((p[0]-x0)*(x1-x0)+(p[1]-y0)*(y1-y0))/length2))
+        return math.dist(p,(x0+u*(x1-x0),y0+u*(y1-y0)))
     i=max(range(a+1,b),key=lambda j:(offset(xy[j]),-j))
     if offset(xy[i])>tolerance:keep.add(i);_simplify(xy,a,i,tolerance,keep);_simplify(xy,i,b,tolerance,keep)
 
@@ -48,6 +51,7 @@ def strokes(fs,ts,xy):
         state='hold' if distance<STROKE['hold_px'] else direction(dx,dy)
         if units and units[-1]['direction']==state:
             u=units[-1];u.update(end_frame=fs[b],end_seconds=ts[b],dx_px=u['dx_px']+dx,dy_px=u['dy_px']+dy);u['distance_px']=math.hypot(u['dx_px'],u['dy_px'])
+            if state=='hold' and u['distance_px']>=STROKE['hold_px']:u['direction']=direction(u['dx_px'],u['dy_px'])
         else:units.append(dict(start_frame=fs[a],end_frame=fs[b],start_seconds=ts[a],end_seconds=ts[b],direction=state,dx_px=dx,dy_px=dy,distance_px=distance))
     largest=max((u['distance_px'] for u in units if u['direction']!='hold'),default=0.)
     for u in units:

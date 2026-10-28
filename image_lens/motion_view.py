@@ -37,6 +37,8 @@ def render(report,packet,directory,root,source_video):
     for feature in report['features']:
         paths[feature['point_id']]=[(n,table[n]['pts_seconds'],p['xy']) for n in range(start,end+1)
                                     for p in table[n]['points'] if p.get('point_id')==feature['point_id'] and usable(p,w,h)]
+    runs={f['point_id']:[run['frames'] for run in f['continuous_runs']] for f in report['features']}
+    def same_run(pid,a,b):return b==a+1 and any(lo<=a and b<=hi for lo,hi in runs[pid])
     units=[(f['point_id'],u) for f in report['features'] for run in f['continuous_runs'] for u in run['strokes']['units']]
     picks=[start]+[u[k] for _,u in units if u['major'] for k in ('start_frame','end_frame')]+[end]
     picks=sorted(set(picks));picks=picks if len(picks)<=SIZE['thumbs'] else [picks[round(i*(len(picks)-1)/(SIZE['thumbs']-1))] for i in range(SIZE['thumbs'])]
@@ -59,7 +61,8 @@ def render(report,packet,directory,root,source_video):
         for pid,rows in paths.items():
             rows=[r for r in rows if until is None or r[0]<=until]
             for (a,_,p),(b,_,q) in zip(rows,rows[1:]):
-                if b==a+1:mark.line((p[0]*scale,p[1]*scale,q[0]*scale,q[1]*scale),fill=color(b),width=3)
+                # Only validated continuous runs are joined; breaks and identity transitions stay unconnected.
+                if same_run(pid,a,b):mark.line((p[0]*scale,p[1]*scale,q[0]*scale,q[1]*scale),fill=color(b),width=3)
             if rows:
                 x,y=rows[-1][2];mark.ellipse((x*scale-radius,y*scale-radius,x*scale+radius,y*scale+radius),outline='white',fill=color(rows[-1][0]),width=2)
     main_w,main_h=SIZE['main'];scale=min(main_w/w,main_h/h);thumb_w=SIZE['width']//SIZE['thumbs']-10;tscale=thumb_w/w;thumb_h=round(h*tscale)
