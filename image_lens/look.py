@@ -58,7 +58,9 @@ def _summary(report, window, group, md_path, traj):
     warnings = [l for l in motion_report.trajectory_lines(report, view) if l.startswith('- 주의')] if view else []
     if warnings:
         lines.append(f"  - 경고 {len(warnings)}건: 큰 이동이 그림 변경 후보나 포즈 겹침 구간과 겹친다. 원본 비교 먼저.")
-    return (lines if moves else []), dict(group=group, major_moves=moves, together=together, warnings=len(warnings),
+    if not moves and not any(f['continuous_runs'] for f in report['features']):
+        lines = [f"- {names[group]}: 쓸 수 있는 연속 관측 없음(가려짐·화면 밖·추적 끊김). 정지가 아니라 모름."]
+    return (lines if moves or len(lines) == 1 and '모름' in lines[0] else []), dict(group=group, major_moves=moves, together=together, warnings=len(warnings),
                        report=str(md_path), trajectory=str(traj))
 
 

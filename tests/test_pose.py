@@ -129,4 +129,10 @@ class Together(unittest.TestCase):
         self.assertEqual([g['points'] for g in groups], [['nose', 'eye-l']])
 
 
+    def test_group_members_all_overlap(self):
+        report = dict(features=[self.feature('a', 0, 100, 'right', 100.), self.feature('b', 0, 50, 'right', 100.),
+                                self.feature('c', 50, 100, 'right', 100.)])
+        groups = motion_report.together(report)
+        self.assertTrue(all(not ({'b', 'c'} <= set(g['points'])) for g in groups))
+
 if __name__ == '__main__': unittest.main()

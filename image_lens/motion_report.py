@@ -185,7 +185,9 @@ def together(report):
             big,small=max(g['distance_px'],u['distance_px']),min(g['distance_px'],u['distance_px'])
             if (g['direction']==u['direction'] and pid not in g['points'] and (hi-lo)/shorter>=TOGETHER['min_overlap']
                     and big<=small*TOGETHER['max_distance_ratio']):
-                g['points'].append(pid);break
+                # The group keeps the shared interval, so every member overlaps every other.
+                g['points'].append(pid);g['frames']=[lo,hi]
+                g['seconds']=[max(g['seconds'][0],u['start_seconds']),min(g['seconds'][1],u['end_seconds'])];break
         else:groups.append(dict(points=[pid],frames=[u['start_frame'],u['end_frame']],seconds=[u['start_seconds'],u['end_seconds']],
                                 direction=u['direction'],distance_px=u['distance_px']))
     return [g for g in groups if len(g['points'])>1]

@@ -30,4 +30,11 @@ class Windows(unittest.TestCase):
         self.assertEqual(found, []); self.assertEqual(skipped[0]['reason'], 'no unflagged pose track')
 
 
+
+class Summary(unittest.TestCase):
+    def test_no_observation_is_unknown_not_still(self):
+        report = dict(features=[dict(point_id='hip-l', continuous_runs=[])])
+        lines, _ = look._summary(report, None, 'legs', 'x', 'y')
+        self.assertEqual(len(lines), 1); self.assertIn('모름', lines[0])
+
 if __name__ == '__main__': unittest.main()
