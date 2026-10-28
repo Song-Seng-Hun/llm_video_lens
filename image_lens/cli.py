@@ -5,7 +5,7 @@ from pathlib import Path
 import sys
 from image_lens import paths
 
-COMMANDS = ('scan', 'compare', 'brief', 'catalog', 'pose', 'seed', 'bind', 'prepare', 'validate', 'track', 'analyze')
+COMMANDS = ('look', 'scan', 'compare', 'brief', 'catalog', 'pose', 'seed', 'bind', 'prepare', 'validate', 'track', 'analyze')
 
 
 def parser(command, description):
@@ -120,6 +120,17 @@ def dispatch(command, arguments):
         output = paths.write(a.out, brief.markdown(result)) if a.format == 'markdown' else paths.write_json(a.out, result)
         return dict(status='written', output=str(output), source_status=result['status'],
                     returned_shots=result['coverage']['returned_segments'], images_written=0, model_loaded=False)
+    if command == 'look':
+        from image_lens import look
+        ap = parser(command, 'One-command look: scan, pose, pose-seeded tracking per shot window, one short look.md.')
+        ap.add_argument('--video', required=True); ap.add_argument('--detector', required=True)
+        ap.add_argument('--pose-model', required=True); ap.add_argument('--checkpoint', required=True)
+        ap.add_argument('--out', required=True, help='new output directory inside the workspace')
+        ap.add_argument('--max-shots', type=int, default=look.LOOK['max_shots']); ap.add_argument('--max-seconds', type=int, default=1800)
+        a = ap.parse_args(arguments)
+        if not 1 <= a.max_shots <= 64 or not 60 <= a.max_seconds <= 7200:
+            raise ValueError('--max-shots 1..64 and --max-seconds 60..7200')
+        return look.run(a.video, a.detector, a.pose_model, a.checkpoint, a.out, a.max_shots, a.max_seconds)
     if command == 'pose':
         from image_lens import pose
         ap = parser(command, 'Optional local whole-body pose (pinned user-supplied ONNX weights); per-shot track IDs and overlap flags.')
