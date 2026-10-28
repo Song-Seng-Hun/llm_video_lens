@@ -1,0 +1,3 @@
+* text=auto eol=lf
+# Keep upstream bytes exactly as pinned, including its original line endings.
+image_lens/vendor/** -text

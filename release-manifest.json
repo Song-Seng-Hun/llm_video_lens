@@ -1,0 +1,500 @@
+{
+  "schema": "image-lens.source-release/1",
+  "date_kst": "2026-10-29",
+  "source_only": true,
+  "authored_code_license": "not granted by this extraction; preserve owner decision",
+  "vendor_licenses": {
+    "PySceneDetect": "BSD-3-Clause plus embedded MIT notice",
+    "CoTracker": "CC-BY-NC-4.0"
+  },
+  "excluded": [
+    "workspace",
+    "TASKS.md",
+    "environments",
+    "weights",
+    "media",
+    "generated results",
+    "credentials",
+    "historical experiment outputs"
+  ],
+  "manifest_self_excluded": true,
+  "file_count": 95,
+  "total_bytes": 921096,
+  "files": [
+    {
+      "path": ".gitattributes",
+      "bytes": 124,
+      "sha256": "cfcebcb614fcc258d15a7049f6837a941f4fbd603bf341142c8819b8273932ee"
+    },
+    {
+      "path": ".gitignore",
+      "bytes": 228,
+      "sha256": "0e19822010301a9f3a5880d71ce22f16a6461f6bf086242da94645fb26be8af0"
+    },
+    {
+      "path": "README.md",
+      "bytes": 6660,
+      "sha256": "4f852c19c6572917845bb6274d2f011eedbab8c816b22ba06f762688d01c8b77"
+    },
+    {
+      "path": "docs/import-provenance.json",
+      "bytes": 952,
+      "sha256": "f280de1bfcca71356ca7538c9f6f28a7f9916c54b45a7964516f2d63b47262ee"
+    },
+    {
+      "path": "docs/jobs.md",
+      "bytes": 3765,
+      "sha256": "b37175f64018e56f2b7b0e9358a9218454b39accff248f17ebffbdc9d4b6e62f"
+    },
+    {
+      "path": "docs/limitations.md",
+      "bytes": 2567,
+      "sha256": "5d5eeaa690f2d4bb7a0123c0c6120b3b520a05ff8894eb327430637bf13f493a"
+    },
+    {
+      "path": "docs/provenance.md",
+      "bytes": 3037,
+      "sha256": "457fd799eeef3e361ae63af483aab4f9d4c3abd13ffe4a2661a696ee44945761"
+    },
+    {
+      "path": "docs/verification.md",
+      "bytes": 5375,
+      "sha256": "62e1b89b213f5190b9bc8c8bb073815a5bd5a3de476f18bbf24ff207fb8bba09"
+    },
+    {
+      "path": "image_lens/__init__.py",
+      "bytes": 103,
+      "sha256": "4d5420998b278de3dea2e89f18301ed3883d85c227098bf1f1d2c9439feb3c27"
+    },
+    {
+      "path": "image_lens/__main__.py",
+      "bytes": 57,
+      "sha256": "7d515557bba6b682b0d94aead4f800ed0b51f7305dd1285973b5b2a3790a86b8"
+    },
+    {
+      "path": "image_lens/analyze_motion.py",
+      "bytes": 30962,
+      "sha256": "c30375e1d8b49629e708d0ce3cf1cf91c52b60a9c0867cd140364a293eed9745"
+    },
+    {
+      "path": "image_lens/appearance_inspection.py",
+      "bytes": 7537,
+      "sha256": "430a74560012f3a335e812c02547a59b90e2b00ea7f7b6a6a4d99d55beabbe07"
+    },
+    {
+      "path": "image_lens/brief.py",
+      "bytes": 11843,
+      "sha256": "1eb345a78e1ffde237a99563d437afc31bdeb8e8c7a7237055fd08148c1614ac"
+    },
+    {
+      "path": "image_lens/checkpoint-manifest.json",
+      "bytes": 304,
+      "sha256": "21671428a65971282345511e6a9fca6fc284194a6d3e29357db7698c94a794a5"
+    },
+    {
+      "path": "image_lens/cli.py",
+      "bytes": 10857,
+      "sha256": "83a479aa9a8a31783232567bbea7434165ef92c7f92aec555cd55c8d019f9119"
+    },
+    {
+      "path": "image_lens/foreground_regions.py",
+      "bytes": 7099,
+      "sha256": "b297d0e075240b8110e69f8e390cb2ec62544eb3c7cfe007ff4929751690f823"
+    },
+    {
+      "path": "image_lens/jobs.py",
+      "bytes": 6192,
+      "sha256": "b3ec971ca2fb53ebb2a7cb5c73a8f2f54733770ef6c6ee445599fcca2ebc5b39"
+    },
+    {
+      "path": "image_lens/motion_report.py",
+      "bytes": 22783,
+      "sha256": "cf3e266e39202eb0aaf70d1a1772ffc64e6016c0cbbf24599d9ca94b143f6422"
+    },
+    {
+      "path": "image_lens/observations.py",
+      "bytes": 6560,
+      "sha256": "e7ccd7ce6828861ac9fd9a3598b5a04b81fd4df6c290eb4b88792132e03e8f9a"
+    },
+    {
+      "path": "image_lens/part_regions.py",
+      "bytes": 25071,
+      "sha256": "62d83c12372637554cc3fc7ad6bb2d5ad0eadd6bb84ab7f99d2aa40390f91d29"
+    },
+    {
+      "path": "image_lens/paths.py",
+      "bytes": 2509,
+      "sha256": "f502c36b5a83bcbc3554248c7f672749c30b2b7f0387acd01903068ee241b5d4"
+    },
+    {
+      "path": "image_lens/run_point_tracker.py",
+      "bytes": 17611,
+      "sha256": "aadb64e664a10249ab491c06638c8de8665b4dd9415fb0fa912499b20075bd30"
+    },
+    {
+      "path": "image_lens/shot-detector-pins.json",
+      "bytes": 3356,
+      "sha256": "1bb3f9848438cc449435da0119f18eb81b9d68f624d61f71bb605375a0614d89"
+    },
+    {
+      "path": "image_lens/shot_boundaries.py",
+      "bytes": 20237,
+      "sha256": "5ac050aba1cca27e3e7f1b87cd69a349a490bc9e4f390a87c7ac3c8825b31f23"
+    },
+    {
+      "path": "image_lens/source-manifest.json",
+      "bytes": 5888,
+      "sha256": "dfd7f811a3425b956f9d79ab487f8db19c8293fefa6578aaed06fe6e488972d0"
+    },
+    {
+      "path": "image_lens/tracking_child.py",
+      "bytes": 598,
+      "sha256": "d111d0e7ae318c4732a3af74e9d6149064d1b55db92d214cdf202bb36d7df963"
+    },
+    {
+      "path": "image_lens/vendor/local-patch.json",
+      "bytes": 325,
+      "sha256": "cab7d2b3ff145435b1362a34cf31085cb85a75e98499507d2d7375b1e4e138e6"
+    },
+    {
+      "path": "image_lens/vendor/shot-detector/scenedetect/__init__.py",
+      "bytes": 7739,
+      "sha256": "f8de82dea1cab48097ade01324d9656bf690520b13edcb020bf035a3d47f6a7a"
+    },
+    {
+      "path": "image_lens/vendor/shot-detector/scenedetect/__main__.py",
+      "bytes": 2402,
+      "sha256": "a175f80e21b94903812cf7d4ee1dabab96930c8d7b41482a8c65d412bb4ad9db"
+    },
+    {
+      "path": "image_lens/vendor/shot-detector/scenedetect/_cli/__init__.py",
+      "bytes": 61933,
+      "sha256": "d1d7355d21d5caacb7d9ead34f458c8f019fee9cfc539c265879ae3264879206"
+    },
+    {
+      "path": "image_lens/vendor/shot-detector/scenedetect/_cli/commands.py",
+      "bytes": 20729,
+      "sha256": "9b5356ed87597df4ddd44710f8f601453e980492bf6fc263af2dd82460e63574"
+    },
+    {
+      "path": "image_lens/vendor/shot-detector/scenedetect/_cli/config.py",
+      "bytes": 30447,
+      "sha256": "32812e7d679fb530e87b89b0c9b15b06dd1c3ead4a8429e42a8e5c24471b0bf9"
+    },
+    {
+      "path": "image_lens/vendor/shot-detector/scenedetect/_cli/context.py",
+      "bytes": 27002,
+      "sha256": "fccc34e45da394828c3887beee8fc77117a01f9a40d5100aa81e6f1e8c0c576d"
+    },
+    {
+      "path": "image_lens/vendor/shot-detector/scenedetect/_cli/controller.py",
+      "bytes": 8505,
+      "sha256": "6a67e8de61510ebf900849ac3ea7fd49f735703f14d622bd2ebdf53dd8445771"
+    },
+    {
+      "path": "image_lens/vendor/shot-detector/scenedetect/_thirdparty/__init__.py",
+      "bytes": 765,
+      "sha256": "36bf14f60e1f88aa6c02fd28c5211d4bca4e790a921e5feac427e75413773456"
+    },
+    {
+      "path": "image_lens/vendor/shot-detector/scenedetect/_thirdparty/simpletable.py",
+      "bytes": 10112,
+      "sha256": "913107c1cade69c6023d4afd1d8398a425b4bfa86aecd09cbf15cb477bfa4d9b"
+    },
+    {
+      "path": "image_lens/vendor/shot-detector/scenedetect/backends/__init__.py",
+      "bytes": 4916,
+      "sha256": "2a7e4c07ba7f500566b4015f33ed21b617cc9b01be2042ccc19f8d85d9034046"
+    },
+    {
+      "path": "image_lens/vendor/shot-detector/scenedetect/backends/moviepy.py",
+      "bytes": 10934,
+      "sha256": "87b4122682303e96d0a76f9578f9eccd1b6abca7746c34b225dd059122be9218"
+    },
+    {
+      "path": "image_lens/vendor/shot-detector/scenedetect/backends/opencv.py",
+      "bytes": 23302,
+      "sha256": "7451c12e3ef37348507a65a64e16d1f5f6025c54156486f494c7cf28a9f91527"
+    },
+    {
+      "path": "image_lens/vendor/shot-detector/scenedetect/backends/pyav.py",
+      "bytes": 15027,
+      "sha256": "34ebc32ea9498be6c1421ac7200398bc2ccffc2dcc3844d54ee82c3b94c5efce"
+    },
+    {
+      "path": "image_lens/vendor/shot-detector/scenedetect/detectors/__init__.py",
+      "bytes": 3378,
+      "sha256": "19c77a55aec21bc38d603a56f787cc22b742480660c2d705782a157e41f9fec0"
+    },
+    {
+      "path": "image_lens/vendor/shot-detector/scenedetect/detectors/adaptive_detector.py",
+      "bytes": 8536,
+      "sha256": "240dea19b0b2cf2aee14d237ba535c686442e5f89d01f4fafed95d24be0cc3f1"
+    },
+    {
+      "path": "image_lens/vendor/shot-detector/scenedetect/detectors/content_detector.py",
+      "bytes": 10816,
+      "sha256": "9c0e89c77cb15efdd36a8c6ed2c27a453423bb272bc1f341eb3bb721e9e0f649"
+    },
+    {
+      "path": "image_lens/vendor/shot-detector/scenedetect/detectors/hash_detector.py",
+      "bytes": 7594,
+      "sha256": "e8e2275f850d08b955fa319e921c66bc845f630cff2c62033fc69c32619675c3"
+    },
+    {
+      "path": "image_lens/vendor/shot-detector/scenedetect/detectors/histogram_detector.py",
+      "bytes": 7333,
+      "sha256": "0383bc4fbdde38edf9f40dc9288ef9731234997aa7ee26d0b085e4542a4e45ee"
+    },
+    {
+      "path": "image_lens/vendor/shot-detector/scenedetect/detectors/threshold_detector.py",
+      "bytes": 8473,
+      "sha256": "8bd343bff6c66ba510eafbbdf1488c05e84c9dadb6b43c064e1893bc226a431a"
+    },
+    {
+      "path": "image_lens/vendor/shot-detector/scenedetect/frame_timecode.py",
+      "bytes": 20843,
+      "sha256": "38c24cf9c33bded93e22fb45d27226f9dae5dda2d77ed234971b862110dfec2d"
+    },
+    {
+      "path": "image_lens/vendor/shot-detector/scenedetect/platform.py",
+      "bytes": 12154,
+      "sha256": "c3218a7da9bfb37a503d5c47a233199ad3845ac81ad2a3df824c095bdb80a2d5"
+    },
+    {
+      "path": "image_lens/vendor/shot-detector/scenedetect/scene_detector.py",
+      "bytes": 9950,
+      "sha256": "d4114366d1b87074abe37cc8324f303b6d43aff36aeb866aa8a8dd6718460572"
+    },
+    {
+      "path": "image_lens/vendor/shot-detector/scenedetect/scene_manager.py",
+      "bytes": 65499,
+      "sha256": "5982de8e2c1457d718474f9b44e60dc66bdcfa2eabb97a7f0bb156c922436063"
+    },
+    {
+      "path": "image_lens/vendor/shot-detector/scenedetect/stats_manager.py",
+      "bytes": 13312,
+      "sha256": "98ea16b36090eb60cad4e80bfda3715bf53c522e15c7007c19233167c93132aa"
+    },
+    {
+      "path": "image_lens/vendor/shot-detector/scenedetect/video_manager.py",
+      "bytes": 33196,
+      "sha256": "c0680019eaec7576a232dc0387339b25ff4e371b05edf45fd1319c1b1cfee522"
+    },
+    {
+      "path": "image_lens/vendor/shot-detector/scenedetect/video_splitter.py",
+      "bytes": 15342,
+      "sha256": "786bc68fc3d1964eb04b1ffa96cc914d308a6fc6599d3025ee122dc3afb90bc4"
+    },
+    {
+      "path": "image_lens/vendor/shot-detector/scenedetect/video_stream.py",
+      "bytes": 6979,
+      "sha256": "d6a35d4e7ae923c04c867bacaf61291a4c11135e15132a6be02bb6bbf45cc3fb"
+    },
+    {
+      "path": "image_lens/vendor/shot-detector/scenedetect-0.6.7.1.dist-info/licenses/LICENSE",
+      "bytes": 1505,
+      "sha256": "7e12ac97d04790cb7d3e2e80992ce2157cb77d08d555d4bcf685e86d8ca0d619"
+    },
+    {
+      "path": "image_lens/vendor/source/LICENSE.md",
+      "bytes": 19332,
+      "sha256": "1d8ca66080a2701508a70be4ddad4be28c509bcc3397a682fb8edf767fdd7a00"
+    },
+    {
+      "path": "image_lens/vendor/source/README.md",
+      "bytes": 17804,
+      "sha256": "214ec02decccf2b5d10477398018f7b6b69d20e2b9e16d483f130595424adabf"
+    },
+    {
+      "path": "image_lens/vendor/source/cotracker/__init__.py",
+      "bytes": 197,
+      "sha256": "34bd8069c54764e7b8d73a78905dbe6467140a2f73170875128f6ca4d8cdd0aa"
+    },
+    {
+      "path": "image_lens/vendor/source/cotracker/datasets/__init__.py",
+      "bytes": 197,
+      "sha256": "34bd8069c54764e7b8d73a78905dbe6467140a2f73170875128f6ca4d8cdd0aa"
+    },
+    {
+      "path": "image_lens/vendor/source/cotracker/datasets/dataclass_utils.py",
+      "bytes": 6247,
+      "sha256": "85081775c3b4c74b456cc4e6f164d559cac77adecce28b010b527a46a2efb488"
+    },
+    {
+      "path": "image_lens/vendor/source/cotracker/datasets/dr_dataset.py",
+      "bytes": 5296,
+      "sha256": "e70e9eeb66c08f40c4312268768532050ca5e269e1d84503cc12fdefc4db5969"
+    },
+    {
+      "path": "image_lens/vendor/source/cotracker/datasets/kubric_movif_dataset.py",
+      "bytes": 20085,
+      "sha256": "c8cb9537c44cfbff1c13b2251a5947126f0baa65fe7ced48edf2218493c6c663"
+    },
+    {
+      "path": "image_lens/vendor/source/cotracker/datasets/real_dataset.py",
+      "bytes": 8417,
+      "sha256": "889edb66f65151dfac3271c91ecc47c1490508f54cc1fe0f7860e699f9a1da1e"
+    },
+    {
+      "path": "image_lens/vendor/source/cotracker/datasets/tap_vid_datasets.py",
+      "bytes": 9580,
+      "sha256": "2806cc6c1d5df1703c942feb05154a7b78ffa8ac4cb2fb032876ce3cf335699b"
+    },
+    {
+      "path": "image_lens/vendor/source/cotracker/datasets/utils.py",
+      "bytes": 3531,
+      "sha256": "05c40c9dbc51f588cd5d889b3abd9795eb55a0a720d60519fedde54baeaac3c6"
+    },
+    {
+      "path": "image_lens/vendor/source/cotracker/evaluation/__init__.py",
+      "bytes": 197,
+      "sha256": "34bd8069c54764e7b8d73a78905dbe6467140a2f73170875128f6ca4d8cdd0aa"
+    },
+    {
+      "path": "image_lens/vendor/source/cotracker/evaluation/core/__init__.py",
+      "bytes": 197,
+      "sha256": "34bd8069c54764e7b8d73a78905dbe6467140a2f73170875128f6ca4d8cdd0aa"
+    },
+    {
+      "path": "image_lens/vendor/source/cotracker/evaluation/core/eval_utils.py",
+      "bytes": 6181,
+      "sha256": "4f23ce75896694a8f5d8f7e5650c15d4f74a2e7135ae176c8295621d60916cb9"
+    },
+    {
+      "path": "image_lens/vendor/source/cotracker/evaluation/core/evaluator.py",
+      "bytes": 10695,
+      "sha256": "9432df1c94f9786e4ef579632d9b8cd6b2e7680800564d50e38588ed7bb56274"
+    },
+    {
+      "path": "image_lens/vendor/source/cotracker/evaluation/evaluate.py",
+      "bytes": 6518,
+      "sha256": "5b7f886332ed7772567c0ae83ae5275a716fe69129a66ffc9168cd1a397e646d"
+    },
+    {
+      "path": "image_lens/vendor/source/cotracker/models/__init__.py",
+      "bytes": 197,
+      "sha256": "34bd8069c54764e7b8d73a78905dbe6467140a2f73170875128f6ca4d8cdd0aa"
+    },
+    {
+      "path": "image_lens/vendor/source/cotracker/models/bootstap_predictor.py",
+      "bytes": 2305,
+      "sha256": "7e25e4d8884b0bc01c72b2e00eb7da0f0e1e97ea1e4944818f16baee6347cfe3"
+    },
+    {
+      "path": "image_lens/vendor/source/cotracker/models/build_cotracker.py",
+      "bytes": 1519,
+      "sha256": "5b33c7cf80b85662721c48f3ea569ca7bd0c430344e77e9fdccfaceb70988fdc"
+    },
+    {
+      "path": "image_lens/vendor/source/cotracker/models/core/__init__.py",
+      "bytes": 197,
+      "sha256": "34bd8069c54764e7b8d73a78905dbe6467140a2f73170875128f6ca4d8cdd0aa"
+    },
+    {
+      "path": "image_lens/vendor/source/cotracker/models/core/cotracker/__init__.py",
+      "bytes": 197,
+      "sha256": "34bd8069c54764e7b8d73a78905dbe6467140a2f73170875128f6ca4d8cdd0aa"
+    },
+    {
+      "path": "image_lens/vendor/source/cotracker/models/core/cotracker/blocks.py",
+      "bytes": 13946,
+      "sha256": "65a742fbec3d6a6eed26d40fc7d1179c609b7a35e2cd4b1146ea7800089d6823"
+    },
+    {
+      "path": "image_lens/vendor/source/cotracker/models/core/cotracker/cotracker.py",
+      "bytes": 21682,
+      "sha256": "711df4fc7d109824e52f8e111df396a2e7d844796084f1f6a4419690c14e6b28"
+    },
+    {
+      "path": "image_lens/vendor/source/cotracker/models/core/cotracker/cotracker3_offline.py",
+      "bytes": 8701,
+      "sha256": "41cff5b775ca071ff12bce23ef7887cb639171da84a32e0d75194661101ce238"
+    },
+    {
+      "path": "image_lens/vendor/source/cotracker/models/core/cotracker/cotracker3_online.py",
+      "bytes": 20945,
+      "sha256": "4c8bfce5546d85ba22c6b5292b870ad2aa0af1e0b6ba5a22e644c39bb496475e"
+    },
+    {
+      "path": "image_lens/vendor/source/cotracker/models/core/cotracker/losses.py",
+      "bytes": 4228,
+      "sha256": "fe23dacbfa563f9499e39f78338aad046145211d80f4674e723a6625afb22043"
+    },
+    {
+      "path": "image_lens/vendor/source/cotracker/models/core/embeddings.py",
+      "bytes": 3968,
+      "sha256": "9c1066f2d3b44317454126ff79256d4aa07f12e736bb09fdf598a09696aa4dde"
+    },
+    {
+      "path": "image_lens/vendor/source/cotracker/models/core/model_utils.py",
+      "bytes": 14150,
+      "sha256": "8f13adb13866cba3b1b0ad90f7c961918f71d75e912d8b6ccf77906b81c95a8c"
+    },
+    {
+      "path": "image_lens/vendor/source/cotracker/models/evaluation_predictor.py",
+      "bytes": 7156,
+      "sha256": "7bb03606c08638de28f79abfcf8bd03eb0c42bfd811e6bb8a00d752a2a943597"
+    },
+    {
+      "path": "image_lens/vendor/source/cotracker/predictor.py",
+      "bytes": 11500,
+      "sha256": "783536d6c77790fa6c8e005f2df1d6bd4f0d8955c2c67d464bfb4e64d366375f"
+    },
+    {
+      "path": "image_lens/vendor/source/cotracker/utils/__init__.py",
+      "bytes": 197,
+      "sha256": "34bd8069c54764e7b8d73a78905dbe6467140a2f73170875128f6ca4d8cdd0aa"
+    },
+    {
+      "path": "image_lens/vendor/source/cotracker/utils/train_utils.py",
+      "bytes": 8703,
+      "sha256": "235bd0cfeb0285125f0d372649fe97496847b1afefccf05188f0d0694f417151"
+    },
+    {
+      "path": "image_lens/vendor/source/cotracker/utils/visualizer.py",
+      "bytes": 13064,
+      "sha256": "0b5fef184d44c408568559a634821968b6907d2b526b967d2a4bbd843b0fc587"
+    },
+    {
+      "path": "image_lens/vendor/source/cotracker/version.py",
+      "bytes": 221,
+      "sha256": "a8b2612b07c2cbeb2d32c99711fb1c2829571938776fb8188812c66c9b129949"
+    },
+    {
+      "path": "image_lens/watchdog.py",
+      "bytes": 1493,
+      "sha256": "decb9ea9b4211f089a04a41867f09de46e5bd697ba25251db9dffdbf5089fbea"
+    },
+    {
+      "path": "image_lens_cli.py",
+      "bytes": 254,
+      "sha256": "6c96d0ec6c2351966f9a261fdfdeafeafedc1d9c3c36198153600c4ddab989bc"
+    },
+    {
+      "path": "pyproject.toml",
+      "bytes": 877,
+      "sha256": "92442ebf5a425e756450dafa8db8f9cd0498a484044226203da3a1ff414f857d"
+    },
+    {
+      "path": "requirements-tracking.txt",
+      "bytes": 109,
+      "sha256": "94979708df0aa72e59d052a87adc1398b00a354159f162520acf804be57ead96"
+    },
+    {
+      "path": "requirements.txt",
+      "bytes": 191,
+      "sha256": "90f9b8cc97c609e44be9016049f4af4062265dda8c78b6fe6adb9b913ede2e35"
+    },
+    {
+      "path": "tests/smoke_runtime.py",
+      "bytes": 4329,
+      "sha256": "91b6ad9d9b2045fdcb06869ec84290a5e9d443d7c9d304f810b599e1bf8bff55"
+    },
+    {
+      "path": "tests/test_contracts.py",
+      "bytes": 15170,
+      "sha256": "e7c37057995d9648a9a093c67c93e38778a465f3a560811b2d5bd246a753e351"
+    }
+  ]
+}

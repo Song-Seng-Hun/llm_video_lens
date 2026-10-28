@@ -1,0 +1,7 @@
+{
+  "url": "https://huggingface.co/facebook/cotracker3/resolve/a304f912a43a3f37a81256e55243137d60d223b7/scaled_offline.pth",
+  "size": 101890938,
+  "sha256": "2670d4562ed69326dda775a26e54883925cd11b6fc9b24cb7aa9f8078bce7834",
+  "checksum": "matches official HF LFS digest",
+  "license": "CC-BY-NC-4.0"
+}

@@ -1,0 +1,6 @@
+{
+  "file": "cotracker/models/build_cotracker.py",
+  "before_sha256": "72a2d04fafb26c7f2ee0d7236fa63d5a7adbc9a9f1bab1d68f41bdd1ea657c89",
+  "after_sha256": "5b33c7cf80b85662721c48f3ea569ca7bd0c430344e77e9fdccfaceb70988fdc",
+  "change": "explicit weights_only=True; never weaken restricted loading; no other source changes"
+}

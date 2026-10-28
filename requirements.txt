@@ -1,0 +1,5 @@
+# Decode/render dependencies. Cached briefs/analysis use stdlib only.
+# Validated extraction runtime: CPython 3.12, macOS arm64.
+numpy==2.2.6
+opencv-python-headless==4.12.0.88
+Pillow==13.0.0

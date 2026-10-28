@@ -1,0 +1,15 @@
+{
+  "source_generation": "selected 037 diagnostic / 035 canonical context / 033 shots / 027 foreground",
+  "original_modules": {
+    "shot_boundaries.py": "7d4d8bdac0f8283cdae44f521c0276c984daacba9a0c27ab2abb46250aa2de9e",
+    "appearance_inspection.py": "430a74560012f3a335e812c02547a59b90e2b00ea7f7b6a6a4d99d55beabbe07",
+    "analyze_motion.py": "d3436250378353a5fac09a87627a9ec8432241effbe506c326fe7e637bf09b1c",
+    "motion_report.py": "cf3e266e39202eb0aaf70d1a1772ffc64e6016c0cbbf24599d9ca94b143f6422",
+    "part_regions.py": "62d83c12372637554cc3fc7ad6bb2d5ad0eadd6bb84ab7f99d2aa40390f91d29",
+    "foreground_regions.py": "b297d0e075240b8110e69f8e390cb2ec62544eb3c7cfe007ff4929751690f823",
+    "observations.py": "e7ccd7ce6828861ac9fd9a3598b5a04b81fd4df6c290eb4b88792132e03e8f9a",
+    "run_point_tracker.py": "7940c57eb67d80762f61e35f55a87436b2598abb277c92b78f146b6f4c8a1ec3"
+  },
+  "historical_evidence_modified": false,
+  "source_only": true
+}

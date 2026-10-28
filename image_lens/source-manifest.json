@@ -1,0 +1,174 @@
+{
+  "commit": "82e02e8029753ad4ef13cf06be7f4fc5facdda4d",
+  "url": "https://codeload.github.com/facebookresearch/co-tracker/zip/82e02e8029753ad4ef13cf06be7f4fc5facdda4d",
+  "archive_bytes": 33561861,
+  "archive_sha256": "2706dfa5e6b800d56aee87b952f93c9855da0fa59c3cd06ef8ac9c03b3b083f9",
+  "files": [
+    {
+      "path": "LICENSE.md",
+      "bytes": 19332,
+      "sha256": "1d8ca66080a2701508a70be4ddad4be28c509bcc3397a682fb8edf767fdd7a00"
+    },
+    {
+      "path": "README.md",
+      "bytes": 17804,
+      "sha256": "214ec02decccf2b5d10477398018f7b6b69d20e2b9e16d483f130595424adabf"
+    },
+    {
+      "path": "cotracker/__init__.py",
+      "bytes": 197,
+      "sha256": "34bd8069c54764e7b8d73a78905dbe6467140a2f73170875128f6ca4d8cdd0aa"
+    },
+    {
+      "path": "cotracker/datasets/__init__.py",
+      "bytes": 197,
+      "sha256": "34bd8069c54764e7b8d73a78905dbe6467140a2f73170875128f6ca4d8cdd0aa"
+    },
+    {
+      "path": "cotracker/datasets/dataclass_utils.py",
+      "bytes": 6247,
+      "sha256": "85081775c3b4c74b456cc4e6f164d559cac77adecce28b010b527a46a2efb488"
+    },
+    {
+      "path": "cotracker/datasets/dr_dataset.py",
+      "bytes": 5296,
+      "sha256": "e70e9eeb66c08f40c4312268768532050ca5e269e1d84503cc12fdefc4db5969"
+    },
+    {
+      "path": "cotracker/datasets/kubric_movif_dataset.py",
+      "bytes": 20085,
+      "sha256": "c8cb9537c44cfbff1c13b2251a5947126f0baa65fe7ced48edf2218493c6c663"
+    },
+    {
+      "path": "cotracker/datasets/real_dataset.py",
+      "bytes": 8417,
+      "sha256": "889edb66f65151dfac3271c91ecc47c1490508f54cc1fe0f7860e699f9a1da1e"
+    },
+    {
+      "path": "cotracker/datasets/tap_vid_datasets.py",
+      "bytes": 9580,
+      "sha256": "2806cc6c1d5df1703c942feb05154a7b78ffa8ac4cb2fb032876ce3cf335699b"
+    },
+    {
+      "path": "cotracker/datasets/utils.py",
+      "bytes": 3531,
+      "sha256": "05c40c9dbc51f588cd5d889b3abd9795eb55a0a720d60519fedde54baeaac3c6"
+    },
+    {
+      "path": "cotracker/evaluation/__init__.py",
+      "bytes": 197,
+      "sha256": "34bd8069c54764e7b8d73a78905dbe6467140a2f73170875128f6ca4d8cdd0aa"
+    },
+    {
+      "path": "cotracker/evaluation/core/__init__.py",
+      "bytes": 197,
+      "sha256": "34bd8069c54764e7b8d73a78905dbe6467140a2f73170875128f6ca4d8cdd0aa"
+    },
+    {
+      "path": "cotracker/evaluation/core/eval_utils.py",
+      "bytes": 6181,
+      "sha256": "4f23ce75896694a8f5d8f7e5650c15d4f74a2e7135ae176c8295621d60916cb9"
+    },
+    {
+      "path": "cotracker/evaluation/core/evaluator.py",
+      "bytes": 10695,
+      "sha256": "9432df1c94f9786e4ef579632d9b8cd6b2e7680800564d50e38588ed7bb56274"
+    },
+    {
+      "path": "cotracker/evaluation/evaluate.py",
+      "bytes": 6518,
+      "sha256": "5b7f886332ed7772567c0ae83ae5275a716fe69129a66ffc9168cd1a397e646d"
+    },
+    {
+      "path": "cotracker/models/__init__.py",
+      "bytes": 197,
+      "sha256": "34bd8069c54764e7b8d73a78905dbe6467140a2f73170875128f6ca4d8cdd0aa"
+    },
+    {
+      "path": "cotracker/models/bootstap_predictor.py",
+      "bytes": 2305,
+      "sha256": "7e25e4d8884b0bc01c72b2e00eb7da0f0e1e97ea1e4944818f16baee6347cfe3"
+    },
+    {
+      "path": "cotracker/models/build_cotracker.py",
+      "bytes": 1500,
+      "sha256": "72a2d04fafb26c7f2ee0d7236fa63d5a7adbc9a9f1bab1d68f41bdd1ea657c89"
+    },
+    {
+      "path": "cotracker/models/core/__init__.py",
+      "bytes": 197,
+      "sha256": "34bd8069c54764e7b8d73a78905dbe6467140a2f73170875128f6ca4d8cdd0aa"
+    },
+    {
+      "path": "cotracker/models/core/cotracker/__init__.py",
+      "bytes": 197,
+      "sha256": "34bd8069c54764e7b8d73a78905dbe6467140a2f73170875128f6ca4d8cdd0aa"
+    },
+    {
+      "path": "cotracker/models/core/cotracker/blocks.py",
+      "bytes": 13946,
+      "sha256": "65a742fbec3d6a6eed26d40fc7d1179c609b7a35e2cd4b1146ea7800089d6823"
+    },
+    {
+      "path": "cotracker/models/core/cotracker/cotracker.py",
+      "bytes": 21682,
+      "sha256": "711df4fc7d109824e52f8e111df396a2e7d844796084f1f6a4419690c14e6b28"
+    },
+    {
+      "path": "cotracker/models/core/cotracker/cotracker3_offline.py",
+      "bytes": 8701,
+      "sha256": "41cff5b775ca071ff12bce23ef7887cb639171da84a32e0d75194661101ce238"
+    },
+    {
+      "path": "cotracker/models/core/cotracker/cotracker3_online.py",
+      "bytes": 20945,
+      "sha256": "4c8bfce5546d85ba22c6b5292b870ad2aa0af1e0b6ba5a22e644c39bb496475e"
+    },
+    {
+      "path": "cotracker/models/core/cotracker/losses.py",
+      "bytes": 4228,
+      "sha256": "fe23dacbfa563f9499e39f78338aad046145211d80f4674e723a6625afb22043"
+    },
+    {
+      "path": "cotracker/models/core/embeddings.py",
+      "bytes": 3968,
+      "sha256": "9c1066f2d3b44317454126ff79256d4aa07f12e736bb09fdf598a09696aa4dde"
+    },
+    {
+      "path": "cotracker/models/core/model_utils.py",
+      "bytes": 14150,
+      "sha256": "8f13adb13866cba3b1b0ad90f7c961918f71d75e912d8b6ccf77906b81c95a8c"
+    },
+    {
+      "path": "cotracker/models/evaluation_predictor.py",
+      "bytes": 7156,
+      "sha256": "7bb03606c08638de28f79abfcf8bd03eb0c42bfd811e6bb8a00d752a2a943597"
+    },
+    {
+      "path": "cotracker/predictor.py",
+      "bytes": 11500,
+      "sha256": "783536d6c77790fa6c8e005f2df1d6bd4f0d8955c2c67d464bfb4e64d366375f"
+    },
+    {
+      "path": "cotracker/utils/__init__.py",
+      "bytes": 197,
+      "sha256": "34bd8069c54764e7b8d73a78905dbe6467140a2f73170875128f6ca4d8cdd0aa"
+    },
+    {
+      "path": "cotracker/utils/train_utils.py",
+      "bytes": 8703,
+      "sha256": "235bd0cfeb0285125f0d372649fe97496847b1afefccf05188f0d0694f417151"
+    },
+    {
+      "path": "cotracker/utils/visualizer.py",
+      "bytes": 13064,
+      "sha256": "0b5fef184d44c408568559a634821968b6907d2b526b967d2a4bbd843b0fc587"
+    },
+    {
+      "path": "cotracker/version.py",
+      "bytes": 221,
+      "sha256": "a8b2612b07c2cbeb2d32c99711fb1c2829571938776fb8188812c66c9b129949"
+    }
+  ],
+  "executed": false
+}
