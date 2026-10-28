@@ -20,7 +20,7 @@
   ],
   "manifest_self_excluded": true,
   "file_count": 100,
-  "total_bytes": 978758,
+  "total_bytes": 980097,
   "files": [
     {
       "path": ".gitattributes",
@@ -94,8 +94,8 @@
     },
     {
       "path": "image_lens/cli.py",
-      "bytes": 14339,
-      "sha256": "0a71a5da4ec5558c358b4b60e3d3425c7375843002d7e35930e2cbd2e1ba48e3"
+      "bytes": 14513,
+      "sha256": "bf1a806d7952b5dbb28d25ff29963d07632ac93a4ed57511bb3a760ad542fe3d"
     },
     {
       "path": "image_lens/foreground_regions.py",
@@ -134,8 +134,8 @@
     },
     {
       "path": "image_lens/pose.py",
-      "bytes": 18685,
-      "sha256": "913415b00c861c6ebb652f190d4e3b20e9cfc169ab4844a8159c4535f692f7c8"
+      "bytes": 18744,
+      "sha256": "d4101bcd39db568e2dd49d7e8e72643c9762e81deafbe1e30f4173765180958c"
     },
     {
       "path": "image_lens/run_point_tracker.py",
@@ -519,8 +519,8 @@
     },
     {
       "path": "tests/test_pose.py",
-      "bytes": 5725,
-      "sha256": "934c8b8abae9a88cbe067fd40c2361e9d4352f4d05f358625711fcfbd8dbef1b"
+      "bytes": 6831,
+      "sha256": "2be5f50c27759d61a186c01b0dd74abcc9c4d7f40652dcb64f5612fdd8a79ccd"
     }
   ]
 }

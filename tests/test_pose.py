@@ -45,6 +45,23 @@ class Seeds(unittest.TestCase):
         self.assertFalse(any(n.startswith(('hair', 'head')) for n in seeds))
         self.assertIn('nose', seeds)
 
+    def test_ears_only_frame_writes_nothing(self):
+        import tempfile, json
+        from image_lens import paths
+        with tempfile.TemporaryDirectory(dir=REPO/'workspace') as root:
+            paths.configure(root); root = Path(root)
+            video = root/'v.bin'; video.write_bytes(b'x')
+            scan = dict(analysis_segments=[dict(start_frame=0, end_frame=9)])
+            paths.write_json('shots.json', scan)
+            t = track(); t['scores'] = [0.]*133; t['scores'][pose.BODY['ear_l']] = .9
+            packet = dict(schema='image-lens.pose/1', source_video=str(video), source_sha256=paths.sha(video), width=1440, height=1080,
+                          fps=50., canonical_shots=dict(path=str(root/'shots.json'), sha256=paths.sha(root/'shots.json')),
+                          flags=dict(frames=[]), frames=[dict(frame=0, tracks=[t])])
+            paths.write_json('pose.json', packet)
+            with self.assertRaisesRegex(ValueError, 'no usable pose seeds'):
+                pose.seed(str(root/'pose.json'), 0, 'j', 'crops')
+            self.assertFalse((root/'crops').exists())
+
     def test_groups_fit_report_and_observation_caps(self):
         self.assertTrue(all(len(names) <= 8 for names in pose.GROUPS.values()))
 

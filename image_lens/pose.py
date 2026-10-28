@@ -9,7 +9,7 @@ MODELS = dict(detector=(101400344, '3dea6513388889f0fff4b77bf7a26013600321b9eb9c
               pose=(228708578, '9a9bc17c13ff0a1e37507f45a037a21bc410cd08374b0e664c57d0080843aa58'))
 PARAMS = dict(det_score=.10, det_nms=.45, det_input=[640, 640], pose_input=[192, 256], track_activation=.25,
               lost_track_buffer=30, minimum_matching_threshold=.8, tracker_reset='every canonical shot',
-              max_frames=20000, keypoint_schema='coco133')
+              max_frames=9000, keypoint_schema='coco133')
 FLAGS = dict(overlap_iou=.10, jump_diagonals=.15, min_score=.30)
 SEED = dict(min_score=.30, max_frames=160, border_px=32, uncertainty_px=(8., 24.))
 BODY = dict(nose=0, eye_l=1, eye_r=2, ear_l=3, ear_r=4, shoulder_l=5, shoulder_r=6, elbow_l=7, elbow_r=8,
@@ -266,7 +266,7 @@ def seed(pose_path, frame, job, evidence_dir, track_id=None, length=SEED['max_fr
     if end == frame:
         raise ValueError('seed frame is the last frame of its shot')
     seeds = seed_points(track, packet['width'], packet['height'])
-    if not seeds:
+    if not any(name in seeds for names in GROUPS.values() for name in names):
         raise ValueError('no usable pose seeds on this frame')
     crops = _marked_crops(video, frame, packet['width'], packet['height'], seeds, paths.confined(evidence_dir, new=True))
     jobs = []

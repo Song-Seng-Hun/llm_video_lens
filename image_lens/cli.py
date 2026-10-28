@@ -136,7 +136,8 @@ def dispatch(command, arguments):
             signal.signal(signal.SIGALRM, lambda *_: (_ for _ in ()).throw(TimeoutError('pose wall budget exhausted')))
             signal.alarm(a.max_seconds)
         result = pose.run(str(paths.confined(a.shots, exists=True)), a.detector, a.pose_model, a.start, a.end)
-        output = paths.write_json(a.out, result)
+        # Compact: indented keypoints are ~4x larger and would hit the 64 MiB read cap on long clips.
+        output = paths.write(a.out, json.dumps(result, ensure_ascii=False, allow_nan=False, separators=(',', ':'))+'\n')
         return dict(status='written', output=str(output), frames=len(result['frames']), flagged_frames=len(result['flags']['frames']),
                     elapsed_seconds=result['elapsed_seconds'], model_loaded=True, images_written=0)
     if command == 'seed':
