@@ -66,7 +66,10 @@ def admitted_report(value, scan):
                                       excluded_anchor_ranges=f['excluded_anchor_ranges'][:2],
                                       omitted_anchor_range_count=max(0, len(f['excluded_anchor_ranges'])-2),
                                       total_run_count=f['total_run_count'], omitted_run_count=f['omitted_run_count'],
-                                      break_reasons=f['break_reasons']) for f in expected['features']])
+                                      break_reasons=f['break_reasons'],
+                                      strokes=[dict(seconds=[u['start_seconds'], u['end_seconds']], frames=[u['start_frame'], u['end_frame']],
+                                                    direction=u['direction'], distance_px=round(u['distance_px'], 1), major=u['major'])
+                                               for run in f['continuous_runs'][:2] for u in run['strokes']['units'][:6]]) for f in expected['features']])
     else:
         raise ValueError('unsupported brief report schema; keep its raw locator for manual inspection')
     if any(report.get(k) != v for k, v in expected.items()):

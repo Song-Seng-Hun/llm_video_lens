@@ -11,3 +11,5 @@
 - No new neural inference, training, dependency installation, paid API, network service or media redistribution is part of extraction verification. Experimental inference and Windows operation remain unverified.
 
 - The POSIX tracker parent kills/reaps its own child group on budget expiry and caught Python interruptions. Forced termination of the parent can still leave a worker until its own deadline; no daemon or external process supervisor is provided. Actual neural execution remains unverified for this extraction.
+- Strokes summarize one continuous run of screen estimates after a 5-sample median filter. They make large moves and pauses easy to read; they are not action labels, easing or proof of held drawings. A hold is small net travel only.
+- Appearance-change candidates are consecutive-frame mean gray-difference jumps (at least 12 and 4x the shot median). Motion, effects, flashes or camera moves also trigger them, and redraws below the threshold are missed. They are hints for manual `compare`; automatic redraw/action decisions stay null.

@@ -27,7 +27,7 @@ def analyze(arguments):
     if '--help' in arguments or '-h' in arguments:
         return selected_entry(analyze_motion, arguments)
     arguments = list(arguments)
-    path_flags = {'--tracks', '--shots', '--report-bindings', '--out', '--evidence-dir'}
+    path_flags = {'--tracks', '--shots', '--report-bindings', '--out', '--evidence-dir', '--trajectory-dir'}
     parsed_paths = {}
     for i, token in enumerate(arguments):
         # One canonical spelling avoids ambiguous validation of --key=value.
@@ -36,7 +36,7 @@ def analyze(arguments):
         if token in path_flags:
             if i+1 == len(arguments):
                 raise ValueError('missing path argument')
-            output = token in ('--out', '--evidence-dir')
+            output = token in ('--out', '--evidence-dir', '--trajectory-dir')
             value = paths.confined(arguments[i+1], exists=not output, new=output,
                                    max_bytes=None if output else 16*1024*1024)
             arguments[i+1] = str(value)

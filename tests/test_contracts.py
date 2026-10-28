@@ -258,4 +258,34 @@ raise SystemExit(main(['--workspace', sys.argv[2], 'prepare', '--queries', 'quer
         self.assertIsNone(shot_boundaries.context({'shot_check':None}))
 
 
+    # Readability additions: trajectory guard and stroke recomputation in brief.
+    def bindings(self):
+        return dict(schema='team-eye.motion-bindings/1', source_tracks_sha256=paths.sha(self.root/'tracks.json'),
+                    basis='source_frame_grouping_only',
+                    actors=[dict(actor_id='A', label='authored patch', features=[dict(point_id='surface0', label='patch')])])
+
+    def test_trajectory_dir_requires_report_bindings(self):
+        paths.write_json('tracks.json', self.observed_tracks())
+        result = self.cli('analyze', '--tracks', 'tracks.json', '--point', 'surface0', '--start', '0', '--end', '15',
+                          '--trajectory-dir', 'traj', '--out', 'timing.json')
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn('requires --report-bindings', result.stdout+result.stderr)
+        self.assertFalse((self.root/'traj').exists() or (self.root/'timing.json').exists())
+
+    def test_brief_carries_recomputed_strokes(self):
+        paths.write_json('tracks.json', self.observed_tracks())
+        paths.write_json('bindings.json', self.bindings())
+        result = self.cli('analyze', '--tracks', 'tracks.json', '--report-bindings', 'bindings.json',
+                          '--start', '0', '--end', '15', '--out', 'report.json')
+        self.assertEqual(result.returncode, 0, result.stderr)
+        packet = brief.build('shots.json', reports=['report.json'])
+        strokes = packet['report_references'][0]['observation']['features'][0]['strokes']
+        self.assertEqual([s['direction'] for s in strokes], ['right'])
+        report = json.loads((self.root/'report.json').read_text())
+        report['features'][0]['continuous_runs'][0]['strokes']['units'][0]['direction'] = 'left'
+        paths.write_json('forged.json', report)
+        packet = brief.build('shots.json', reports=['forged.json'])
+        self.assertEqual(packet['coverage']['admitted_report_count'], 0)
+
+
 if __name__ == '__main__': unittest.main()

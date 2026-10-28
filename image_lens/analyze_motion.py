@@ -287,11 +287,14 @@ def main():
     ap.add_argument('--evidence-frames',help='region report only: 1..3 unique native frame numbers, requires --evidence-dir')
     ap.add_argument('--inspect-breaks',action='store_true',help='review mode: bounded source context for broken tracks; no motion inference')
     ap.add_argument('--region-report',action='store_true',help='explicit source-color region report with --report-bindings')
+    ap.add_argument('--trajectory-dir',help='new task-local whole-frame path sheet plus appearance-change candidates; requires --report-bindings')
     ap.add_argument('--foreground-extent',action='store_true',help='optional flat-background inspection mask, requires --region-report and --evidence-dir')
     args=ap.parse_args();out=Path(args.out).resolve()
     if not out.is_relative_to(workspace_root()) or out.exists() or out.is_symlink():raise ValueError('new task-local output required')
     if args.foreground_extent and not(args.region_report and args.report_bindings and args.evidence_dir):
         raise ValueError('--foreground-extent requires --region-report, --report-bindings and --evidence-dir')
+    if args.trajectory_dir and not args.report_bindings or args.trajectory_dir and args.region_report:
+        raise ValueError('--trajectory-dir requires --report-bindings without --region-report')
     evidence_frames=None
     if args.evidence_frames is not None:
         if not(args.region_report and args.report_bindings and args.evidence_dir):
@@ -379,6 +382,11 @@ def main():
         # Validate numerical serialization before optional media side effects or opening output.
         json.dumps(result,ensure_ascii=False,allow_nan=False)
         if args.evidence_dir:result['evidence_contact']=report_module.render_contact(result,packet,args.evidence_dir,workspace_root(),foreground_masks=foreground_masks)
+        if args.trajectory_dir:
+            spec=importlib.util.spec_from_file_location('motion_view',Path(__file__).with_name('motion_view.py'))
+            view_module=importlib.util.module_from_spec(spec);spec.loader.exec_module(view_module)
+            result['trajectory_view']=view_module.render(result,packet,args.trajectory_dir,workspace_root(),report_module._source_video(result,workspace_root()))
+            result['trajectory_view']['renderer_sha256']=hashlib.sha256(Path(view_module.__file__).read_bytes()).hexdigest()
         if region_module:result['region_reporter_sha256']=hashlib.sha256(Path(region_module.__file__).read_bytes()).hexdigest()
         if shot_context:result['shot_context']=shot_context
         text=(region_module.markdown(result)if region_module else report_module.markdown(result)) if args.format=='markdown' else json.dumps(result,indent=2,ensure_ascii=False,allow_nan=False)+'\n'

@@ -1,5 +1,5 @@
 """Source-indexed motion reports. No new tracking, anatomical inference or gap filling."""
-import hashlib,json,math,re
+import hashlib,json,math,re,statistics
 from pathlib import Path
 
 RESOLUTION=2.
@@ -19,6 +19,42 @@ def ranges(values):
 def direction(dx,dy):
     if math.hypot(dx,dy)<RESOLUTION:return 'within_resolution'
     return DIRECTIONS[int(math.floor((math.degrees(math.atan2(dy,dx))+22.5)/45))%8]
+
+STROKE=dict(median_samples=5,simplify_px=12.,hold_px=10.,hold_step_px=.75,hold_min_samples=6,max_strokes=8)
+
+def _simplify(xy,a,b,tolerance,keep):
+    # Ramer-Douglas-Peucker on the median-filtered path; keeps the farthest corner above tolerance.
+    if b-a<2:return
+    (x0,y0),(x1,y1)=xy[a],xy[b];length=math.hypot(x1-x0,y1-y0)
+    def offset(p):return abs((x1-x0)*(y0-p[1])-(x0-p[0])*(y1-y0))/length if length else math.dist(p,xy[a])
+    i=max(range(a+1,b),key=lambda j:(offset(xy[j]),-j))
+    if offset(xy[i])>tolerance:keep.add(i);_simplify(xy,a,i,tolerance,keep);_simplify(xy,i,b,tolerance,keep)
+
+def strokes(fs,ts,xy):
+    """Coarse readable movement units over one continuous run; summary only, raw coordinates are untouched."""
+    half=STROKE['median_samples']//2
+    smooth=[(statistics.median(p[0] for p in xy[max(0,i-half):i+half+1]),statistics.median(p[1] for p in xy[max(0,i-half):i+half+1])) for i in range(len(xy))]
+    keep={0,len(xy)-1};_simplify(smooth,0,len(xy)-1,STROKE['simplify_px'],keep)
+    # A pause on a straight line is not a corner; split at near-still runs so holds stay visible.
+    still=[math.dist(a,b)<STROKE['hold_step_px'] for a,b in zip(smooth,smooth[1:])];i=0
+    while i<len(still):
+        j=i
+        while j<len(still) and still[j]:j+=1
+        if j-i>=STROKE['hold_min_samples']:keep.update((i,j))
+        i=j+1
+    corners=sorted(keep);units=[]
+    for a,b in zip(corners,corners[1:]):
+        dx,dy=smooth[b][0]-smooth[a][0],smooth[b][1]-smooth[a][1];distance=math.hypot(dx,dy)
+        state='hold' if distance<STROKE['hold_px'] else direction(dx,dy)
+        if units and units[-1]['direction']==state:
+            u=units[-1];u.update(end_frame=fs[b],end_seconds=ts[b],dx_px=u['dx_px']+dx,dy_px=u['dy_px']+dy);u['distance_px']=math.hypot(u['dx_px'],u['dy_px'])
+        else:units.append(dict(start_frame=fs[a],end_frame=fs[b],start_seconds=ts[a],end_seconds=ts[b],direction=state,dx_px=dx,dy_px=dy,distance_px=distance))
+    largest=max((u['distance_px'] for u in units if u['direction']!='hold'),default=0.)
+    for u in units:
+        elapsed=u['end_seconds']-u['start_seconds'];u['mean_speed_px_per_s']=u['distance_px']/elapsed if elapsed>0 else 0.
+        u['major']=u['direction']!='hold' and u['distance_px']>=largest/2
+    return dict(units=units[:STROKE['max_strokes']],omitted_unit_count=max(0,len(units)-STROKE['max_strokes']),params=STROKE,
+                basis='median-filtered screen path simplified to corners; major = at least half the largest unit; holds are small net travel, not proof of held drawings')
 
 def quote(value):
     # Code-span delimiter exceeds every embedded backtick run. JSON encodes literal newlines.
@@ -68,7 +104,7 @@ def run_summary(rows,pid,infer):
         else:phases.append(dict(start_frame=fs[left],end_frame=fs[right],start_seconds=ts[left],end_seconds=ts[right],direction=state))
     return dict(frames=[fs[0],fs[-1]],seconds=[ts[0],ts[-1]],samples=len(rows),net_dx_px=dx,net_dy_px=dy,
                 net_screen_direction=direction(dx,dy),min_x=extreme(0,1),max_x=extreme(0,-1),
-                horizontal_span_px=max(x[0] for x in xy)-min(x[0] for x in xy),phases=phases,speed_windows=speed_windows,
+                horizontal_span_px=max(x[0] for x in xy)-min(x[0] for x in xy),strokes=strokes(fs,ts,xy),phases=phases,speed_windows=speed_windows,
                 timing=infer(ts,xy),query_index=rows[0][2][pid]['query_index'],anchor_frame=rows[0][2][pid]['anchor_frame'])
 
 def build_report(packet,binding,start,end,collect,infer):
@@ -146,6 +182,11 @@ def markdown(report):
                   f"- 연속 구간 수 {f['total_run_count']}; 생략된 구간 {f['omitted_run_count']}; 끊김 원인 {f['break_reasons']}",
                   f"- 한 연속 구간 안의 최대 수평 범위 {f['max_within_run_horizontal_span_px']}px; 관측 최소x {f['min_x_usable_observation']}"]
         for s in f['continuous_runs']:
+            lines.append(f"- 큰 동작 요약 f{s['frames'][0]}..{s['frames'][1]} (중앙값 필터 후 꺾이는 점 기준, 원본 좌표는 그대로):")
+            for u in s['strokes']['units']:
+                motion='거의 정지(순이동 10px 미만)' if u['direction']=='hold' else ('**큰 이동** ' if u['major'] else '')+f"{KO[u['direction']]} 약 {u['distance_px']:.0f}px, 평균 {u['mean_speed_px_per_s']:.0f}px/s"
+                lines.append(f"  - {u['start_seconds']:.2f}–{u['end_seconds']:.2f}s (f{u['start_frame']}..{u['end_frame']}): {motion}")
+            if s['strokes']['omitted_unit_count']:lines.append(f"  - 생략된 동작 단위 {s['strokes']['omitted_unit_count']}개")
             lines.append(f"- 연속 f{s['frames'][0]}..{s['frames'][1]} / {s['seconds'][0]:.6f}..{s['seconds'][1]:.6f}s: {KO[s['net_screen_direction']]}; Δx={s['net_dx_px']:.3f}px Δy={s['net_dy_px']:.3f}px; 고정 유형맞춤={s['timing']['label']}")
             speeds='; '.join(f"f{w['frames'][0]}..{w['frames'][1]}={w['net_speed_px_per_s']:.1f}/{w['observed_travel_px_per_s']:.1f}" for w in s['speed_windows'])
             lines.append('- 속도 관측(화면px/s, 끝점 순이동/관측 경로 이동; 카메라·흔들림 포함): '+speeds)
@@ -162,6 +203,21 @@ def markdown(report):
               f"분석기 SHA256 {report['analyzer_sha256']}; 보고기 SHA256 {report['reporter_sha256']}",
               f"표시 생략 단계 {omitted}개. 전체 수치근거는 JSON/원본 추적에 있다. 비어 있음은 정지의 증거가 아니다."]
     if report.get('evidence_contact'):lines.append(f"선택 이미지: {quote(report['evidence_contact']['path'])}")
+    view=report.get('trajectory_view')
+    if view:
+        lines += ['','## 궤적 그림과 그림 변경 후보',f"궤적 그림(전체 화면, 파랑→빨강 시간순): {quote(view['path'])}"]
+        change=view['appearance_change']
+        if change['candidates']:
+            lines.append('그림·외형이 바뀌었을 수 있는 곳(자동 판정 아님, 움직임·효과·카메라도 원인일 수 있다):')
+            lines += [f"- f{c['after_frame']}→f{c['frame']} 차이 {c['mean_abs_diff']:.1f} (기준 {change['threshold']:.1f}); 확인: `compare --frames {c['after_frame']},{c['frame']}`" for c in change['candidates']]
+            if change['omitted_candidate_count']:lines.append(f"- 생략된 후보 {change['omitted_candidate_count']}개")
+            lines.append('후보 앞뒤로 그림이 바뀌었다면 그 사이 추적은 같은 부위라는 보장이 없다.')
+            for f in report['features']:
+                for run in f['continuous_runs']:
+                    for u in run['strokes']['units']:
+                        hits=[c['frame'] for c in change['candidates'] if u['major'] and u['start_frame']<=c['frame']<=u['end_frame']]
+                        if hits:lines.append(f"- 주의: {quote(f['point_id'])}의 큰 이동 f{u['start_frame']}..{u['end_frame']}이 후보 f{hits}와 겹친다. 실제 움직임이 아니라 잔상·그림 교체로 추적점이 튄 것일 수 있으니 원본을 먼저 비교한다.")
+        else:lines.append(f"기준 {change['threshold']:.1f} 이상인 그림 변경 후보 없음. 없다는 것이 같은 그림이라는 증거는 아니다.")
     return '\n'.join(lines)+'\n'
 
 def _source_video(report,root):
