@@ -5,7 +5,8 @@
   "authored_code_license": "not granted by this extraction; preserve owner decision",
   "vendor_licenses": {
     "PySceneDetect": "BSD-3-Clause plus embedded MIT notice",
-    "CoTracker": "CC-BY-NC-4.0"
+    "CoTracker": "CC-BY-NC-4.0",
+    "rtmlib-derived detector postprocess": "Apache-2.0 (pose.py ScoredYOLOX)"
   },
   "excluded": [
     "workspace",
@@ -18,8 +19,8 @@
     "historical experiment outputs"
   ],
   "manifest_self_excluded": true,
-  "file_count": 95,
-  "total_bytes": 921096,
+  "file_count": 100,
+  "total_bytes": 984294,
   "files": [
     {
       "path": ".gitattributes",
@@ -33,8 +34,8 @@
     },
     {
       "path": "README.md",
-      "bytes": 6660,
-      "sha256": "4f852c19c6572917845bb6274d2f011eedbab8c816b22ba06f762688d01c8b77"
+      "bytes": 9880,
+      "sha256": "0dc5e0a9e352cf6d4c2eb5aeb022f4162e33b52613f4ba821b32340f26de67d9"
     },
     {
       "path": "docs/import-provenance.json",
@@ -48,8 +49,8 @@
     },
     {
       "path": "docs/limitations.md",
-      "bytes": 2567,
-      "sha256": "5d5eeaa690f2d4bb7a0123c0c6120b3b520a05ff8894eb327430637bf13f493a"
+      "bytes": 3766,
+      "sha256": "21abe396cfa212f4550a589c90f31c8dc3f3065d7cbef447975f8f2b04a25650"
     },
     {
       "path": "docs/provenance.md",
@@ -73,8 +74,8 @@
     },
     {
       "path": "image_lens/analyze_motion.py",
-      "bytes": 30962,
-      "sha256": "c30375e1d8b49629e708d0ce3cf1cf91c52b60a9c0867cd140364a293eed9745"
+      "bytes": 32770,
+      "sha256": "4622c2369e6d6d916cea2fe8db0fc99697efd43486cac49a5cbfb46f0ac51e45"
     },
     {
       "path": "image_lens/appearance_inspection.py",
@@ -83,8 +84,8 @@
     },
     {
       "path": "image_lens/brief.py",
-      "bytes": 11843,
-      "sha256": "1eb345a78e1ffde237a99563d437afc31bdeb8e8c7a7237055fd08148c1614ac"
+      "bytes": 12244,
+      "sha256": "51fc65c7451a88c4dec643f737b4b77fbaf672743f2103f091eb5be662c3162d"
     },
     {
       "path": "image_lens/checkpoint-manifest.json",
@@ -93,8 +94,8 @@
     },
     {
       "path": "image_lens/cli.py",
-      "bytes": 10857,
-      "sha256": "83a479aa9a8a31783232567bbea7434165ef92c7f92aec555cd55c8d019f9119"
+      "bytes": 14513,
+      "sha256": "bf1a806d7952b5dbb28d25ff29963d07632ac93a4ed57511bb3a760ad542fe3d"
     },
     {
       "path": "image_lens/foreground_regions.py",
@@ -108,8 +109,13 @@
     },
     {
       "path": "image_lens/motion_report.py",
-      "bytes": 22783,
-      "sha256": "cf3e266e39202eb0aaf70d1a1772ffc64e6016c0cbbf24599d9ca94b143f6422"
+      "bytes": 32585,
+      "sha256": "4839415f63eaf7e2694910044d3f7e36085f4b8e5506672d117a13e090af3379"
+    },
+    {
+      "path": "image_lens/motion_view.py",
+      "bytes": 10578,
+      "sha256": "bd73b304fba1fd1c30dc6a9c011264e137c04fe11c08c379f3926c58cbeefb35"
     },
     {
       "path": "image_lens/observations.py",
@@ -125,6 +131,11 @@
       "path": "image_lens/paths.py",
       "bytes": 2509,
       "sha256": "f502c36b5a83bcbc3554248c7f672749c30b2b7f0387acd01903068ee241b5d4"
+    },
+    {
+      "path": "image_lens/pose.py",
+      "bytes": 18744,
+      "sha256": "d4101bcd39db568e2dd49d7e8e72643c9762e81deafbe1e30f4173765180958c"
     },
     {
       "path": "image_lens/run_point_tracker.py",
@@ -155,6 +166,11 @@
       "path": "image_lens/vendor/local-patch.json",
       "bytes": 325,
       "sha256": "cab7d2b3ff145435b1362a34cf31085cb85a75e98499507d2d7375b1e4e138e6"
+    },
+    {
+      "path": "image_lens/vendor/shot-detector/scenedetect-0.6.7.1.dist-info/licenses/LICENSE",
+      "bytes": 1505,
+      "sha256": "7e12ac97d04790cb7d3e2e80992ce2157cb77d08d555d4bcf685e86d8ca0d619"
     },
     {
       "path": "image_lens/vendor/shot-detector/scenedetect/__init__.py",
@@ -290,11 +306,6 @@
       "path": "image_lens/vendor/shot-detector/scenedetect/video_stream.py",
       "bytes": 6979,
       "sha256": "d6a35d4e7ae923c04c867bacaf61291a4c11135e15132a6be02bb6bbf45cc3fb"
-    },
-    {
-      "path": "image_lens/vendor/shot-detector/scenedetect-0.6.7.1.dist-info/licenses/LICENSE",
-      "bytes": 1505,
-      "sha256": "7e12ac97d04790cb7d3e2e80992ce2157cb77d08d555d4bcf685e86d8ca0d619"
     },
     {
       "path": "image_lens/vendor/source/LICENSE.md",
@@ -473,8 +484,13 @@
     },
     {
       "path": "pyproject.toml",
-      "bytes": 877,
-      "sha256": "92442ebf5a425e756450dafa8db8f9cd0498a484044226203da3a1ff414f857d"
+      "bytes": 1020,
+      "sha256": "c1e00df0d267ba48e0091becd18c1f73ad9e538208d434ffc9bdb9edf88fdf22"
+    },
+    {
+      "path": "requirements-pose.txt",
+      "bytes": 196,
+      "sha256": "41ac47869841534abd02f74426ffae08457961d8c682c34dc384d50e67dda776"
     },
     {
       "path": "requirements-tracking.txt",
@@ -493,8 +509,18 @@
     },
     {
       "path": "tests/test_contracts.py",
-      "bytes": 15170,
-      "sha256": "e7c37057995d9648a9a093c67c93e38778a465f3a560811b2d5bd246a753e351"
+      "bytes": 17770,
+      "sha256": "baad7c5ac555f1997c4531c67bd6e52cb9aebba3817506b18708e53d5a8dd2d3"
+    },
+    {
+      "path": "tests/test_motion_readability.py",
+      "bytes": 3220,
+      "sha256": "366e459e154809b46283acee3258366609af7db1e5454c50fca14f63a32e4928"
+    },
+    {
+      "path": "tests/test_pose.py",
+      "bytes": 7631,
+      "sha256": "57c5766aaf083ed3c34359aaf8f7d228105565d99bac289381252e0dbd06e07b"
     }
   ]
 }

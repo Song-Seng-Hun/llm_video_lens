@@ -13,6 +13,7 @@ dependencies = []
 [project.optional-dependencies]
 core = ["numpy==2.2.6", "opencv-python-headless==4.12.0.88", "Pillow==13.0.0"]
 tracking = ["numpy==2.2.6", "opencv-python-headless==4.12.0.88", "Pillow==13.0.0", "torch==2.9.0"]
+pose = ["numpy==2.2.6", "opencv-python-headless==4.12.0.88", "Pillow==13.0.0", "onnxruntime==1.23.2", "rtmlib==0.0.16", "supervision==0.26.1"]
 
 [project.scripts]
 image-lens = "image_lens.cli:main"

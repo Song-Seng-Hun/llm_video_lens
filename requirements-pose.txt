@@ -1,0 +1,5 @@
+# Optional local pose (YOLOX HumanArt + RTMW133 ONNX). rtmlib is Apache-2.0; supply and check the weight terms yourself.
+-r requirements.txt
+onnxruntime==1.23.2
+rtmlib==0.0.16
+supervision==0.26.1
