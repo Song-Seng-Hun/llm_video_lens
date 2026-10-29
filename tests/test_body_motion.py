@@ -46,4 +46,29 @@ class BodyMotion(unittest.TestCase):
         limb = body_motion.describe([packet(paths)], dict(seed=0, end=20))['limbs'][0]
         self.assertEqual(limb['side'], '화면 왼쪽')
 
+
+def pose(shoulders, wrists, size=100.):
+    k = [[0., 0.]]*133; s = [0.]*133
+    k = [list(p) for p in k]
+    (k[5], k[6]), (k[9], k[10]) = shoulders, wrists
+    for i in (5, 6, 9, 10):
+        s[i] = .9
+    return dict(bbox=[0, 0, size, size], keypoints=k, scores=s)
+
+
+class Bridge(unittest.TestCase):
+    def test_arm_dropping_on_the_switch_frame_is_reported(self):
+        before = pose(([300., 300.], [100., 300.]), ([320., 420.], [-60., 300.]))
+        after = pose(([300., 300.], [100., 300.]), ([320., 420.], [180., 520.]))
+        r = body_motion.bridge(before, after, (61, 62))
+        limb = r['limbs'][0]
+        self.assertEqual((limb['side'], limb['direction']), ('화면 왼쪽', 'down_right')); self.assertLess(limb['axis_px'], 0)
+        self.assertIn('몸 쪽으로', '\n'.join(body_motion.bridge_lines(r)))
+
+    def test_far_apart_or_different_size_is_not_bridged(self):
+        a = pose(([300., 300.], [100., 300.]), ([320., 420.], [-60., 300.]))
+        self.assertIsNone(body_motion.bridge(a, a, (10, 40)))
+        small = pose(([220., 300.], [180., 300.]), ([320., 420.], [-60., 300.]))
+        self.assertIsNone(body_motion.bridge(a, small, (61, 62)))
+
 if __name__ == '__main__': unittest.main()

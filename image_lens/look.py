@@ -123,7 +123,7 @@ def run(video, detector, pose_model, checkpoint, out, max_shots=LOOK['max_shots'
     pose_packet, _ = paths.load(root/'pose.json', max_bytes=64*1024*1024)
     pose_frames = {f['frame']: f['tracks'] for f in pose_packet['frames']}
     flagged = {r['frame'] for r in pose_packet['flags']['frames']}
-    shots = []; lines = []
+    shots = []; lines = []; last_end = None
     segments = scan['analysis_segments']
     for segment in segments[:max_shots]:
         sid = segment['segment_id']; s0, s1 = segment['start_frame'], segment['end_frame']
@@ -171,6 +171,11 @@ def run(video, detector, pose_model, checkpoint, out, max_shots=LOOK['max_shots'
             # Hand tips flicker on drawn hands, so only head, arms and legs decide a cut.
             cut = cut_frame([t[3] for t in tracked if t[1] != 'hands'], w)
             end = w['end'] if cut is None else min(w['end'], max(cut, w['seed']+LOOK['min_frames']-1))
+            from image_lens import body_motion
+            if last_end is not None:
+                done['bridge'] = body_motion.bridge(body_motion.largest(pose_frames.get(last_end)), body_motion.largest(pose_frames.get(w['seed'])),
+                                                    (last_end, w['seed']))
+                lines += body_motion.bridge_lines(done['bridge'])
             lines.append(f"- 구간 f{w['seed']}..{end} (점 배치 f{w['seed']}" + (f", {people}명 중 가장 큰 사람" if people > 1 else '') + ')')
             for name, group, stem, _ in tracked:
                 try:
@@ -191,13 +196,13 @@ def run(video, detector, pose_model, checkpoint, out, max_shots=LOOK['max_shots'
                     lines.append(f'  - {group} 실패: {str(error)[:120]}')
             if still:lines.append(f"  - {'·'.join(still)}: 큰 이동 없음")
             if tracked:
-                from image_lens import body_motion
                 done['body'] = body_motion.describe([t[3] for t in tracked], dict(w, end=end))
                 lines += ['  '+l for l in body_motion.lines(done['body'])]
             if end < w['end']:
                 done['cut_after'] = end; start = end+1
                 lines.append(f"  - f{end} 뒤 점이 한꺼번에 끊김(그림 바뀜·화면 전환 추정): f{end+1}부터 점을 다시 놓음")
             if done['groups']:lines.append(f"  - 자세히: {base.name}-<head|arms|legs>.report.md, 그림 {base.name}-<묶음>-traj/trajectory.png")
+            last_end = end if done['groups'] else None
             entry['windows'].append(done)
         lines.append('')
     if len(segments) > max_shots:

@@ -125,3 +125,58 @@ def lines(result):
     if not result['limbs']:
         out.append('  - 팔다리: 몸 기준으로도 기준 미만')
     return out
+
+
+# Across a costume change or cut the drawing is replaced, but an animated move often runs through it (an arm dropping
+# from the side to the waist on the switch frame). Compare the same pose keypoints on the two frames around it.
+BRIDGE = dict(max_gap=3, min_score=.30, size_ratio=(.75, 1.33), max_centre_shift=1.)
+KEYPOINTS = dict(wrist=(9, 10), elbow=(7, 8))  # hand tips repeat the wrist and are rough on drawn hands
+
+
+def largest(tracks):
+    return max(tracks, key=lambda t: (t['bbox'][2]-t['bbox'][0])*(t['bbox'][3]-t['bbox'][1])) if tracks else None
+
+
+def bridge(before, after, frames):
+    """Body-relative jumps of limb keypoints between two nearby frames, or None when it is not plausibly the same figure."""
+    if not before or not after or frames[1]-frames[0] > BRIDGE['max_gap']:
+        return None
+    def body(t):
+        k, s = t['keypoints'], t['scores']
+        if min(s[5], s[6]) < BRIDGE['min_score']:
+            return None
+        return ((k[5][0]+k[6][0])/2, (k[5][1]+k[6][1])/2), math.dist(k[5], k[6])
+    a, b = body(before), body(after)
+    if not a or not b or not a[1] or not BRIDGE['size_ratio'][0] <= b[1]/a[1] <= BRIDGE['size_ratio'][1] \
+            or math.dist(a[0], b[0]) > BRIDGE['max_centre_shift']*a[1]:
+        return None
+    size = (a[1]+b[1])/2; limit = max(BODY_MOTION['min_px'], BODY_MOTION['min_ratio']*size)
+    limbs = []
+    for part, pair in KEYPOINTS.items():
+        for side, i in zip('lr', pair):
+            if min(before['scores'][i], after['scores'][i]) < BRIDGE['min_score']:
+                continue
+            ra = (before['keypoints'][i][0]-a[0][0], before['keypoints'][i][1]-a[0][1])
+            rb = (after['keypoints'][i][0]-b[0][0], after['keypoints'][i][1]-b[0][1])
+            dx, dy = rb[0]-ra[0], rb[1]-ra[1]
+            if math.hypot(dx, dy) < limit:
+                continue
+            shoulder = after['keypoints'][5 if side == 'l' else 6][0]-b[0][0]
+            spread = abs(rb[0])-abs(ra[0])
+            limbs.append(dict(point_id=f'{part}-{side}', part=PARTS[part], side='화면 왼쪽' if shoulder < 0 else '화면 오른쪽',
+                              direction=motion_report.direction(dx, dy), distance_px=round(math.hypot(dx, dy), 1),
+                              axis_px=round(spread, 1) if abs(spread) >= limit else 0.))
+    shift = (b[0][0]-a[0][0], b[0][1]-a[0][1])
+    return dict(frames=list(frames), limit_px=round(limit, 1), limbs=limbs,
+                centre_shift=dict(direction=motion_report.direction(*shift), distance_px=round(math.hypot(*shift), 1)))
+
+
+def bridge_lines(result):
+    if not result or not result['limbs']:
+        return []
+    a, b = result['frames']
+    out = [f"- 전환 사이 (f{a}→f{b}, 그림이 바뀌어도 이어지는 움직임, 포즈 기준):"]
+    for limb in result['limbs']:
+        axis = '' if not limb['axis_px'] else f", 몸 {'바깥으로' if limb['axis_px'] > 0 else '쪽으로'} {abs(limb['axis_px']):.0f}px"
+        out.append(f"  - {limb['side']} {limb['part']}: {motion_report.KO[limb['direction']].replace('화면 ', '')} {limb['distance_px']:.0f}px{axis}")
+    return out
