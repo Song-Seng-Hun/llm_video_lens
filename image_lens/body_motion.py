@@ -179,7 +179,7 @@ def bridge_lines(result):
     if not result or not result['limbs']:
         return []
     a, b = result['frames']
-    out = [f"- 전환 사이 (f{a}→f{b}, 그림이 바뀌어도 이어지는 움직임, 포즈 기준):"]
+    out = [f"- 전환 앞뒤 자세 차이 (f{a}→f{b}, 포즈 기준; 두 프레임만 비교, 사이 경로·속도는 모름):"]
     for limb in result['limbs']:
         axis = '' if not limb['axis_px'] else f", 몸 {'바깥으로' if limb['axis_px'] > 0 else '쪽으로'} {abs(limb['axis_px']):.0f}px"
         out.append(f"  - {limb['side']} {limb['part']}: {motion_report.KO[limb['direction']].replace('화면 ', '')} {limb['distance_px']:.0f}px{axis}")

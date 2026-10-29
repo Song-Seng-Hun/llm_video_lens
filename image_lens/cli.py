@@ -5,7 +5,7 @@ from pathlib import Path
 import sys
 from image_lens import paths
 
-COMMANDS = ('look', 'scan', 'compare', 'brief', 'catalog', 'pose', 'seed', 'bind', 'prepare', 'validate', 'track', 'analyze', 'grid', 'mark')
+COMMANDS = ('look', 'scan', 'compare', 'brief', 'catalog', 'pose', 'seed', 'bind', 'prepare', 'validate', 'track', 'analyze', 'grid', 'mark', 'focus')
 
 
 def parser(command, description):
@@ -137,6 +137,12 @@ def dispatch(command, arguments):
         ap.add_argument('--checkpoint', required=True); ap.add_argument('--out', required=True, help='new output directory')
         a = ap.parse_args(arguments)
         return mark.run(a.video, a.shots, a.frame, a.point, a.checkpoint, a.out, a.end, not a.no_snap)
+    if command == 'focus':
+        from image_lens import digest
+        ap = parser(command, 'Print one shot of a look run in full detail (look-full.md).')
+        ap.add_argument('--look', required=True, help='look output directory'); ap.add_argument('--shot', required=True)
+        a = ap.parse_args(arguments)
+        return dict(status='ok', shot=a.shot, text=digest.focus(a.look, a.shot))
     if command == 'look':
         from image_lens import look
         ap = parser(command, 'One-command look: scan, pose, pose-seeded tracking per shot window, one short look.md.')
@@ -250,7 +256,9 @@ def main(argv=None):
     try:
         paths.configure(a.workspace)
         result = dispatch(a.command, a.arguments)
-        if result is not None:
+        if a.command == 'focus':
+            print(result['text'], end='')  # plain Markdown for the reader, not a JSON receipt
+        elif result is not None:
             print(json.dumps(result, ensure_ascii=False, allow_nan=False))
         return 0
     except (ValueError, OSError, KeyError, TypeError, ImportError, TimeoutError, OverflowError) as error:

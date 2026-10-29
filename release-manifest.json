@@ -19,8 +19,8 @@
     "historical experiment outputs"
   ],
   "manifest_self_excluded": true,
-  "file_count": 109,
-  "total_bytes": 1064005,
+  "file_count": 111,
+  "total_bytes": 1076459,
   "files": [
     {
       "path": ".gitattributes",
@@ -34,8 +34,8 @@
     },
     {
       "path": "README.md",
-      "bytes": 16003,
-      "sha256": "5e2d77f96f3356513f10f53aef07ed17ee5388d300ebf142b569162f6dd8e853"
+      "bytes": 16747,
+      "sha256": "8b720941925b62cd807d5dffc71deacd20f91b34452a417ec0fd8d753afbd0a3"
     },
     {
       "path": "docs/import-provenance.json",
@@ -84,8 +84,8 @@
     },
     {
       "path": "image_lens/body_motion.py",
-      "bytes": 11467,
-      "sha256": "442bd811a7f709a9034cc47d36e88c7fd79958f40fc66d0eb95851e1e757838b"
+      "bytes": 11492,
+      "sha256": "e9c053df1037f204d56fe321cb926f4bde492b5e8c41c221aaa5b13c508f72a8"
     },
     {
       "path": "image_lens/brief.py",
@@ -104,8 +104,13 @@
     },
     {
       "path": "image_lens/cli.py",
-      "bytes": 17004,
-      "sha256": "aa78d9c4303d565da678734f415c3d628777fdfaaa065657903702d4d37e5d7d"
+      "bytes": 17539,
+      "sha256": "0e593f0e7d4c0c4af6a4ea106339bd1b3f2cb3883bb11cf2b29270afd4f1a8d5"
+    },
+    {
+      "path": "image_lens/digest.py",
+      "bytes": 8396,
+      "sha256": "b04a1573740791fe171c816b7e091feff11763cc9e55b5bd6abb104aab52c5ae"
     },
     {
       "path": "image_lens/foreground_regions.py",
@@ -119,8 +124,8 @@
     },
     {
       "path": "image_lens/look.py",
-      "bytes": 18615,
-      "sha256": "a78824f374313742ca6d53d4c93dbd9a0cd566ac3597850c106438329a0ff6f9"
+      "bytes": 19076,
+      "sha256": "3fc0d434d3bc431864bc3d4099ee4f2702b3aad2090b34fcedd433f8cd954fab"
     },
     {
       "path": "image_lens/mark.py",
@@ -541,6 +546,11 @@
       "path": "tests/test_contracts.py",
       "bytes": 17770,
       "sha256": "baad7c5ac555f1997c4531c67bd6e52cb9aebba3817506b18708e53d5a8dd2d3"
+    },
+    {
+      "path": "tests/test_digest.py",
+      "bytes": 2293,
+      "sha256": "a0f2e4a2acf5ed5a549310ca100361d0cc8ae9951bee2d4c5aa9d4218f338b55"
     },
     {
       "path": "tests/test_look.py",

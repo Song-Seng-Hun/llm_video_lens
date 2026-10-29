@@ -91,7 +91,7 @@ def _summary(report, window, group, md_path, traj, frame_motion=None):
     whole frame (camera pan, scrolling UI) are set aside and counted."""
     import math
     from image_lens import camera, motion_report
-    moves = []; with_camera = 0; kept = set()
+    moves = []; facts = []; with_camera = 0; kept = set()
     for f in report['features']:
         for run in f['continuous_runs']:
             for u in run['strokes']['units']:
@@ -105,6 +105,8 @@ def _summary(report, window, group, md_path, traj, frame_motion=None):
                     continue
                 timing = f", {motion_report.EASE_KO[u['ease']]}" if u.get('ease') else ''
                 moves.append(f"{f['point_id']} {motion_report.KO[u['direction']]} {u['distance_px']:.0f}px(f{u['start_frame']}..{u['end_frame']}{timing})")
+                facts.append(dict(point=f['point_id'], direction=u['direction'], distance_px=u['distance_px'],
+                                  frames=[u['start_frame'], u['end_frame']], ease=u.get('ease')))
                 kept.add(f['point_id'])
     together = [g for g in motion_report.together(report) if 2*len(kept & set(g['points'])) >= len(g['points'])]
     lines = [f"- {NAMES[group]}: " + ('; '.join(moves) if moves else '큰 이동 없음')]
@@ -119,7 +121,7 @@ def _summary(report, window, group, md_path, traj, frame_motion=None):
         lines.append(f"  - f{cut['after']} 뒤로 점 {cut['count']}/{cut['total']}개 끊김(그림 바뀜·가려짐·화면 밖). 그 뒤는 정지가 아니라 모름.")
     if not moves and not any(f['continuous_runs'] for f in report['features']):
         lines = [f"- {NAMES[group]}: 쓸 수 있는 연속 관측 없음(가려짐·화면 밖·추적 끊김). 정지가 아니라 모름."]
-    return (lines if moves or cut or len(lines) == 1 and '모름' in lines[0] else []), dict(group=group, major_moves=moves, together=together, warnings=len(warnings),
+    return (lines if moves or cut or len(lines) == 1 and '모름' in lines[0] else []), dict(group=group, major_moves=moves, moves=facts, together=together, warnings=len(warnings),
                        lost=cut, camera_only_moves=with_camera, report=str(md_path), trajectory=str(traj))
 
 
@@ -193,7 +195,7 @@ def run(video, detector, pose_model, checkpoint, out, max_shots=LOOK['max_shots'
                                                     (last_end, w['seed']))
                 lines += body_motion.bridge_lines(done['bridge'])
             lines.append(f"- 구간 f{w['seed']}..{end} (점 배치 f{w['seed']}" + (f", {people}명 중 가장 큰 사람" if people > 1 else '') + ')')
-            skeleton = receipt.get('skeleton') or dict(plausible=True)
+            skeleton = receipt.get('skeleton') or dict(plausible=True); done['skeleton'] = skeleton['plausible']
             if not skeleton['plausible']:
                 lines.append(f"  - 골격 신뢰 낮음({skeleton['reason']}): 팔·다리 이름 없이 얼굴과 많이 움직인 곳(move-a…)만 봄")
             from image_lens import camera, motion_report
@@ -239,7 +241,7 @@ def run(video, detector, pose_model, checkpoint, out, max_shots=LOOK['max_shots'
                 except STEP_ERRORS as error:
                     entry['errors'].append(dict(window=w, job=name, error=str(error)[:300]))
                     lines.append(f'  - {group} 실패: {str(error)[:120]}')
-            if still:lines.append(f"  - {'·'.join(still)}: 큰 이동 없음")
+            if still:lines.append(f"  - {'·'.join(still)}: 화면 기준 큰 이동({motion_report.STROKE['major_min_px']:.0f}px 이상) 없음")
             if tracked and skeleton['plausible']:
                 done['body'] = body_motion.describe([t[3] for t in tracked], dict(w, end=end))
                 lines += ['  '+l for l in body_motion.lines(done['body'])]
@@ -262,13 +264,14 @@ def run(video, detector, pose_model, checkpoint, out, max_shots=LOOK['max_shots'
         lines.append('')
     if len(segments) > max_shots:
         lines.append(f'생략된 장면 {len(segments)-max_shots}개 (--max-shots {max_shots}).')
-    head = ['# 영상 움직임 한눈 보기', '',
+    head = ['# 영상 움직임 자세히 (요약은 look.md)', '',
             f"영상 {source.name}: {scan['source_frame_count']}프레임, {scan['fps']:g}fps, 장면 {len(segments)}개. 점은 포즈 기준 자동 배치(머리카락은 눈 기준 기하), 부위·동일인 미검증.",
             '경고는 "원본부터 비교하라"는 뜻이다. 가짜 움직임이라는 판정이 아니다. 자세한 수치는 장면별 report.json에 있다.', '']
-    text = '\n'.join(head+lines).rstrip('\n')+'\n'
-    look_md = paths.write(root/'look.md', text)
+    paths.write(root/'look-full.md', '\n'.join(head+lines).rstrip('\n')+'\n')
     record = dict(schema='image-lens.look/1', source_video=str(source), source_sha256=scan['source_sha256'], params=LOOK,
                   max_shots=max_shots, elapsed_seconds=round(time.monotonic()-started, 1), shots=shots)
     paths.write_json(root/'look.json', record)
+    from image_lens import digest
+    look_md = paths.write(root/'look.md', digest.markdown(record, scan, 'look-full.md'))
     return dict(status='written', output=str(look_md), shots=len(shots), windows=sum(len(s['windows']) for s in shots),
                 errors=sum(len(s['errors']) for s in shots), elapsed_seconds=record['elapsed_seconds'])
