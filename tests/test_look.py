@@ -52,4 +52,21 @@ class Summary(unittest.TestCase):
         lines, summary = look._summary(report, dict(seed=0, end=99), 'arms', 'x', 'y')
         self.assertEqual(lines, []); self.assertIsNone(summary['lost'])
 
+
+class Cut(unittest.TestCase):
+    def packet(self, last_visible, seed=0, end=99):
+        return dict(frames=[dict(frame=n, points=[dict(point_id=p, visible=n <= e) for p, e in last_visible.items()]) for n in range(seed, end+1)])
+
+    def test_group_dropping_together_cuts_the_window(self):
+        arms = self.packet(dict(a=40, b=41, c=99)); head = self.packet(dict(x=99, y=99))
+        self.assertEqual(look.cut_frame([head, arms], dict(seed=0, end=99)), 41)
+
+    def test_no_cut_when_points_last_to_the_end(self):
+        self.assertIsNone(look.cut_frame([self.packet(dict(a=99, b=95, c=30))], dict(seed=0, end=99)))
+
+    def test_reseed_starts_after_the_cut(self):
+        poses = {n: [dict(track_id='t')] for n in range(0, 200)}
+        window, _ = look.next_window(dict(start_frame=0, end_frame=199), 42, poses, {42, 43})
+        self.assertEqual(window, dict(seed=44, end=199))
+
 if __name__ == '__main__': unittest.main()
