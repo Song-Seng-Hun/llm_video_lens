@@ -113,4 +113,51 @@ class Framing(unittest.TestCase):
         self.assertEqual(body_motion.upper_check(track), (True, 'upper body'))
         self.assertFalse(body_motion.upper_check(keypoints({5: (560, 420), 7: (540, 600)}))[0])
 
+
+class PoseEvents(unittest.TestCase):
+    FACE = {i: (600+2*(i-23), 150+(i-23)) for i in range(23, 91)}  # face box x 600..734, y 150..217
+
+    def frames(self, joints, n=30, track='t'):
+        return {f: [dict(keypoints(joints(f)), track_id=track, bbox=[400, 100, 900, 800])] for f in range(n)}
+
+    def test_hand_brought_to_the_cheek_is_a_run(self):
+        def joints(f):
+            j = {**self.FACE, 1: (640, 170), 2: (700, 170), 5: (560, 420), 6: (780, 420), 9: (560, 700), 10: (780, 700)}
+            if 10 <= f <= 20:
+                j[10] = (740, 190)  # right wrist at the cheek height, just outside the face box
+            return j
+        found = body_motion.pose_events(self.frames(joints), dict(seed=0, end=29), 60)
+        self.assertEqual(len(found['hand_face']), 1)
+        e = found['hand_face'][0]
+        self.assertEqual((e['frames'], e['side'], e['region']), ([10, 20], '화면 오른쪽', '볼'))
+
+    def test_one_shoulder_rising_is_not_cancelled(self):
+        def joints(f):
+            lift = 40 if 10 <= f <= 20 else 0  # shoulder width 200: a .2 rise
+            return {1: (640, 170), 2: (700, 170), 5: (560, 420-lift), 6: (760, 420), 9: (560, 700), 10: (760, 700)}
+        found = body_motion.pose_events(self.frames(joints), dict(seed=0, end=29), 60)
+        moves = [(e['side'], e['rise']) for e in found['shoulders']]
+        self.assertEqual(moves, [('화면 왼쪽', True), ('화면 왼쪽', False)]); self.assertFalse(found['turn'])
+        self.assertEqual(found['hands_seen'], {'화면 왼쪽': 1.0, '화면 오른쪽': 1.0})
+
+    def test_hand_points_without_a_wrist_are_not_a_hand(self):
+        joints = lambda f: {**self.FACE, 1: (640, 170), 2: (700, 170), 5: (560, 420), 6: (780, 420), 112: (740, 190), 113: (742, 195)}
+        self.assertEqual(body_motion.pose_events(self.frames(joints), dict(seed=0, end=29), 60)['hand_face'], [])
+
+    def test_turn_drops_shoulder_heights(self):
+        def joints(f):
+            half = 100 if f < 10 or f > 20 else 30  # shoulders collapse to a third of their width and come back
+            return {1: (640, 170), 2: (700, 170), 5: (660-half, 420-(30 if f == 15 else 0)), 6: (660+half, 420)}
+        found = body_motion.pose_events(self.frames(joints), dict(seed=0, end=29), 60)
+        self.assertTrue(found['turn']); self.assertEqual(found['shoulders'], [])
+
+    def test_unseen_hands_are_counted(self):
+        found = body_motion.pose_events(self.frames(lambda f: {1: (640, 170), 2: (700, 170), 5: (560, 420), 6: (760, 420)}), dict(seed=0, end=29), 60)
+        self.assertEqual(found['hands_seen'], {'화면 왼쪽': 0.0, '화면 오른쪽': 0.0})
+
+    def test_zigzag_ignores_jitter(self):
+        self.assertEqual(body_motion._zigzag([0, 1, 2, 3, 2, 1, 0], 1.5), [(0, 3, 3), (3, 6, -3)])
+        self.assertEqual(body_motion._zigzag([0, .1, 0, .1], 1), [])
+
+
 if __name__ == '__main__': unittest.main()

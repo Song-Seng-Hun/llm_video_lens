@@ -256,3 +256,124 @@ def upper_check(track):
     if arm > SKELETON['max_arm']:
         return False, f'arm segment {arm:.2f} shoulder widths'
     return True, 'upper body'
+
+
+
+# Relations and shoulder moves straight from the per-frame pose (every frame is posed). Seedance blind test: hand to
+# cheek, hand to face, shoulder rolls and shrugs were missed; the tracked-point path measures limbs against the
+# shoulder midpoint, which cancels a shared shrug. Distances are in face or shoulder widths, durations in seconds.
+# COCO-WholeBody: 23-90 face contour and features, 91-111 left hand, 112-132 right hand.
+EVENTS = dict(min_score=.30, face_points=10, face_pad=.25, near_seconds=.1, gap_frames=3, hip_score=.5, hip_coverage=.8,
+              shoulder_move=.12, width_change=.12, turn=.35, hands_seen=.5)
+FACE = range(23, 91)
+HANDS = dict(l=(9, range(91, 112)), r=(10, range(112, 133)))
+REGION_KO = ('이마·눈', '볼', '입·턱')
+
+
+def _person(tracks, track_id):
+    same = [t for t in tracks or [] if t.get('track_id') == track_id]
+    return same[0] if same else largest(tracks)
+
+
+def _runs(flags, gap):
+    """[(first, last)] of frame runs where flags[n] is true, joining holes of at most `gap` frames."""
+    out = []
+    for n in sorted(n for n, v in flags.items() if v):
+        if out and n-out[-1][1] <= gap+1:
+            out[-1][1] = n
+        else:
+            out.append([n, n])
+    return [tuple(r) for r in out]
+
+
+def _zigzag(values, limit):
+    """[(i0, i1, change)] of the rises and falls of a 1-D series of at least `limit`; a turn counts once the series
+    has come back by `limit`, so jitter below it never splits a move."""
+    out = []; lo = hi = anchor = 0; trend = 0
+    for i, v in enumerate(values):
+        if trend >= 0 and v >= values[hi]:
+            hi = i
+        if trend <= 0 and v <= values[lo]:
+            lo = i
+        if trend == 0 and values[hi]-values[lo] >= limit:
+            trend = 1 if hi > lo else -1; anchor = lo if trend > 0 else hi
+        elif trend > 0 and values[hi]-v >= limit:
+            out.append((anchor, hi, values[hi]-values[anchor])); trend = -1; anchor = hi; lo = i
+        elif trend < 0 and v-values[lo] >= limit:
+            out.append((anchor, lo, values[lo]-values[anchor])); trend = 1; anchor = lo; hi = i
+    end = hi if trend > 0 else lo
+    if trend and abs(values[end]-values[anchor]) >= limit:
+        out.append((anchor, end, values[end]-values[anchor]))
+    return out
+
+
+def _smooth(values):
+    return [v for v, _ in _median3([(v, 0.) for v in values])]
+
+
+def _screen_side(person, i):
+    k = person['keypoints']
+    return '화면 왼쪽' if k[i][0] < (k[5][0]+k[6][0])/2 else '화면 오른쪽'
+
+
+def pose_events(pose_frames, window, fps):
+    """Hand-near-face runs, per-shoulder rises and falls, shoulder-width changes and the share of frames each wrist
+    was seen, for the person posed on the seed frame. Sides are screen sides on the seed frame."""
+    seed = largest(pose_frames.get(window['seed']))
+    if not seed:
+        return None
+    people = {n: _person(pose_frames.get(n), seed.get('track_id')) for n in range(window['seed'], window['end']+1)}
+    people = {n: p for n, p in people.items() if p}
+    ok = lambda p, i: p['scores'][i] >= EVENTS['min_score']
+    sides = dict(l=_screen_side(seed, 5), r=_screen_side(seed, 6))
+    near = {s: {} for s in HANDS}; where = {s: {} for s in HANDS}; seen = {s: 0 for s in HANDS}
+    for n, p in people.items():
+        k = p['keypoints']
+        face = [k[i] for i in FACE if ok(p, i)]
+        for s, (wrist, hand) in HANDS.items():
+            seen[s] += ok(p, wrist)
+            points = [k[i] for i in (wrist, *hand) if ok(p, i)]
+            # Hand points without their wrist are often something else near the face (Seedance: a cat's paws).
+            if len(face) < EVENTS['face_points'] or not ok(p, wrist):
+                continue
+            x0, x1 = min(q[0] for q in face), max(q[0] for q in face); y0, y1 = min(q[1] for q in face), max(q[1] for q in face)
+            pad = EVENTS['face_pad']*(x1-x0)
+            inside = [q for q in points if x0-pad <= q[0] <= x1+pad and y0-pad <= q[1] <= y1+pad]
+            near[s][n] = bool(inside)
+            if inside:
+                y = sorted(q[1] for q in inside)[len(inside)//2]
+                where[s][n] = min(2, max(0, int(3*(y-y0)/max(1., y1-y0))))
+    shortest = max(3, round(EVENTS['near_seconds']*fps))
+    hand_face = []
+    for s in HANDS:
+        for a, b in _runs(near[s], EVENTS['gap_frames']):
+            spots = sorted(where[s][n] for n in range(a, b+1) if n in where[s])
+            if b-a+1 >= shortest:
+                hand_face.append(dict(side=sides[s], frames=[a, b], seconds=round((b-a+1)/fps, 2), region=REGION_KO[spots[len(spots)//2]]))
+    shoulders = []; width = []
+    both = [n for n, p in people.items() if ok(p, 5) and ok(p, 6)]
+    hips = [n for n in both if min(people[n]['scores'][11], people[n]['scores'][12]) >= EVENTS['hip_score']]
+    ref = (11, 12) if both and len(hips) >= EVENTS['hip_coverage']*len(both) else (1, 2)
+    rows = [n for n in both if all(ok(people[n], i) for i in ref)]
+    if len(rows) >= 4:
+        k = lambda n: people[n]['keypoints']
+        size = sorted(math.dist(k(n)[5], k(n)[6]) for n in rows)[len(rows)//2]
+        for i, s in ((5, 'l'), (6, 'r')):
+            # Up is positive: the shoulder's height above the hips or eyes, in shoulder widths.
+            height = _smooth([(_mean([k(n)[j] for j in ref])[1]-k(n)[i][1])/size for n in rows])
+            shoulders += [dict(side=sides[s], rise=c > 0, amount=round(abs(c), 2), frames=[rows[a], rows[b]])
+                          for a, b, c in _zigzag(height, EVENTS['shoulder_move'])]
+        # Shoulder width against the eye distance, which does not turn with the chest: wider is a chest opening or a
+        # turn toward the camera, narrower the reverse.
+        scale = [n for n in rows if ok(people[n], 1) and ok(people[n], 2) and math.dist(k(n)[1], k(n)[2])]
+        if len(scale) >= 4:
+            ratio = _smooth([math.dist(k(n)[5], k(n)[6])/math.dist(k(n)[1], k(n)[2]) for n in scale])
+            base = sorted(ratio)[len(ratio)//2]
+            width = [dict(wider=c > 0, share=round(abs(c), 2), frames=[scale[a], scale[b]])
+                     for a, b, c in _zigzag([r/base for r in ratio], EVENTS['width_change'])]
+    # A large width swing is a turn (or a mislabelled, blurred pose): the shoulder points jump, so their heights mean nothing.
+    turn = any(e['share'] >= EVENTS['turn'] for e in width)
+    if turn:
+        shoulders = []
+    return dict(hand_face=sorted(hand_face, key=lambda e: e['frames'][0]), shoulders=sorted(shoulders, key=lambda e: e['frames'][0]),
+                width=width, turn=turn, hands_seen={sides[s]: round(seen[s]/max(1, len(people)), 2) for s in HANDS})

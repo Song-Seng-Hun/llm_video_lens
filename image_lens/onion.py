@@ -79,30 +79,100 @@ def _image(cv2, np, first, last, box, result, path):
     cv2.imwrite(str(path), picture)
 
 
+# The onion overlays start and end only: a spin or a hand that goes out and back ends where it began, so the overlay
+# looks still (Seedance blind test, all three spins missed). The frame most unlike the start, away from both ends,
+# goes next to it.
+PEAK = dict(min_frames=8, margin=.15, scale=4, plateau=.95)
+
+
+def _crop(cv2, image, bbox):
+    h, w = image.shape[:2]
+    x0, y0, x1, y1 = _box(bbox, w, h) if bbox else (0, 0, w, h)
+    return image[y0:y1, x0:x1]
+
+
+def peak(video, start, end, bbox, image):
+    """Frame number of the frame most unlike `start` (mean grey difference inside the padded person box), searched
+    away from both window ends, drawn as a grey panel right of the onion image. None for short windows."""
+    import cv2
+    import numpy as np
+    if end-start+1 < PEAK['min_frames']:
+        return None
+    lo, hi = start+max(1, int(PEAK['margin']*(end-start))), end-max(1, int(PEAK['margin']*(end-start)))
+    cap = cv2.VideoCapture(str(video))
+    try:
+        cap.set(cv2.CAP_PROP_POS_FRAMES, start)
+        found = {}; first = None
+        for n in range(start, hi+1):
+            ok, frame = cap.read()
+            if not ok:
+                break
+            small = cv2.resize(cv2.cvtColor(_crop(cv2, frame, bbox), cv2.COLOR_BGR2GRAY), None, fx=1/PEAK['scale'], fy=1/PEAK['scale'], interpolation=cv2.INTER_AREA).astype(np.float32)
+            if first is None:
+                first = small
+            elif n >= lo:
+                found[n] = float(np.abs(small-first).mean())
+        if not found:
+            return None
+        # Once a part has left its start outline the difference stops growing; take the middle of that plateau.
+        plateau = [n for n, d in found.items() if d >= PEAK['plateau']*max(found.values())]
+        n = plateau[len(plateau)//2]
+        cap.set(cv2.CAP_PROP_POS_FRAMES, n)
+        ok, frame = cap.read()
+    finally:
+        cap.release()
+    if not ok:
+        return None
+    onion = cv2.imread(str(image))
+    panel = cv2.cvtColor(cv2.cvtColor(_crop(cv2, frame, bbox), cv2.COLOR_BGR2GRAY), cv2.COLOR_GRAY2BGR)
+    if onion is not None and onion.shape[0] == panel.shape[0]:
+        cv2.putText(panel, f'f{n}', (6, 28), cv2.FONT_HERSHEY_SIMPLEX, .9, (0, 200, 255), 2)
+        cv2.imwrite(str(image), np.hstack([onion, np.full((onion.shape[0], 6, 3), 255, np.uint8), panel]))
+    return n
+
+
+def still(video, frame, bbox, image):
+    """One native frame (cropped to the padded person box when there is one) for a range too short to track."""
+    import cv2
+    cap = cv2.VideoCapture(str(video))
+    try:
+        cap.set(cv2.CAP_PROP_POS_FRAMES, frame)
+        ok, picture = cap.read()
+    finally:
+        cap.release()
+    if not ok:
+        return None
+    cv2.imwrite(str(image), _crop(cv2, picture, bbox))
+    return image.name
+
+
 SHEET = dict(tile=360, label=20, columns=4, per_sheet=16)
 
 
 def sheets(root, items):
     """Onion images of a whole look on a few contact sheets (time label above each), so an image reader sees the
-    gestures the text loses (heart hands, V signs on Seedance close-ups). items: [(start_s, end_s, image name)]."""
+    gestures the text loses (heart hands, V signs on Seedance close-ups). items: [(start_s, end_s, image name, note)]."""
     import cv2
     import numpy as np
     t, top = SHEET['tile'], SHEET['label']; written = []
     for first in range(0, len(items), SHEET['per_sheet']):
         tiles = []
-        for start, end, name in items[first:first+SHEET['per_sheet']]:
+        for start, end, name, note in items[first:first+SHEET['per_sheet']]:
             image = cv2.imread(str(root/name))
             if image is None:
                 continue
-            h, w = image.shape[:2]; k = t/max(h, w)
+            # Fit the width; tall pictures stop at 1.5 tiles. Rows take their tallest tile, so wide pictures leave no gap.
+            h, w = image.shape[:2]; k = min(t/w, 1.5*t/h)
             image = cv2.resize(image, (max(1, int(w*k)), max(1, int(h*k))), interpolation=cv2.INTER_AREA)
-            tile = np.zeros((t+top, t, 3), np.uint8); tile[top:top+image.shape[0], :image.shape[1]] = image
-            cv2.putText(tile, f'{start:.2f}-{end:.2f}s', (4, 15), cv2.FONT_HERSHEY_SIMPLEX, .5, (255, 255, 255), 1)
+            tile = np.zeros((image.shape[0]+top, t, 3), np.uint8); tile[top:, :image.shape[1]] = image
+            cv2.putText(tile, f'{start:.2f}-{end:.2f}s {note}'.rstrip(), (4, 15), cv2.FONT_HERSHEY_SIMPLEX, .5, (255, 255, 255), 1)
             tiles.append(tile)
         if not tiles:
             continue
-        tiles += [np.zeros_like(tiles[0])]*(-len(tiles) % SHEET['columns'])
-        rows = [np.hstack(tiles[i:i+SHEET['columns']]) for i in range(0, len(tiles), SHEET['columns'])]
+        tiles += [np.zeros((top, t, 3), np.uint8)]*(-len(tiles) % SHEET['columns'])
+        pad = lambda tile, height: np.vstack([tile, np.zeros((height-tile.shape[0], t, 3), np.uint8)])
+        rows = [np.hstack([pad(x, max(y.shape[0] for y in row)) for x in row])
+                for row in (tiles[i:i+SHEET['columns']] for i in range(0, len(tiles), SHEET['columns']))]
         path = root/f'onion-sheet-{len(written)+1}.jpg'
         cv2.imwrite(str(path), np.vstack(rows)); written.append(path.name)
     return written
@@ -122,7 +192,7 @@ def lines(result, image_name=None):
         return []
     out = ['- 높이별 흐름 (사람 상자 5등분, 카메라 뺌): ' + ' · '.join(parts)]
     if image_name:
-        out.append(f"  - 어니언 그림: {image_name} (청록=시작, 빨강=끝, 초록 화살표=띠별 이동 ×{ONION['arrow_scale']})")
+        out.append(f"  - 어니언 그림: {image_name} (청록=시작, 빨강=끝, 초록 화살표=띠별 이동 ×{ONION['arrow_scale']}; 오른쪽 회색=시작과 가장 다른 가운데 프레임)")
     return out
 
 

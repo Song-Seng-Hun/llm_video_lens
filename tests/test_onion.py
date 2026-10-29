@@ -1,3 +1,4 @@
+from pathlib import Path
 import unittest
 from image_lens import onion
 
@@ -52,5 +53,24 @@ class Parts(unittest.TestCase):
     def test_small_moves_next_to_a_big_one_are_dropped(self):
         tracks = self._tracks({'move-a': [(100+40*t, 100) for t in range(10)], 'move-b': [(500, 100+2*t) for t in range(10)]})
         self.assertEqual(onion.parts(tracks, 9), ['move-a'])
+
+
+class Peak(unittest.TestCase):
+    def test_out_and_back_shows_the_far_frame(self):
+        import tempfile
+        import cv2
+        import numpy as np
+        with tempfile.TemporaryDirectory() as d:
+            video = Path(d)/'v.avi'; out = cv2.VideoWriter(str(video), cv2.VideoWriter_fourcc(*'MJPG'), 10, (320, 240))
+            for k in range(21):  # a block goes right and comes back: start and end are the same picture
+                frame = np.full((240, 320, 3), 255, np.uint8); x = 60+8*min(k, 20-k)
+                cv2.rectangle(frame, (x, 80), (x+40, 160), (0, 0, 0), -1); out.write(frame)
+            out.release()
+            bbox = (40, 60, 280, 180); image = Path(d)/'o.jpg'
+            onion.bands(video, 0, 20, bbox, None, image); width = cv2.imread(str(image)).shape[1]
+            self.assertIn(onion.peak(video, 0, 20, bbox, image), (9, 10, 11))
+            self.assertGreater(cv2.imread(str(image)).shape[1], 2*width)
+            self.assertEqual(onion.still(video, 3, None, Path(d)/'s.jpg'), 's.jpg')
+
 
 if __name__ == '__main__': unittest.main()

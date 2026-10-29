@@ -153,6 +153,7 @@ def window_line(done, fps, first=None):
         flow = _bands(done.get('bands'))
         if flow:
             fields.append('높이별: ' + flow)
+    fields += events(done.get('events'), fps)
     notes = []
     if not done.get('skeleton', True):
         notes.append('골격 신뢰 낮음')
@@ -167,6 +168,33 @@ def window_line(done, fps, first=None):
     if notes:
         fields.append('비고: ' + ', '.join(notes))
     return '- ' + ' | '.join(fields)
+
+
+def events(found, fps):
+    """Fields from the per-frame pose: hand near the face, each shoulder's rises and falls, shoulder-width changes, and
+    hands mostly unseen. A limb below the stroke threshold is not still when its hand was out of view (Seedance 13 s:
+    hands spreading off the bottom edge read as "정지")."""
+    if not found:
+        return []
+    out = []
+    near = [f"{_side(e['side'])}손이 얼굴({e['region']}) 가까이 {e['frames'][0]/fps:.2f}–{(e['frames'][1]+1)/fps:.2f}s" for e in found['hand_face']]
+    if near:
+        out.append('손-얼굴: ' + '; '.join(near[:DIGEST['parts']]) + (f" (+{len(near)-DIGEST['parts']})" if len(near) > DIGEST['parts'] else ''))
+    moves = {}
+    for e in found['shoulders']:
+        moves.setdefault(e['side'], []).append(('올라감' if e['rise'] else '내려감') + f" {e['amount']:.2f}({e['frames'][0]/fps:.2f}s)")
+    if moves:
+        out.append('어깨: ' + '; '.join(f"{_side(side)}어깨 " + ' → '.join(m[:DIGEST['parts']]) for side, m in sorted(moves.items())))
+    if found.get('turn'):
+        e = max(found['width'], key=lambda e: e['share'])
+        out.append(f"몸 돌림 후보: 어깨 폭 크게 {'넓어짐' if e['wider'] else '좁아짐'}({e['frames'][0]/fps:.2f}–{(e['frames'][1]+1)/fps:.2f}s; 포즈가 튄 것일 수도), 어깨 높이는 안 씀")
+    elif found['width']:
+        out.append('어깨 폭: ' + ' → '.join(f"{'넓어짐' if e['wider'] else '좁아짐'} {100*e['share']:.0f}%({e['frames'][0]/fps:.2f}s)"
+                                           for e in found['width'][:DIGEST['parts']]))
+    hidden = [_side(side) for side, share in sorted(found['hands_seen'].items()) if share < body_motion.EVENTS['hands_seen']]
+    if hidden:
+        out.append(f"{'·'.join(hidden)}손 대부분 안 보임: 멈춤 아님, 모름")
+    return out
 
 
 def bridge_line(bridge):
@@ -195,13 +223,14 @@ def markdown(record, scan, full_name):
            '"몸 기준"은 그 위에 팔다리가 더 한 움직임(몸 중심 기준, 같은 쪽 팔·다리에서 같이 움직인 점은 한 줄). '
            '"높이별"은 사람 상자를 위→아래 5칸으로 나눈 이동(px, 0=8px 미만). 골격 신뢰가 낮으면 팔다리 이름 없이 "화면" 이동만. '
            '"자세 A"는 처음과 끝 그림이 같은 구간이 다시 나온 것: 반복은 처음과 다른 점만 쓴다. '
-           '시간 다음 칸은 구도(전신/무릎 위/상반신/얼굴 클로즈업, 포즈 관절이 화면 안에 있는지로 판단): 상반신·클로즈업이면 사람 상자가 화면 아래에서 잘려서 '
+           '어깨는 엉덩이(없으면 눈) 기준 높이 변화, 숫자는 어깨 폭 단위. 어깨 폭은 눈 사이 거리 기준: 넓어짐=가슴 폄·카메라 쪽으로 돎, 좁아짐=웅크림·옆으로 돎. 시간 다음 칸은 구도(전신/무릎 위/상반신/얼굴 클로즈업, 포즈 관절이 화면 안에 있는지로 판단): 상반신·클로즈업이면 사람 상자가 화면 아래에서 잘려서 '
            '높이별 아래 칸은 다리가 아니라 가슴·손이나 얼굴 아래쪽이고, "(팔만)"은 엉덩이 없이 어깨로 팔만 이름 붙였다는 뜻.',
            f"자세히: `image_lens focus --look <이 폴더> --shot <shot-id>` (또는 {full_name}). 점 이름·부위는 미검증, 수치는 원본 비교 전 후보.", '']
     if record.get('scaled'):
         out.insert(3, f"원본 {record['scaled']['from'][0]}×{record['scaled']['from'][1]}을 {record['scaled']['to'][0]}×{record['scaled']['to'][1]}로 줄여서 봄: px는 줄인 영상 기준.")
     if record.get('onion_sheets'):
-        out.insert(-1, f"어니언 모음 그림: {', '.join(record['onion_sheets'])} (구간마다 청록=시작, 빨강=끝, 초록 화살표=높이별 이동). "
+        out.insert(-1, f"어니언 모음 그림: {', '.join(record['onion_sheets'])} (구간마다 청록=시작, 빨강=끝, 초록 화살표=높이별 이동, 오른쪽 회색=시작과 가장 다른 가운데 프레임: 돌거나 갔다 돌아오는 동작은 여기서 보임; "
+                       '"still"=추적하기엔 짧은 컷의 한 장면). '
                        '손 모양(하트·브이)처럼 글에 안 나오는 동작은 그림에서 본다.')
     windows = [d for s in record['shots'] for d in s['windows']]
     seen = {}
@@ -214,7 +243,7 @@ def markdown(record, scan, full_name):
     for s in record['shots']:
         out.append(f"## {s['segment_id']} {s['seconds'][0]:.2f}–{s['seconds'][1]:.2f}s")
         for k in s['skipped']:
-            out.append(f"- 건너뜀 f{k['frames'][0]}..{k['frames'][1]}: {k['reason']}")
+            out.append(f"- 건너뜀 f{k['frames'][0]}..{k['frames'][1]}: {k['reason']}" + (' (모음 그림에 still 사진: 자세만, 움직임 모름)' if k.get('still') else ''))
         for done in s['windows']:
             bridge = done.get('bridge'); pair = (prev.get('motif'), done.get('motif')) if prev else (None, None)
             if bridge and bridge['limbs'] and all(pair) and pair in switches:

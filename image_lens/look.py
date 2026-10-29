@@ -175,14 +175,24 @@ def run(video, detector, pose_model, checkpoint, out, max_shots=LOOK['max_shots'
         entry = dict(segment_id=sid, frames=[s0, s1], seconds=[round(s0/fps, 2), round((s1+1)/fps, 2)], windows=[], skipped=[], errors=[])
         shots.append(entry)
         lines.append(f"## {sid} {entry['seconds'][0]:.2f}–{entry['seconds'][1]:.2f}s (f{s0}..{s1})")
+        def still(k):
+            # A cut too short to track still shows its pose (Seedance: 83 skipped ranges, many whole cuts under 0.2 s).
+            from image_lens import body_motion, onion
+            mid = (k['frames'][0]+k['frames'][1])//2; person = body_motion.largest(pose_frames.get(mid))
+            try:
+                k['still'] = onion.still(source, mid, person['bbox'] if person else None, root/f'{sid}-still-f{mid}.jpg')
+            except Exception as error:  # OpenCV raises its own error type; the still is optional
+                entry['errors'].append(dict(frames=k['frames'], step='still', error=str(error)[:300]))
+            return f" (사진 {k['still']}: 자세만, 움직임 모름)" if k.get('still') else ''
         if s1 == s0:
-            entry['skipped'].append(dict(frames=[s0, s1], reason='single-frame shot')); lines += ['- 건너뜀: 1프레임 장면', '']
+            k = dict(frames=[s0, s1], reason='single-frame shot'); entry['skipped'].append(k)
+            lines += ['- 건너뜀: 1프레임 장면'+still(k), '']
             continue
         start = s0; i = 0
         while start <= s1:
             w, skipped = next_window(segment, start, pose_frames, flagged)
             entry['skipped'] += skipped
-            lines += [f"- 건너뜀 f{k['frames'][0]}..{k['frames'][1]}: {k['reason']}" for k in skipped]
+            lines += [f"- 건너뜀 f{k['frames'][0]}..{k['frames'][1]}: {k['reason']}" + ('' if entry['windows'] else still(k)) for k in skipped]
             if w is None:
                 break
             if remaining() < 60:
@@ -272,6 +282,9 @@ def run(video, detector, pose_model, checkpoint, out, max_shots=LOOK['max_shots'
             if tracked and skeleton['plausible']:
                 done['body'] = body_motion.describe([t[3] for t in tracked], dict(w, end=end))
                 lines += ['  '+l for l in body_motion.lines(done['body'])]
+            done['events'] = body_motion.pose_events(pose_frames, dict(w, end=end), fps)
+            from image_lens import digest
+            lines += ['  - '+f for f in digest.events(done['events'], fps)]
             person = body_motion.largest(pose_frames.get(w['seed']))
             if tracked and person:
                 from image_lens import onion
@@ -280,6 +293,7 @@ def run(video, detector, pose_model, checkpoint, out, max_shots=LOOK['max_shots'
                     moving = cam if cam and math.hypot(*cam) >= motion_report.STROKE['major_min_px'] else None
                     done['bands'] = onion.bands(source, w['seed'], end, person['bbox'], moving, picture)
                     done['onion'] = picture.name
+                    done['peak'] = onion.peak(source, w['seed'], end, person['bbox'], picture)
                     lines += ['  '+l for l in onion.lines(done['bands'], picture.name)]
                 except Exception as error:  # OpenCV raises its own error type; the view is optional
                     entry['errors'].append(dict(window=w, step='onion', error=str(error)[:300]))
@@ -304,8 +318,11 @@ def run(video, detector, pose_model, checkpoint, out, max_shots=LOOK['max_shots'
             '경고는 "원본부터 비교하라"는 뜻이다. 가짜 움직임이라는 판정이 아니다. 자세한 수치는 장면별 report.json에 있다.', '']
     paths.write(root/'look-full.md', '\n'.join(head+lines).rstrip('\n')+'\n')
     from image_lens import onion
-    sheets = onion.sheets(root, [(d['window']['seed']/scan['fps'], (d.get('cut_after', d['window']['end'])+1)/scan['fps'], d['onion'])
-                                 for s in shots for d in s['windows'] if d.get('onion')])
+    fps = scan['fps']
+    sheets = onion.sheets(root, sorted([(d['window']['seed']/fps, (d.get('cut_after', d['window']['end'])+1)/fps, d['onion'], '')
+                                        for s in shots for d in s['windows'] if d.get('onion')]
+                                       + [(k['frames'][0]/fps, (k['frames'][1]+1)/fps, k['still'], 'still')
+                                          for s in shots for k in s['skipped'] if k.get('still')]))
     from image_lens import motif
     for (done, _), label in zip(looks, motif.assign([l for _, l in looks])):
         if label:
