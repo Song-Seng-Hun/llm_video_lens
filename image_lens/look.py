@@ -7,8 +7,8 @@ import time
 from pathlib import Path
 from image_lens import paths
 
-LOOK = dict(max_shots=16, window_frames=160, min_frames=12, track_seconds=300, groups=('head', 'arms', 'hands', 'legs', 'free'))
-NAMES = dict(head='머리', arms='팔', hands='손끝', legs='다리', free='이름 없는 점')
+LOOK = dict(max_shots=16, window_frames=160, min_frames=12, track_seconds=300, groups=('head', 'arms', 'hands', 'legs', 'move'))
+NAMES = dict(head='머리', arms='팔', hands='손끝', legs='다리', move='많이 움직인 곳', marked='찍은 점')
 STEP_ERRORS = (ValueError, OSError, KeyError, TypeError, ImportError, TimeoutError, OverflowError)
 
 
@@ -103,7 +103,8 @@ def _summary(report, window, group, md_path, traj, frame_motion=None):
                         and math.hypot(u['dx_px']-cam[0], u['dy_px']-cam[1]) < motion_report.STROKE['major_min_px']:
                     with_camera += 1
                     continue
-                moves.append(f"{f['point_id']} {motion_report.KO[u['direction']]} {u['distance_px']:.0f}px(f{u['start_frame']}..{u['end_frame']})")
+                timing = f", {motion_report.EASE_KO[u['ease']]}" if u.get('ease') else ''
+                moves.append(f"{f['point_id']} {motion_report.KO[u['direction']]} {u['distance_px']:.0f}px(f{u['start_frame']}..{u['end_frame']}{timing})")
                 kept.add(f['point_id'])
     together = [g for g in motion_report.together(report) if 2*len(kept & set(g['points'])) >= len(g['points'])]
     lines = [f"- {NAMES[group]}: " + ('; '.join(moves) if moves else '큰 이동 없음')]
@@ -194,7 +195,7 @@ def run(video, detector, pose_model, checkpoint, out, max_shots=LOOK['max_shots'
             lines.append(f"- 구간 f{w['seed']}..{end} (점 배치 f{w['seed']}" + (f", {people}명 중 가장 큰 사람" if people > 1 else '') + ')')
             skeleton = receipt.get('skeleton') or dict(plausible=True)
             if not skeleton['plausible']:
-                lines.append(f"  - 골격 신뢰 낮음({skeleton['reason']}): 팔·다리 이름 대신 이름 없는 점(pt-a…)으로 봄")
+                lines.append(f"  - 골격 신뢰 낮음({skeleton['reason']}): 팔·다리 이름 없이 얼굴과 많이 움직인 곳(move-a…)만 봄")
             from image_lens import camera, motion_report
             try:
                 frame_motion = camera.path(source, w['seed'], end)
@@ -225,6 +226,16 @@ def run(video, detector, pose_model, checkpoint, out, max_shots=LOOK['max_shots'
             if tracked and skeleton['plausible']:
                 done['body'] = body_motion.describe([t[3] for t in tracked], dict(w, end=end))
                 lines += ['  '+l for l in body_motion.lines(done['body'])]
+            person = body_motion.largest(pose_frames.get(w['seed']))
+            if tracked and person:
+                from image_lens import onion
+                picture = base.with_name(base.name+'-onion.jpg')
+                try:
+                    moving = cam if cam and math.hypot(*cam) >= motion_report.STROKE['major_min_px'] else None
+                    done['bands'] = onion.bands(source, w['seed'], end, person['bbox'], moving, picture)
+                    lines += ['  '+l for l in onion.lines(done['bands'], picture.name)]
+                except Exception as error:  # OpenCV raises its own error type; the view is optional
+                    entry['errors'].append(dict(window=w, step='onion', error=str(error)[:300]))
             if end < w['end']:
                 done['cut_after'] = end; start = end+1
                 lines.append(f"  - f{end} 뒤 점이 한꺼번에 끊김(그림 바뀜·화면 전환 추정): f{end+1}부터 점을 다시 놓음")

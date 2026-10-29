@@ -5,7 +5,7 @@ import math
 from image_lens import motion_report
 
 BODY_MOTION = dict(min_ratio=.06, min_px=8., min_frames=4, max_segments=3, ref_coverage=.8)
-PARTS = dict(wrist='손목', elbow='팔꿈치', thumb='엄지 끝', index='검지 끝', thigh='허벅지', knee='무릎', ankle='발목')
+PARTS = dict(wrist='손목', elbow='팔꿈치', thumb='엄지 끝', index='검지 끝', thigh='허벅지', knee='무릎', ankle='발목', move='많이 움직인 곳')
 HEAD = ('nose', 'eye-l', 'eye-r')
 
 
@@ -99,6 +99,8 @@ def describe(packets, window):
         anchor = points.get(('hip-' if part in ('허벅지', '무릎', '발목') else 'shoulder-')+pid.rsplit('-', 1)[-1], {})
         at = [anchor[n][0]-centre[n][0] for n in common if n in anchor]
         x = sorted(at)[len(at)//2] if at else rel[0][0]
+        if part == PARTS['move']:
+            part = f"{part} {pid.rsplit('-', 1)[-1]}"  # unnamed: keep the letter so it matches the onion image and tracks
         limbs.append(dict(point_id=pid, part=part, side='화면 왼쪽' if x < 0 else '화면 오른쪽',
                           strokes=strokes[:BODY_MOTION['max_segments']], omitted=max(0, len(strokes)-BODY_MOTION['max_segments']),
                           axis_px=round(spread, 1) if abs(spread) >= limit else 0.))

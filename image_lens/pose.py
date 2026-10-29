@@ -20,10 +20,9 @@ GROUPS = dict(head=('nose', 'eye_l', 'eye_r', 'hair_front', 'head_top', 'hair_si
               arms=('shoulder_l', 'shoulder_r', 'elbow_l', 'elbow_r', 'wrist_l', 'wrist_r'),
               hands=('thumb_l', 'index_l', 'thumb_r', 'index_r'),
               legs=('hip_l', 'hip_r', 'thigh_l', 'thigh_r', 'knee_l', 'knee_r', 'ankle_l', 'ankle_r'),
-              free=tuple(f'pt_{c}' for c in 'abcdefgh'))
+              move=tuple(f'move_{c}' for c in 'abcdef'))
 # When the skeleton is implausible (props, folded or cut-off bodies), arm/leg names would be confident and wrong:
 # keep the face, drop named limbs, and track unnamed high-contrast corners inside the person box instead.
-FREE = dict(max_points=8, quality=.05, spacing=.12, border_px=32)
 # Hair seeds sit on a head frame built from the two eyes: d = eye distance, up = away from the nose.
 # Offsets in d units; checked by eye on AKAGE only, so every seed stays a candidate surface point.
 HAIR = dict(front=(0., .8), top=(0., 1.7), side=(1.3, -.2))
@@ -226,30 +225,8 @@ def seed_points(track, width, height):
 
 LABELS = dict(head='머리·눈·머리카락 (포즈 기준 자동 배치, 부위 미검증)', arms='팔 (포즈 관절에서 시작, 부위 미검증)',
               hands='엄지·검지 끝 (포즈 손 키포인트, 그림 손에서는 거침, 부위 미검증)',
-              free='이름 없는 점 (골격을 믿기 어려워 사람 영역의 모서리에 놓음, 부위 이름 없음)',
+              move='많이 움직인 곳 (어니언 틈이 가장 두꺼운 시작 프레임 윤곽, 부위 이름 없음)',
               legs='다리·허벅지 (포즈 관절에서 시작, 허벅지는 엉덩이-무릎 중간, 부위 미검증)')
-
-
-def free_points(video, frame, bbox, width, height):
-    """Unnamed corner seeds inside the person box, spread out so they cover the figure rather than one detailed patch."""
-    import cv2
-    cap = cv2.VideoCapture(str(video))
-    try:
-        cap.set(cv2.CAP_PROP_POS_FRAMES, frame); ok, bgr = cap.read()
-    finally:
-        cap.release()
-    if not ok:
-        return {}
-    b = FREE['border_px']
-    x0, y0 = max(b, int(bbox[0])), max(b, int(bbox[1])); x1, y1 = min(width-b, int(bbox[2])), min(height-b, int(bbox[3]))
-    if x1-x0 < 16 or y1-y0 < 16:
-        return {}
-    gray = cv2.cvtColor(bgr[y0:y1, x0:x1], cv2.COLOR_BGR2GRAY)
-    found = cv2.goodFeaturesToTrack(gray, FREE['max_points'], FREE['quality'], FREE['spacing']*min(x1-x0, y1-y0))
-    if found is None:
-        return {}
-    return {name: dict(xy=[round(float(x)+x0, 2), round(float(y)+y0, 2)], seed_rule='unnamed corner in person box (skeleton implausible)')
-            for name, (x, y) in zip(GROUPS['free'], found.reshape(-1, 2))}
 
 
 def _marked_crops(video, frame, width, height, seeds, directory):
@@ -310,7 +287,8 @@ def seed(pose_path, frame, job, evidence_dir, track_id=None, length=SEED['max_fr
     plausible, reason = body_motion.skeleton_check(track)
     if not plausible:
         seeds = {name: p for name, p in seeds.items() if name in GROUPS['head']}
-        seeds.update(free_points(video, frame, track['bbox'], packet['width'], packet['height']))
+    from image_lens import onion
+    seeds.update(onion.gap_seeds(video, frame, end, track['bbox'], GROUPS['move']))
     if not any(name in seeds for names in GROUPS.values() for name in names):
         raise ValueError('no usable pose seeds on this frame')
     crops = _marked_crops(video, frame, packet['width'], packet['height'], seeds, paths.confined(evidence_dir, new=True))

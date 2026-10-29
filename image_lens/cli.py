@@ -5,7 +5,7 @@ from pathlib import Path
 import sys
 from image_lens import paths
 
-COMMANDS = ('look', 'scan', 'compare', 'brief', 'catalog', 'pose', 'seed', 'bind', 'prepare', 'validate', 'track', 'analyze')
+COMMANDS = ('look', 'scan', 'compare', 'brief', 'catalog', 'pose', 'seed', 'bind', 'prepare', 'validate', 'track', 'analyze', 'grid', 'mark')
 
 
 def parser(command, description):
@@ -120,6 +120,23 @@ def dispatch(command, arguments):
         output = paths.write(a.out, brief.markdown(result)) if a.format == 'markdown' else paths.write_json(a.out, result)
         return dict(status='written', output=str(output), source_status=result['status'],
                     returned_shots=result['coverage']['returned_segments'], images_written=0, model_loaded=False)
+    if command == 'grid':
+        from image_lens import mark
+        ap = parser(command, 'One frame (or a box of it) with a labelled source-pixel grid, for reading point positions by eye.')
+        ap.add_argument('--video', required=True); ap.add_argument('--frame', type=int, required=True)
+        ap.add_argument('--box', help='x0,y0,x1,y1 zoom box in source pixels'); ap.add_argument('--out', required=True)
+        a = ap.parse_args(arguments)
+        return mark.grid(a.video, a.frame, a.out, tuple(int(v) for v in a.box.split(',')) if a.box else None)
+    if command == 'mark':
+        from image_lens import mark
+        ap = parser(command, 'Track agent-placed, agent-named points from one frame (names are the agent reading, not verified).')
+        ap.add_argument('--video', required=True); ap.add_argument('--shots', required=True, help='shots.json from scan or look')
+        ap.add_argument('--frame', type=int, required=True); ap.add_argument('--end', type=int)
+        ap.add_argument('--point', action='append', required=True, help='name=x,y in source pixels; repeat up to 8 times')
+        ap.add_argument('--no-snap', action='store_true', help='keep the given positions instead of the nearest corner')
+        ap.add_argument('--checkpoint', required=True); ap.add_argument('--out', required=True, help='new output directory')
+        a = ap.parse_args(arguments)
+        return mark.run(a.video, a.shots, a.frame, a.point, a.checkpoint, a.out, a.end, not a.no_snap)
     if command == 'look':
         from image_lens import look
         ap = parser(command, 'One-command look: scan, pose, pose-seeded tracking per shot window, one short look.md.')
