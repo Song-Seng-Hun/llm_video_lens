@@ -98,13 +98,19 @@ def lines(result, image_name=None):
 
 
 # Seeds where the onion gap is thickest: the band between the start outline and a later outline is widest where that
-# part moved most (AKAGE pose 1: sleeves and hair tips; MikuMiku hammer: the head's lower edge). Gaps also open where
-# a part arrives, so a seed must sit on an outline of the start frame inside the gap. Thirds catch moves that return.
-GAPS = dict(points=6, diff=40, min_area=80, min_half_px=4., spacing_px=40., edge=(50, 150), switch_share=.3)
+# part moved (AKAGE pose 1: sleeves and hair tips; MikuMiku hammer: the hammer head). Gaps also open where a part
+# arrives, so a candidate must sit on an outline of the start frame inside the gap. Thirds catch moves that return.
+# Gap width is not travel (the hammer scene's widest gap, 124 px, moved 39 px; the hammer moved 450 px), and joined gaps
+# are not one part, so up to 12 candidates are seeded and tracked; `parts` then keeps one point per group that moved
+# together. LK flow cannot follow the hammer swing (110-170 px of 450, and a face point dragged 500 px by it), so the
+# grouping uses the real tracks. Together = paths never further apart than 16 px or half the larger travel: at 8 px / a
+# quarter, AKAGE kept 6 points in 11 of 19 windows (drawn parts deform as they move) and the hammer got two points.
+GAPS = dict(points=6, diff=40, min_area=80, min_half_px=4., spacing_px=40., edge=(50, 150), switch_share=.3,
+            keep_share=.4, min_travel_px=8., together_px=16., together_share=.5)
 
 
 def gap_seeds(video, start, end, bbox, names):
-    """{name: {xy, seed_rule}} at the thickest start-frame outline points of the onion gaps, one per height band first."""
+    """{name: {xy, seed_rule}}: candidates on start-frame outlines inside onion gaps, widest gap first; `parts` picks."""
     import cv2
     import numpy as np
     from image_lens import camera, motion_report
@@ -131,14 +137,12 @@ def gap_seeds(video, start, end, bbox, names):
     end = max(kept)
     if end == start:
         return {}
-    later = {n: kept[n] for n in sorted({start+(end-start)//3, start+2*(end-start)//3, end} - {start})}
+    later = sorted({start+(end-start)//3, start+2*(end-start)//3, end} - {start})
     moves = camera.path(video, start, end)
     outline = cv2.dilate(cv2.Canny(first, *GAPS['edge']), np.ones((3, 3), np.uint8)) > 0
     found = []
-    for n, image in later.items():
-        if image is None:
-            continue
-        shift = camera.between(moves, start, n)
+    for n in later:
+        image = kept[n]; shift = camera.between(moves, start, n)
         if shift and math.hypot(*shift) >= motion_report.STROKE['major_min_px']:
             image = cv2.warpAffine(image, np.float32([[1, 0, -shift[0]], [0, 1, -shift[1]]]), (w, h), borderMode=cv2.BORDER_REPLICATE)
         mask = np.zeros((h, w), np.uint8)
@@ -156,19 +160,36 @@ def gap_seeds(video, start, end, bbox, names):
             y, x = np.unravel_index(on_outline.argmax(), on_outline.shape)
             found.append((2*float(depth[region].max()), int(x), int(y), n))
     found.sort(reverse=True)
-    step = (bbox[3]-bbox[1])/len(ONION['bands'])
-    def band(y):
-        return min(len(ONION['bands'])-1, max(0, int((y-bbox[1])//step)))
-    chosen = []
-    def take(candidate):
-        if len(chosen) < GAPS['points'] and all(math.dist(candidate[1:3], c[1:3]) >= GAPS['spacing_px'] for c in chosen):
-            chosen.append(candidate)
-    for b in range(len(ONION['bands'])):  # spread over heights first so a big arm swing does not take every seed
-        best = next((c for c in found if band(c[2]) == b), None)
-        if best:
-            take(best)
-    for candidate in found:
-        take(candidate)
-    chosen.sort(key=lambda c: -c[0])
-    return {name: dict(xy=[float(x), float(y)], seed_rule=f'onion gap {gap:.0f} px wide by f{n}, on a start-frame outline')
-            for name, (gap, x, y, n) in zip(names, chosen)}
+    candidates = []
+    for c in found:
+        if len(candidates) < len(names) and all(math.dist(c[1:3], k[1:3]) >= GAPS['spacing_px'] for k in candidates):
+            candidates.append(c)
+    return {name: dict(xy=[float(x), float(y)], seed_rule=f'onion gap {gap:.0f} px wide by f{n}, on a start-frame outline (candidate)')
+            for name, (gap, x, y, n) in zip(names, candidates)}
+
+
+def parts(tracks, end, frame_motion=None):
+    """Point ids to report: one per group of candidates whose tracked paths stay together, farthest first, at most 6.
+    Paths are shifts from the first frame minus the camera; a group travelling under keep_share of the farthest is dropped."""
+    from image_lens import camera
+    frames = [f for f in tracks['frames'] if f['frame'] <= end]
+    if not frames:
+        return []
+    origin = {p['point_id']: p['xy'] for p in frames[0]['points'] if p.get('visible') and p.get('xy')}
+    paths = {pid: [] for pid in origin}
+    for f in frames:
+        cam = camera.between(frame_motion, frames[0]['frame'], f['frame']) or (0., 0.)
+        seen = {p['point_id']: p['xy'] for p in f['points'] if p.get('visible') and p.get('xy')}
+        for pid, xy in origin.items():
+            paths[pid].append((seen[pid][0]-xy[0]-cam[0], seen[pid][1]-xy[1]-cam[1]) if pid in seen else None)
+    travel = {pid: max((math.hypot(*d) for d in p if d), default=0.) for pid, p in paths.items()}
+    def together(i, j):
+        gaps = [math.dist(a, b) for a, b in zip(paths[i], paths[j]) if a and b]
+        return bool(gaps) and max(gaps) < max(GAPS['together_px'], GAPS['together_share']*max(travel[i], travel[j]))
+    order = sorted(travel, key=lambda pid: -travel[pid]); chosen = []
+    for pid in order:
+        if travel[pid] < max(GAPS['min_travel_px'], GAPS['keep_share']*travel[order[0]]) or len(chosen) >= GAPS['points']:
+            break
+        if not any(together(pid, other) for other in chosen):
+            chosen.append(pid)
+    return sorted(chosen)

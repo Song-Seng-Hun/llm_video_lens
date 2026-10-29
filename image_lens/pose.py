@@ -20,7 +20,7 @@ GROUPS = dict(head=('nose', 'eye_l', 'eye_r', 'hair_front', 'head_top', 'hair_si
               arms=('shoulder_l', 'shoulder_r', 'elbow_l', 'elbow_r', 'wrist_l', 'wrist_r'),
               hands=('thumb_l', 'index_l', 'thumb_r', 'index_r'),
               legs=('hip_l', 'hip_r', 'thigh_l', 'thigh_r', 'knee_l', 'knee_r', 'ankle_l', 'ankle_r'),
-              move=tuple(f'move_{c}' for c in 'abcdef'))
+              move=tuple(f'move_{c}' for c in 'abcdefghijkl'))
 # When the skeleton is implausible (props, folded or cut-off bodies), arm/leg names would be confident and wrong:
 # keep the face, drop named limbs, and track unnamed high-contrast corners inside the person box instead.
 # Hair seeds sit on a head frame built from the two eyes: d = eye distance, up = away from the nose.
@@ -225,7 +225,7 @@ def seed_points(track, width, height):
 
 LABELS = dict(head='머리·눈·머리카락 (포즈 기준 자동 배치, 부위 미검증)', arms='팔 (포즈 관절에서 시작, 부위 미검증)',
               hands='엄지·검지 끝 (포즈 손 키포인트, 그림 손에서는 거침, 부위 미검증)',
-              move='많이 움직인 곳 (어니언 틈이 가장 두꺼운 시작 프레임 윤곽, 부위 이름 없음)',
+              move='많이 움직인 곳 (어니언 틈 후보 중 같이 움직이는 것끼리 묶은 대표, 부위 이름 없음)',
               legs='다리·허벅지 (포즈 관절에서 시작, 허벅지는 엉덩이-무릎 중간, 부위 미검증)')
 
 

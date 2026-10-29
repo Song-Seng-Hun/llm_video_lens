@@ -20,7 +20,7 @@
   ],
   "manifest_self_excluded": true,
   "file_count": 109,
-  "total_bytes": 1058087,
+  "total_bytes": 1064005,
   "files": [
     {
       "path": ".gitattributes",
@@ -34,8 +34,8 @@
     },
     {
       "path": "README.md",
-      "bytes": 15548,
-      "sha256": "5f28cd5897568dae78def1dc04a5d62f16e01a354718639426cfbd87721ebc78"
+      "bytes": 16003,
+      "sha256": "5e2d77f96f3356513f10f53aef07ed17ee5388d300ebf142b569162f6dd8e853"
     },
     {
       "path": "docs/import-provenance.json",
@@ -119,8 +119,8 @@
     },
     {
       "path": "image_lens/look.py",
-      "bytes": 17268,
-      "sha256": "095edccee8734b910d82f4a93e462354e778ed783c1e3344dfe8c3473f8f4fdc"
+      "bytes": 18615,
+      "sha256": "a78824f374313742ca6d53d4c93dbd9a0cd566ac3597850c106438329a0ff6f9"
     },
     {
       "path": "image_lens/mark.py",
@@ -144,8 +144,8 @@
     },
     {
       "path": "image_lens/onion.py",
-      "bytes": 8649,
-      "sha256": "70a8c2fae4006e862cc33862135e148ce23762feda910a6d012aa455dcdb6cc6"
+      "bytes": 10401,
+      "sha256": "09c94bb4f125d0469d495d5151b764798d66c26bf33f586ca006dcd0beec93ca"
     },
     {
       "path": "image_lens/part_regions.py",
@@ -159,8 +159,8 @@
     },
     {
       "path": "image_lens/pose.py",
-      "bytes": 20583,
-      "sha256": "5a62bebb8bb6ca51d93591c89a7e966fc4c8c95aeda19b3c292c81d586609529"
+      "bytes": 20600,
+      "sha256": "bae9256f36726567d5516ee29439ddc111460203d912bd5bfaa3fdb6fc480d92"
     },
     {
       "path": "image_lens/run_point_tracker.py",
@@ -559,13 +559,13 @@
     },
     {
       "path": "tests/test_onion.py",
-      "bytes": 773,
-      "sha256": "5d276e73f37b766f1b6f8c2edd640b91bfadfd4f072801e0738c20608109b29f"
+      "bytes": 2836,
+      "sha256": "59d6ef64deff82122276bf8db9b03eb377f1bd923ca7f2f4627098d8597a8ace"
     },
     {
       "path": "tests/test_pose.py",
-      "bytes": 8000,
-      "sha256": "c0668683405fb766746e392c262a2800315d1e39d0a9ef2319b6da107f156b54"
+      "bytes": 8284,
+      "sha256": "adb86f02b4e1b52c4578a8756eb4d374825c53716a33b0de4f806ea38f706f4e"
     }
   ]
 }

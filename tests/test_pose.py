@@ -63,7 +63,10 @@ class Seeds(unittest.TestCase):
             self.assertFalse((root/'crops').exists())
 
     def test_groups_fit_report_and_observation_caps(self):
-        self.assertTrue(all(len(names) <= 8 for names in pose.GROUPS.values()))
+        from image_lens import onion
+        # move tracks up to 12 candidates (observation cap) but reports at most onion.GAPS['points'] (report cap 8)
+        self.assertTrue(all(len(names) <= 8 for group, names in pose.GROUPS.items() if group != 'move'))
+        self.assertLessEqual(len(pose.GROUPS['move']), 12); self.assertLessEqual(onion.GAPS['points'], 8)
 
 
 class Flags(unittest.TestCase):

@@ -205,12 +205,29 @@ def run(video, detector, pose_model, checkpoint, out, max_shots=LOOK['max_shots'
             done['camera'] = dict(net=cam, frames=len(frame_motion or {}))
             if cam and math.hypot(*cam) >= motion_report.STROKE['major_min_px']:
                 lines.append(f"  - 화면 전체: {motion_report.KO[motion_report.direction(*cam)]} {math.hypot(*cam):.0f}px (카메라·배경 이동 추정; 이것만 따라간 이동은 아래에서 뺌)")
-            for name, group, stem, _ in tracked:
+            # Move candidates: report one per group that moved together (see onion.parts); the rest stay in the tracks file.
+            from image_lens import onion
+            for k, (name, group, stem, tracks) in enumerate(tracked):
+                if group == 'move':
+                    keep = set(onion.parts(tracks, end, frame_motion))
+                    done['move_candidates'] = len(tracks['frames'][0]['points']) if tracks['frames'] else 0
+                    tracked[k] = (name, group, stem, dict(tracks, frames=[dict(f, points=[p for p in f['points'] if p['point_id'] in keep])
+                                                                          for f in tracks['frames']]))
+            for name, group, stem, tracks in tracked:
+                if group == 'move' and not (tracks['frames'] and tracks['frames'][0]['points']):
+                    still.append(NAMES[group]); continue
                 try:
                     _step('bind', ['--queries', base.with_suffix('.obs.json'), '--tracks', stem.with_suffix('.tracks.json'),
                                    '--job', name, '--out', stem.with_suffix('.bindings.json')])
+                    binding = stem.with_suffix('.bindings.json')
+                    if group == 'move':
+                        keep = {p['point_id'] for p in tracks['frames'][0]['points']}
+                        bindings, _ = paths.load(binding)
+                        for actor in bindings['actors']:
+                            actor['features'] = [f for f in actor['features'] if f['point_id'] in keep]
+                        binding = paths.write_json(stem.with_name(stem.name+'-parts.bindings.json'), bindings)
                     _step('analyze', ['--tracks', stem.with_suffix('.tracks.json'), '--shots', root/'shots.json',
-                                      '--report-bindings', stem.with_suffix('.bindings.json'), '--start', w['seed'], '--end', end,
+                                      '--report-bindings', binding, '--start', w['seed'], '--end', end,
                                       '--format', 'json', '--out', stem.with_suffix('.report.json'),
                                       '--trajectory-dir', stem.with_name(stem.name+'-traj'), '--pose', root/'pose.json'])
                     report, _ = paths.load(stem.with_suffix('.report.json'))

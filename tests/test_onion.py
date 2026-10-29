@@ -13,4 +13,44 @@ class Lines(unittest.TestCase):
     def test_box_is_padded_and_clamped(self):
         self.assertEqual(onion._box((0, 100, 100, 200), 150, 205), (0, 90, 110, 205))
 
+
+class GapSeeds(unittest.TestCase):
+    def _video(self, path, arms):
+        import cv2
+        import numpy as np
+        out = cv2.VideoWriter(str(path), cv2.VideoWriter_fourcc(*'MJPG'), 10, (320, 240))
+        for k in range(10):
+            frame = np.full((240, 320, 3), 255, np.uint8)
+            cv2.rectangle(frame, (140, 60), (180, 200), (0, 0, 0), -1)  # still body
+            for y in arms:  # arms drawn with an inner line, dropping 3 px a frame
+                cv2.rectangle(frame, (180, y+3*k), (240, y+3*k+20), (0, 0, 0), -1)
+                cv2.line(frame, (185, y+3*k+10), (235, y+3*k+10), (255, 255, 255), 2)
+            out.write(frame)
+        out.release()
+
+    def test_candidates_sit_on_moving_arms_only(self):
+        import tempfile, pathlib
+        with tempfile.TemporaryDirectory() as d:
+            video = pathlib.Path(d)/'arms.avi'; self._video(video, [60, 140])
+            seeds = onion.gap_seeds(video, 0, 9, (130, 50, 280, 210), [f'move_{c}' for c in 'abcdefghijkl'])
+            self.assertTrue(seeds)
+            self.assertTrue(all(x >= 180 for x, _ in (s['xy'] for s in seeds.values())), seeds)  # none on the still body
+
+
+class Parts(unittest.TestCase):
+    @staticmethod
+    def _tracks(paths):
+        return dict(frames=[dict(frame=t, points=[dict(point_id=pid, xy=list(p[t]), visible=True) for pid, p in paths.items()])
+                            for t in range(len(next(iter(paths.values()))))])
+
+    def test_points_moving_together_keep_one(self):
+        arm = [(100+5*t, 100) for t in range(10)]
+        tracks = self._tracks({'move-a': arm, 'move-b': [(x+30, y+2) for x, y in arm], 'move-c': [(300, 100+6*t) for t in range(10)],
+                               'move-d': [(400, 400)]*10})
+        self.assertEqual(onion.parts(tracks, 9), ['move-a', 'move-c'])
+
+    def test_small_moves_next_to_a_big_one_are_dropped(self):
+        tracks = self._tracks({'move-a': [(100+40*t, 100) for t in range(10)], 'move-b': [(500, 100+2*t) for t in range(10)]})
+        self.assertEqual(onion.parts(tracks, 9), ['move-a'])
+
 if __name__ == '__main__': unittest.main()
