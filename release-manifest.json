@@ -19,8 +19,8 @@
     "historical experiment outputs"
   ],
   "manifest_self_excluded": true,
-  "file_count": 102,
-  "total_bytes": 1004496,
+  "file_count": 104,
+  "total_bytes": 1016016,
   "files": [
     {
       "path": ".gitattributes",
@@ -34,8 +34,8 @@
     },
     {
       "path": "README.md",
-      "bytes": 11319,
-      "sha256": "da4a9ce5dd10f2bbf3bfb320e0579258af73e892d6cb6e29a49d3df7d44f00c8"
+      "bytes": 11988,
+      "sha256": "55d2b8ffd86174555558c5b998401e47af11507a61fd4276935daa7336e29c21"
     },
     {
       "path": "docs/import-provenance.json",
@@ -83,6 +83,11 @@
       "sha256": "430a74560012f3a335e812c02547a59b90e2b00ea7f7b6a6a4d99d55beabbe07"
     },
     {
+      "path": "image_lens/body_motion.py",
+      "bytes": 6651,
+      "sha256": "4fe143d0920e3f3f859fb6847650e271d02fbe5ed8423185242836ec6d6b67b2"
+    },
+    {
       "path": "image_lens/brief.py",
       "bytes": 12244,
       "sha256": "51fc65c7451a88c4dec643f737b4b77fbaf672743f2103f091eb5be662c3162d"
@@ -109,8 +114,8 @@
     },
     {
       "path": "image_lens/look.py",
-      "bytes": 13638,
-      "sha256": "cea5c4d9fba0285896f7638d0f0f5da1587c020dcfd832bd8ae7ab6ccaef3b54"
+      "bytes": 13962,
+      "sha256": "4d84b98b4349b26ea052ca46f9191ef5419e3371cc601baf75052f01ea1acfb8"
     },
     {
       "path": "image_lens/motion_report.py",
@@ -139,8 +144,8 @@
     },
     {
       "path": "image_lens/pose.py",
-      "bytes": 18744,
-      "sha256": "d4101bcd39db568e2dd49d7e8e72643c9762e81deafbe1e30f4173765180958c"
+      "bytes": 19813,
+      "sha256": "fed125162d0c0fe9ad767e86caa6abae66b6135919073a3698ed1b8048e88c08"
     },
     {
       "path": "image_lens/run_point_tracker.py",
@@ -511,6 +516,11 @@
       "path": "tests/smoke_runtime.py",
       "bytes": 4329,
       "sha256": "91b6ad9d9b2045fdcb06869ec84290a5e9d443d7c9d304f810b599e1bf8bff55"
+    },
+    {
+      "path": "tests/test_body_motion.py",
+      "bytes": 2807,
+      "sha256": "01ebb3ec83e4dd0212b96a332481805b92817565e88124144dd4c68c4d87977f"
     },
     {
       "path": "tests/test_contracts.py",

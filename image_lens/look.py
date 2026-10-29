@@ -6,7 +6,8 @@ import time
 from pathlib import Path
 from image_lens import paths
 
-LOOK = dict(max_shots=16, window_frames=160, min_frames=12, track_seconds=300, groups=('head', 'arms', 'legs'))
+LOOK = dict(max_shots=16, window_frames=160, min_frames=12, track_seconds=300, groups=('head', 'arms', 'hands', 'legs'))
+NAMES = dict(head='머리', arms='팔', hands='손끝', legs='다리')
 STEP_ERRORS = (ValueError, OSError, KeyError, TypeError, ImportError, TimeoutError, OverflowError)
 
 
@@ -87,11 +88,10 @@ def lost(report, window, min_frames=LOOK['min_frames']):
 def _summary(report, window, group, md_path, traj):
     """Short per-group lines for look.md, built from the recomputed report JSON."""
     from image_lens import motion_report
-    names = {'head': '머리', 'arms': '팔', 'legs': '다리'}
     moves = [f"{f['point_id']} {motion_report.KO[u['direction']]} {u['distance_px']:.0f}px(f{u['start_frame']}..{u['end_frame']})"
              for f in report['features'] for run in f['continuous_runs'] for u in run['strokes']['units'] if u['major']]
     together = motion_report.together(report)
-    lines = [f"- {names[group]}: " + ('; '.join(moves) if moves else '큰 이동 없음')]
+    lines = [f"- {NAMES[group]}: " + ('; '.join(moves) if moves else '큰 이동 없음')]
     lines += [f"  - 함께 움직임 {motion_report.quote(g['points'])}: {motion_report.KO[g['direction']]} 약 {g['distance_px']:.0f}px, f{g['frames'][0]}..{g['frames'][1]}"
               for g in together]
     view = report.get('trajectory_view')
@@ -102,7 +102,7 @@ def _summary(report, window, group, md_path, traj):
     if cut:
         lines.append(f"  - f{cut['after']} 뒤로 점 {cut['count']}/{cut['total']}개 끊김(그림 바뀜·가려짐·화면 밖). 그 뒤는 정지가 아니라 모름.")
     if not moves and not any(f['continuous_runs'] for f in report['features']):
-        lines = [f"- {names[group]}: 쓸 수 있는 연속 관측 없음(가려짐·화면 밖·추적 끊김). 정지가 아니라 모름."]
+        lines = [f"- {NAMES[group]}: 쓸 수 있는 연속 관측 없음(가려짐·화면 밖·추적 끊김). 정지가 아니라 모름."]
     return (lines if moves or cut or len(lines) == 1 and '모름' in lines[0] else []), dict(group=group, major_moves=moves, together=together, warnings=len(warnings),
                        lost=cut, report=str(md_path), trajectory=str(traj))
 
@@ -168,7 +168,8 @@ def run(video, detector, pose_model, checkpoint, out, max_shots=LOOK['max_shots'
                     entry['errors'].append(dict(window=w, job=name, error=str(error)[:300]))
                     lines.append(f'  - {group} 실패: {str(error)[:120]}')
             # A drawing change (costume, wipe) drops many points at once: analyze up to it and reseed right after.
-            cut = cut_frame([t[3] for t in tracked], w)
+            # Hand tips flicker on drawn hands, so only head, arms and legs decide a cut.
+            cut = cut_frame([t[3] for t in tracked if t[1] != 'hands'], w)
             end = w['end'] if cut is None else min(w['end'], max(cut, w['seed']+LOOK['min_frames']-1))
             lines.append(f"- 구간 f{w['seed']}..{end} (점 배치 f{w['seed']}" + (f", {people}명 중 가장 큰 사람" if people > 1 else '') + ')')
             for name, group, stem, _ in tracked:
@@ -184,11 +185,15 @@ def run(video, detector, pose_model, checkpoint, out, max_shots=LOOK['max_shots'
                     md = paths.write(stem.with_suffix('.report.md'), motion_report.markdown(report))
                     group_lines, summary = _summary(report, dict(w, end=end), group, md.relative_to(root), stem.with_name(stem.name+'-traj').relative_to(root)/'trajectory.png')
                     lines += ['  '+l for l in group_lines]; done['groups'].append(summary)
-                    if not group_lines:still.append({'head': '머리', 'arms': '팔', 'legs': '다리'}[group])
+                    if not group_lines:still.append(NAMES[group])
                 except STEP_ERRORS as error:
                     entry['errors'].append(dict(window=w, job=name, error=str(error)[:300]))
                     lines.append(f'  - {group} 실패: {str(error)[:120]}')
             if still:lines.append(f"  - {'·'.join(still)}: 큰 이동 없음")
+            if tracked:
+                from image_lens import body_motion
+                done['body'] = body_motion.describe([t[3] for t in tracked], dict(w, end=end))
+                lines += ['  '+l for l in body_motion.lines(done['body'])]
             if end < w['end']:
                 done['cut_after'] = end; start = end+1
                 lines.append(f"  - f{end} 뒤 점이 한꺼번에 끊김(그림 바뀜·화면 전환 추정): f{end+1}부터 점을 다시 놓음")

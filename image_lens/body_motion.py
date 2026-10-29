@@ -1,0 +1,127 @@
+"""Body-relative limb motion for look. Screen-space strokes mix a whole-body bounce or lean with the gesture itself,
+so each limb point is measured against the body centre, and its path is split where it turns.
+Sides are screen sides (화면 왼쪽/오른쪽), taken from where the point starts relative to the body centre."""
+import math
+from image_lens import motion_report
+
+BODY_MOTION = dict(min_ratio=.06, min_px=8., min_frames=4, max_segments=3, ref_coverage=.8)
+PARTS = dict(wrist='손목', elbow='팔꿈치', thumb='엄지 끝', index='검지 끝', thigh='허벅지', knee='무릎', ankle='발목')
+HEAD = ('nose', 'eye-l', 'eye-r')
+
+
+def series(packets, window):
+    """Visible positions per point inside the window, without the seed frame (it is the pose anchor, not a prediction)."""
+    result = {}
+    for packet in packets:
+        for frame in packet['frames']:
+            n = frame['frame']
+            if window['seed'] < n <= window['end']:
+                for p in frame['points']:
+                    if p['visible']:
+                        result.setdefault(p['point_id'], {})[n] = tuple(p['xy'])
+    return result
+
+
+def _mean(points):
+    return (sum(p[0] for p in points)/len(points), sum(p[1] for p in points)/len(points))
+
+
+def reference(points, window):
+    """Body centre per frame and a body size. Shoulder midpoint when both shoulders cover most of the window, else the face."""
+    frames = range(window['seed']+1, window['end']+1)
+    sl, sr = points.get('shoulder-l', {}), points.get('shoulder-r', {})
+    both = [n for n in frames if n in sl and n in sr]
+    if len(both) >= BODY_MOTION['ref_coverage']*len(frames):
+        size = sorted(math.dist(sl[n], sr[n]) for n in both)[len(both)//2]
+        return 'shoulders', {n: _mean([sl[n], sr[n]]) for n in both}, size
+    centre = {}
+    for n in frames:
+        found = [points[k][n] for k in HEAD if n in points.get(k, {})]
+        if found:
+            centre[n] = _mean(found)
+    eyes = [math.dist(points['eye-l'][n], points['eye-r'][n]) for n in frames
+            if n in points.get('eye-l', {}) and n in points.get('eye-r', {})]
+    if not centre or not eyes:
+        return None, {}, None
+    return 'face', centre, 2.5*sorted(eyes)[len(eyes)//2]
+
+
+def _median3(path):
+    return [path[0]]+[tuple(sorted(c)[1] for c in zip(*path[i-1:i+2])) for i in range(1, len(path)-1)]+[path[-1]] if len(path) > 2 else path
+
+
+def _off_chord(p, a, b):
+    """Distance from p to the segment a-b; a point beyond an end (a reversal along the line) counts too."""
+    (ax, ay), (bx, by) = a, b
+    length = (bx-ax)**2+(by-ay)**2
+    t = 0. if not length else max(0., min(1., ((p[0]-ax)*(bx-ax)+(p[1]-ay)*(by-ay))/length))
+    return math.dist(p, (ax+t*(bx-ax), ay+t*(by-ay)))
+
+
+def segments(path, tolerance):
+    """Split a path at the points that leave the straight line most; returns index pairs."""
+    def split(lo, hi):
+        best, at = 0., None
+        for i in range(lo+1, hi):
+            d = _off_chord(path[i], path[lo], path[hi])
+            if d > best:
+                best, at = d, i
+        return split(lo, at)+split(at, hi) if at is not None and best >= tolerance else [(lo, hi)]
+    return split(0, len(path)-1)
+
+
+def describe(packets, window):
+    """Body centre shift plus per-limb relative strokes (direction, size, frames) and toward/away from the body axis."""
+    points = series(packets, window)
+    kind, centre, size = reference(points, window)
+    if not kind:
+        return None
+    limit = max(BODY_MOTION['min_px'], BODY_MOTION['min_ratio']*size)
+    frames = sorted(centre)
+    shift = (centre[frames[-1]][0]-centre[frames[0]][0], centre[frames[-1]][1]-centre[frames[0]][1])
+    limbs = []
+    for pid, track in sorted(points.items()):
+        part = PARTS.get(pid.split('-')[0])
+        common = [n for n in sorted(track) if n in centre]
+        if not part or len(common) < BODY_MOTION['min_frames']:
+            continue
+        rel = _median3([(track[n][0]-centre[n][0], track[n][1]-centre[n][1]) for n in common])
+        strokes = []
+        for lo, hi in segments(rel, limit):
+            dx, dy = rel[hi][0]-rel[lo][0], rel[hi][1]-rel[lo][1]
+            if math.hypot(dx, dy) >= limit:
+                strokes.append(dict(direction=motion_report.direction(dx, dy), distance_px=round(math.hypot(dx, dy), 1),
+                                    frames=[common[lo], common[hi]]))
+        if not strokes:
+            continue
+        spread = abs(rel[-1][0])-abs(rel[0][0])
+        # Screen side of the limb, not of the point: a hand crossing to the chest still belongs to its arm's side.
+        anchor = points.get(('hip-' if part in ('허벅지', '무릎', '발목') else 'shoulder-')+pid.rsplit('-', 1)[-1], {})
+        at = [anchor[n][0]-centre[n][0] for n in common if n in anchor]
+        x = sorted(at)[len(at)//2] if at else rel[0][0]
+        limbs.append(dict(point_id=pid, part=part, side='화면 왼쪽' if x < 0 else '화면 오른쪽',
+                          strokes=strokes[:BODY_MOTION['max_segments']], omitted=max(0, len(strokes)-BODY_MOTION['max_segments']),
+                          axis_px=round(spread, 1) if abs(spread) >= limit else 0.))
+    return dict(reference=kind, size_px=round(size, 1), limit_px=round(limit, 1),
+                centre_shift=dict(direction=motion_report.direction(*shift), distance_px=round(math.hypot(*shift), 1),
+                                  frames=[frames[0], frames[-1]]), limbs=limbs)
+
+
+def lines(result):
+    """look.md lines: one for the body centre, one per moving limb point."""
+    if not result:
+        return ['- 몸 기준: 기준점(어깨·얼굴)이 부족해 계산 못 함']
+    ref = '어깨 가운데' if result['reference'] == 'shoulders' else '얼굴 가운데'
+    c = result['centre_shift']
+    head = f"- 몸 기준 움직임 (몸 중심={ref}, 기준 {result['limit_px']:.0f}px):"
+    body = (f"  - 몸 중심: {motion_report.KO[c['direction']]} {c['distance_px']:.0f}px" if c['distance_px'] >= result['limit_px']
+            else '  - 몸 중심: 거의 그대로')
+    out = [head, body]
+    for limb in result['limbs']:
+        moves = ' → '.join(f"{motion_report.KO[s['direction']].replace('화면 ', '')} {s['distance_px']:.0f}px(f{s['frames'][0]}..{s['frames'][1]})"
+                           for s in limb['strokes'])
+        axis = '' if not limb['axis_px'] else f", 몸 {'바깥으로' if limb['axis_px'] > 0 else '쪽으로'} {abs(limb['axis_px']):.0f}px"
+        out.append(f"  - {limb['side']} {limb['part']}: {moves}{axis}")
+    if not result['limbs']:
+        out.append('  - 팔다리: 몸 기준으로도 기준 미만')
+    return out
