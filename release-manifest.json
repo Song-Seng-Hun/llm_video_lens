@@ -19,8 +19,8 @@
     "historical experiment outputs"
   ],
   "manifest_self_excluded": true,
-  "file_count": 104,
-  "total_bytes": 1021201,
+  "file_count": 105,
+  "total_bytes": 1032698,
   "files": [
     {
       "path": ".gitattributes",
@@ -34,8 +34,8 @@
     },
     {
       "path": "README.md",
-      "bytes": 12479,
-      "sha256": "6f5a920a22fe25838491afb709307ca40e3dac2c60a49f49dbbe1bf7d0761eeb"
+      "bytes": 13286,
+      "sha256": "e4383624f2e9641d1643838cae6728c4d9d980cc137022d71755df5d60d89d0c"
     },
     {
       "path": "docs/import-provenance.json",
@@ -84,13 +84,18 @@
     },
     {
       "path": "image_lens/body_motion.py",
-      "bytes": 9773,
-      "sha256": "9e82f2c01c1be1edd97f3b58435ddb1a45165ed4bd1a44c0c66d1989dceb0a1b"
+      "bytes": 11281,
+      "sha256": "ba747c2cb3bb264e4dd86b35820d9ef960fb1f94ac560c426b4d98e83dc04e93"
     },
     {
       "path": "image_lens/brief.py",
       "bytes": 12244,
       "sha256": "51fc65c7451a88c4dec643f737b4b77fbaf672743f2103f091eb5be662c3162d"
+    },
+    {
+      "path": "image_lens/camera.py",
+      "bytes": 2903,
+      "sha256": "5a3125791029e95564415cf0dc37184eba5cb22b2a53e2cb38c561f739c3f7d5"
     },
     {
       "path": "image_lens/checkpoint-manifest.json",
@@ -99,8 +104,8 @@
     },
     {
       "path": "image_lens/cli.py",
-      "bytes": 15434,
-      "sha256": "41ad8d94bb9a7bbb2f49da251e4dbd97f2cadfdec182fe1737bdf184a4aeba5b"
+      "bytes": 15498,
+      "sha256": "eba491ebc6d741199ffa89a761b7ad3c8682ce15569656433555b00842bccb93"
     },
     {
       "path": "image_lens/foreground_regions.py",
@@ -114,8 +119,8 @@
     },
     {
       "path": "image_lens/look.py",
-      "bytes": 14357,
-      "sha256": "5cd4ff24a08559b2799aee72165fc4865d467747fd85bae2103b7ef0c1b71a33"
+      "bytes": 16397,
+      "sha256": "7addc3e5d8daab2d58206b5ff393ff28a73b25adae7fdd1baf70c928b97750b8"
     },
     {
       "path": "image_lens/motion_report.py",
@@ -144,8 +149,8 @@
     },
     {
       "path": "image_lens/pose.py",
-      "bytes": 19813,
-      "sha256": "fed125162d0c0fe9ad767e86caa6abae66b6135919073a3698ed1b8048e88c08"
+      "bytes": 21640,
+      "sha256": "6551bf785423474cee6dc7a6d7498981a493679aa7cf10388c57467c67c01420"
     },
     {
       "path": "image_lens/run_point_tracker.py",
@@ -519,8 +524,8 @@
     },
     {
       "path": "tests/test_body_motion.py",
-      "bytes": 3984,
-      "sha256": "49893b483891fee194cad0f7da96b04f841e6fda3f8ba61420fefd203187bb7d"
+      "bytes": 4954,
+      "sha256": "d1f80534eae76000f407ab17ed01483eeb0ccca93c9c5ae917f165765babe674"
     },
     {
       "path": "tests/test_contracts.py",
@@ -529,8 +534,8 @@
     },
     {
       "path": "tests/test_look.py",
-      "bytes": 3613,
-      "sha256": "97ccd57d9c08e21f4599b5bac16791f5e983913c930468a5fa72dc21f84e4a49"
+      "bytes": 4991,
+      "sha256": "20c8edd38d43bf73820f8c0d200b4d40a2f44c49f89ba4d13637c486a4997d67"
     },
     {
       "path": "tests/test_motion_readability.py",

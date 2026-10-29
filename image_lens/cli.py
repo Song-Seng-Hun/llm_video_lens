@@ -164,6 +164,7 @@ def dispatch(command, arguments):
         return dict(status='written', output=str(paths.write_json(a.out, packet)),
                     jobs={j['name']: [p['point_id'] for p in j['points']] for j in packet['jobs']},
                     frames=[packet['jobs'][0]['start_frame'], packet['jobs'][0]['end_frame']],
+                    skeleton=packet['seed_source']['skeleton'],
                     seed_frame_flagged=packet['seed_source']['seed_frame_flagged'], images_written=sum(len(j['points']) for j in packet['jobs']),
                     model_loaded=False)
     if command == 'bind':

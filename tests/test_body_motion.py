@@ -48,12 +48,26 @@ class BodyMotion(unittest.TestCase):
 
 
 def pose(shoulders, wrists, size=100.):
-    k = [[0., 0.]]*133; s = [0.]*133
-    k = [list(p) for p in k]
+    k = [[0., 0.] for _ in range(133)]; s = [0.]*133
     (k[5], k[6]), (k[9], k[10]) = shoulders, wrists
-    for i in (5, 6, 9, 10):
+    k[7] = [(shoulders[0][0]+wrists[0][0])/2, (shoulders[0][1]+wrists[0][1])/2]
+    k[8] = [(shoulders[1][0]+wrists[1][0])/2, (shoulders[1][1]+wrists[1][1])/2]
+    width = shoulders[0][0]-shoulders[1][0]
+    k[11], k[12] = [shoulders[0][0]-.1*width, shoulders[0][1]+1.5*width], [shoulders[1][0]+.1*width, shoulders[1][1]+1.5*width]
+    for i in range(5, 13):
         s[i] = .9
     return dict(bbox=[0, 0, size, size], keypoints=k, scores=s)
+
+
+class Skeleton(unittest.TestCase):
+    def test_plain_body_passes_and_folded_one_fails(self):
+        good = pose(([300., 300.], [100., 300.]), ([320., 420.], [80., 420.]))
+        self.assertEqual(body_motion.skeleton_check(good), (True, 'ok'))
+        folded = pose(([300., 300.], [100., 300.]), ([320., 420.], [80., 420.]))
+        folded['keypoints'][11], folded['keypoints'][12] = [290., 330.], [110., 330.]
+        self.assertFalse(body_motion.skeleton_check(folded)[0])
+        weak = pose(([300., 300.], [100., 300.]), ([320., 420.], [80., 420.])); weak['scores'][9] = .1
+        self.assertIn('missing', body_motion.skeleton_check(weak)[1])
 
 
 class Bridge(unittest.TestCase):

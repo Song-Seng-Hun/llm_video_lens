@@ -1,13 +1,14 @@
 """One-command look at a video: scan, pose, pose-seeded tracking per shot window, grouped reports and one short look.md.
 Runs the existing public steps in order with their own guards; a failed shot is recorded and the next one continues."""
 import json
+import math
 import signal
 import time
 from pathlib import Path
 from image_lens import paths
 
-LOOK = dict(max_shots=16, window_frames=160, min_frames=12, track_seconds=300, groups=('head', 'arms', 'hands', 'legs'))
-NAMES = dict(head='머리', arms='팔', hands='손끝', legs='다리')
+LOOK = dict(max_shots=16, window_frames=160, min_frames=12, track_seconds=300, groups=('head', 'arms', 'hands', 'legs', 'free'))
+NAMES = dict(head='머리', arms='팔', hands='손끝', legs='다리', free='이름 없는 점')
 STEP_ERRORS = (ValueError, OSError, KeyError, TypeError, ImportError, TimeoutError, OverflowError)
 
 
@@ -85,12 +86,26 @@ def lost(report, window, min_frames=LOOK['min_frames']):
     return dict(count=len(gone), total=len(ends), after=max(seen) if seen else window['seed'])
 
 
-def _summary(report, window, group, md_path, traj):
-    """Short per-group lines for look.md, built from the recomputed report JSON."""
-    from image_lens import motion_report
-    moves = [f"{f['point_id']} {motion_report.KO[u['direction']]} {u['distance_px']:.0f}px(f{u['start_frame']}..{u['end_frame']})"
-             for f in report['features'] for run in f['continuous_runs'] for u in run['strokes']['units'] if u['major']]
-    together = motion_report.together(report)
+def _summary(report, window, group, md_path, traj, frame_motion=None):
+    """Short per-group lines for look.md, built from the recomputed report JSON. Major strokes that only follow the
+    whole frame (camera pan, scrolling UI) are set aside and counted."""
+    import math
+    from image_lens import camera, motion_report
+    moves = []; with_camera = 0; kept = set()
+    for f in report['features']:
+        for run in f['continuous_runs']:
+            for u in run['strokes']['units']:
+                if not u['major']:
+                    continue
+                cam = camera.between(frame_motion, u['start_frame'], u['end_frame'])
+                # A camera shift below the stroke threshold is noise (a big figure's own matches leak into it); keep the move.
+                if cam and math.hypot(*cam) >= motion_report.STROKE['major_min_px'] \
+                        and math.hypot(u['dx_px']-cam[0], u['dy_px']-cam[1]) < motion_report.STROKE['major_min_px']:
+                    with_camera += 1
+                    continue
+                moves.append(f"{f['point_id']} {motion_report.KO[u['direction']]} {u['distance_px']:.0f}px(f{u['start_frame']}..{u['end_frame']})")
+                kept.add(f['point_id'])
+    together = [g for g in motion_report.together(report) if 2*len(kept & set(g['points'])) >= len(g['points'])]
     lines = [f"- {NAMES[group]}: " + ('; '.join(moves) if moves else '큰 이동 없음')]
     lines += [f"  - 함께 움직임 {motion_report.quote(g['points'])}: {motion_report.KO[g['direction']]} 약 {g['distance_px']:.0f}px, f{g['frames'][0]}..{g['frames'][1]}"
               for g in together]
@@ -104,7 +119,7 @@ def _summary(report, window, group, md_path, traj):
     if not moves and not any(f['continuous_runs'] for f in report['features']):
         lines = [f"- {NAMES[group]}: 쓸 수 있는 연속 관측 없음(가려짐·화면 밖·추적 끊김). 정지가 아니라 모름."]
     return (lines if moves or cut or len(lines) == 1 and '모름' in lines[0] else []), dict(group=group, major_moves=moves, together=together, warnings=len(warnings),
-                       lost=cut, report=str(md_path), trajectory=str(traj))
+                       lost=cut, camera_only_moves=with_camera, report=str(md_path), trajectory=str(traj))
 
 
 def run(video, detector, pose_model, checkpoint, out, max_shots=LOOK['max_shots'], max_seconds=1800):
@@ -177,6 +192,18 @@ def run(video, detector, pose_model, checkpoint, out, max_shots=LOOK['max_shots'
                                                     (last_end, w['seed']))
                 lines += body_motion.bridge_lines(done['bridge'])
             lines.append(f"- 구간 f{w['seed']}..{end} (점 배치 f{w['seed']}" + (f", {people}명 중 가장 큰 사람" if people > 1 else '') + ')')
+            skeleton = receipt.get('skeleton') or dict(plausible=True)
+            if not skeleton['plausible']:
+                lines.append(f"  - 골격 신뢰 낮음({skeleton['reason']}): 팔·다리 이름 대신 이름 없는 점(pt-a…)으로 봄")
+            from image_lens import camera, motion_report
+            try:
+                frame_motion = camera.path(source, w['seed'], end)
+            except Exception as error:  # OpenCV raises its own error type; a missing estimate only disables the filter
+                frame_motion = None; entry['errors'].append(dict(window=w, step='camera', error=str(error)[:300]))
+            cam = camera.between(frame_motion, w['seed'], end)
+            done['camera'] = dict(net=cam, frames=len(frame_motion or {}))
+            if cam and math.hypot(*cam) >= motion_report.STROKE['major_min_px']:
+                lines.append(f"  - 화면 전체: {motion_report.KO[motion_report.direction(*cam)]} {math.hypot(*cam):.0f}px (카메라·배경 이동 추정; 이것만 따라간 이동은 아래에서 뺌)")
             for name, group, stem, _ in tracked:
                 try:
                     _step('bind', ['--queries', base.with_suffix('.obs.json'), '--tracks', stem.with_suffix('.tracks.json'),
@@ -188,14 +215,14 @@ def run(video, detector, pose_model, checkpoint, out, max_shots=LOOK['max_shots'
                     report, _ = paths.load(stem.with_suffix('.report.json'))
                     from image_lens import motion_report
                     md = paths.write(stem.with_suffix('.report.md'), motion_report.markdown(report))
-                    group_lines, summary = _summary(report, dict(w, end=end), group, md.relative_to(root), stem.with_name(stem.name+'-traj').relative_to(root)/'trajectory.png')
+                    group_lines, summary = _summary(report, dict(w, end=end), group, md.relative_to(root), stem.with_name(stem.name+'-traj').relative_to(root)/'trajectory.png', frame_motion)
                     lines += ['  '+l for l in group_lines]; done['groups'].append(summary)
                     if not group_lines:still.append(NAMES[group])
                 except STEP_ERRORS as error:
                     entry['errors'].append(dict(window=w, job=name, error=str(error)[:300]))
                     lines.append(f'  - {group} 실패: {str(error)[:120]}')
             if still:lines.append(f"  - {'·'.join(still)}: 큰 이동 없음")
-            if tracked:
+            if tracked and skeleton['plausible']:
                 done['body'] = body_motion.describe([t[3] for t in tracked], dict(w, end=end))
                 lines += ['  '+l for l in body_motion.lines(done['body'])]
             if end < w['end']:

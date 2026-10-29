@@ -141,6 +141,8 @@ def bridge(before, after, frames):
     """Body-relative jumps of limb keypoints between two nearby frames, or None when it is not plausibly the same figure."""
     if not before or not after or frames[1]-frames[0] > BRIDGE['max_gap']:
         return None
+    if not skeleton_check(before)[0] or not skeleton_check(after)[0]:
+        return None
     def body(t):
         k, s = t['keypoints'], t['scores']
         if min(s[5], s[6]) < BRIDGE['min_score']:
@@ -180,3 +182,31 @@ def bridge_lines(result):
         axis = '' if not limb['axis_px'] else f", 몸 {'바깥으로' if limb['axis_px'] > 0 else '쪽으로'} {abs(limb['axis_px']):.0f}px"
         out.append(f"  - {limb['side']} {limb['part']}: {motion_report.KO[limb['direction']].replace('화면 ', '')} {limb['distance_px']:.0f}px{axis}")
     return out
+
+
+# Calibrated by eye on AKAGE (all plain frames pass; echo-copy ranges fail) and on a 39-cover MikuMiku playlist
+# (6/6 good skeletons pass, 2/26 wrong ones pass). Ratios are in shoulder widths.
+SKELETON = dict(min_score=.30, mean_min=.45, torso=(1., 2.6), hip_width=(.45, 1.6), max_arm=2.5)
+
+
+def skeleton_check(track):
+    """(plausible, reason) for naming arm and leg points from this pose. Faces are judged separately and kept."""
+    k, s = track['keypoints'], track['scores']
+    core = [s[i] for i in range(5, 13)]
+    if min(core) < SKELETON['min_score']:
+        return False, 'shoulder/elbow/wrist/hip missing'
+    if sum(core)/len(core) < SKELETON['mean_min']:
+        return False, f'core joint score {sum(core)/len(core):.2f}'
+    width = math.dist(k[5], k[6])
+    if not width:
+        return False, 'zero shoulder width'
+    torso = math.dist(_mean([k[5], k[6]]), _mean([k[11], k[12]]))/width
+    hips = math.dist(k[11], k[12])/width
+    arm = max(math.dist(k[a], k[b]) for a, b in ((5, 7), (7, 9), (6, 8), (8, 10)))/width
+    if not SKELETON['torso'][0] <= torso <= SKELETON['torso'][1]:
+        return False, f'torso {torso:.2f} shoulder widths'
+    if not SKELETON['hip_width'][0] <= hips <= SKELETON['hip_width'][1]:
+        return False, f'hip width {hips:.2f} shoulder widths'
+    if arm > SKELETON['max_arm']:
+        return False, f'arm segment {arm:.2f} shoulder widths'
+    return True, 'ok'
