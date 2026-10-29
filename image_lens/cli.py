@@ -12,6 +12,21 @@ def parser(command, description):
     return argparse.ArgumentParser(prog='image-lens '+command, description=description)
 
 
+def models(a, *names):
+    """Fill model paths left out on the command line from <workspace>/models.json (per machine, Git-ignored), e.g.
+    {"detector": "...onnx", "pose_model": "...onnx", "checkpoint": "...pth"}. A flag given on the command line wins."""
+    missing = [n for n in names if getattr(a, n) is None]
+    if not missing:
+        return a
+    path = paths.workspace_root()/'models.json'
+    saved = json.loads(path.read_text(encoding='utf-8')) if path.is_file() else {}
+    for n in missing:
+        if not saved.get(n):
+            raise ValueError(f"--{n.replace('_', '-')} not given and not in {path}")
+        setattr(a, n, saved[n])
+    return a
+
+
 def selected_entry(module, arguments):
     """Use the existing selected main; only normalize its external path boundary."""
     previous = sys.argv
@@ -134,8 +149,8 @@ def dispatch(command, arguments):
         ap.add_argument('--frame', type=int, required=True); ap.add_argument('--end', type=int)
         ap.add_argument('--point', action='append', required=True, help='name=x,y in source pixels; repeat up to 8 times')
         ap.add_argument('--no-snap', action='store_true', help='keep the given positions instead of the nearest corner')
-        ap.add_argument('--checkpoint', required=True); ap.add_argument('--out', required=True, help='new output directory')
-        a = ap.parse_args(arguments)
+        ap.add_argument('--checkpoint', help='default: models.json'); ap.add_argument('--out', required=True, help='new output directory')
+        a = models(ap.parse_args(arguments), 'checkpoint')
         return mark.run(a.video, a.shots, a.frame, a.point, a.checkpoint, a.out, a.end, not a.no_snap)
     if command == 'focus':
         from image_lens import digest
@@ -146,22 +161,22 @@ def dispatch(command, arguments):
     if command == 'look':
         from image_lens import look
         ap = parser(command, 'One-command look: scan, pose, pose-seeded tracking per shot window, one short look.md.')
-        ap.add_argument('--video', required=True); ap.add_argument('--detector', required=True)
-        ap.add_argument('--pose-model', required=True); ap.add_argument('--checkpoint', required=True)
+        ap.add_argument('--video', required=True); ap.add_argument('--detector', help='default: models.json')
+        ap.add_argument('--pose-model', help='default: models.json'); ap.add_argument('--checkpoint', help='default: models.json')
         ap.add_argument('--out', required=True, help='new output directory inside the workspace')
         ap.add_argument('--max-shots', type=int, default=look.LOOK['max_shots']); ap.add_argument('--max-seconds', type=int, default=1800)
-        a = ap.parse_args(arguments)
+        a = models(ap.parse_args(arguments), 'detector', 'pose_model', 'checkpoint')
         if not 1 <= a.max_shots <= 64 or not 60 <= a.max_seconds <= 7200:
             raise ValueError('--max-shots 1..64 and --max-seconds 60..7200')
         return look.run(a.video, a.detector, a.pose_model, a.checkpoint, a.out, a.max_shots, a.max_seconds)
     if command == 'pose':
         from image_lens import pose
         ap = parser(command, 'Optional local whole-body pose (pinned user-supplied ONNX weights); per-shot track IDs and overlap flags.')
-        ap.add_argument('--shots', required=True); ap.add_argument('--detector', required=True)
-        ap.add_argument('--pose-model', required=True); ap.add_argument('--out', required=True)
+        ap.add_argument('--shots', required=True); ap.add_argument('--detector', help='default: models.json')
+        ap.add_argument('--pose-model', help='default: models.json'); ap.add_argument('--out', required=True)
         ap.add_argument('--start', type=int, default=0); ap.add_argument('--end', type=int)
         ap.add_argument('--max-seconds', type=int, default=300)
-        a = ap.parse_args(arguments)
+        a = models(ap.parse_args(arguments), 'detector', 'pose_model')
         paths.confined(a.out, new=True)
         if not 1 <= a.max_seconds <= 1800:
             raise ValueError('wall budget must be 1..1800 seconds')

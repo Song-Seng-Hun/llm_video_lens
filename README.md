@@ -78,6 +78,8 @@ python -m image_lens --workspace W mark --video V --shots W/look/shots.json --fr
 python -m image_lens --workspace W look --video clip.mp4 --detector D.onnx --pose-model P.onnx --checkpoint scaled_offline.pth --out look-clip
 ```
 
+Model paths left out on the command line (`look`, `pose`, `mark`) are read from `<workspace>/models.json`, e.g. `{"detector": "/models/yolox_humanart.onnx", "pose_model": "/models/rtmw133.onnx", "checkpoint": "/models/scaled_offline.pth"}`; a flag given on the command line wins. The workspace is Git-ignored, so each machine keeps its own. With it, `python -m image_lens --workspace W look --video clip.mp4 --out look-clip` is the whole command.
+
 ## Whole-body seeds from pose (optional)
 
 `pose` runs a local whole-body pose model over the canonical scan: YOLOX HumanArt person boxes, RTMW 133 keypoints (rtmlib, ONNX Runtime CPU) and ByteTrack IDs reset at every detected cut. The two ONNX files are user-supplied and pinned by size and SHA256; nothing is downloaded or bundled, and the weight license is not established. Install `requirements-pose.txt` into the same environment. The packet also flags frames where the pose layer itself is unreliable: overlapping person boxes (echo copies, afterimages) and body-skeleton jumps within one track.

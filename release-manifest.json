@@ -20,7 +20,7 @@
   ],
   "manifest_self_excluded": true,
   "file_count": 111,
-  "total_bytes": 1078455,
+  "total_bytes": 1080328,
   "files": [
     {
       "path": ".gitattributes",
@@ -34,8 +34,8 @@
     },
     {
       "path": "README.md",
-      "bytes": 16747,
-      "sha256": "8b720941925b62cd807d5dffc71deacd20f91b34452a417ec0fd8d753afbd0a3"
+      "bytes": 17195,
+      "sha256": "7560af17afbc66486ba98d5312f44300cd89c146ca390b145073633a624aa120"
     },
     {
       "path": "docs/import-provenance.json",
@@ -104,8 +104,8 @@
     },
     {
       "path": "image_lens/cli.py",
-      "bytes": 17539,
-      "sha256": "0e593f0e7d4c0c4af6a4ea106339bd1b3f2cb3883bb11cf2b29270afd4f1a8d5"
+      "bytes": 18394,
+      "sha256": "dd07f5005eccaa20739391b15b93634f91ea7d7b0d65acf04147e62fd762ed00"
     },
     {
       "path": "image_lens/digest.py",
@@ -544,8 +544,8 @@
     },
     {
       "path": "tests/test_contracts.py",
-      "bytes": 17770,
-      "sha256": "baad7c5ac555f1997c4531c67bd6e52cb9aebba3817506b18708e53d5a8dd2d3"
+      "bytes": 18340,
+      "sha256": "3ed8977035472f055f138c959782027d5a6be32717d9e514b3ab9523455d242b"
     },
     {
       "path": "tests/test_digest.py",
