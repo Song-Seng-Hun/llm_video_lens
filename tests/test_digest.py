@@ -49,6 +49,12 @@ class Lines(unittest.TestCase):
         self.assertNotIn('반대', digest._bands([band('맨 위', 15., 0.), band('아래', 12., 0.)]))
 
 
+    def test_framing_is_said_first(self):
+        done = dict(window=dict(seed=0, end=29), framing='upper', scope='upper', groups=[],
+                    body=dict(limit_px=12., centre_shift=dict(direction='down', distance_px=2.), limbs=[]))
+        self.assertIn('| 상반신 (팔만) |', digest.window_line(done, 60))
+
+
 class Repeats(unittest.TestCase):
     def window(self, seed, wrist, motif='A'):
         return dict(window=dict(seed=seed, end=seed+14), motif=motif, groups=[],

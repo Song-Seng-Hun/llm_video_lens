@@ -166,8 +166,8 @@ def dispatch(command, arguments):
         ap.add_argument('--out', required=True, help='new output directory inside the workspace')
         ap.add_argument('--max-shots', type=int, default=look.LOOK['max_shots']); ap.add_argument('--max-seconds', type=int, default=1800)
         a = models(ap.parse_args(arguments), 'detector', 'pose_model', 'checkpoint')
-        if not 1 <= a.max_shots <= 64 or not 60 <= a.max_seconds <= 7200:
-            raise ValueError('--max-shots 1..64 and --max-seconds 60..7200')
+        if not 1 <= a.max_shots <= 256 or not 60 <= a.max_seconds <= 7200:
+            raise ValueError('--max-shots 1..256 and --max-seconds 60..7200')
         return look.run(a.video, a.detector, a.pose_model, a.checkpoint, a.out, a.max_shots, a.max_seconds)
     if command == 'pose':
         from image_lens import pose

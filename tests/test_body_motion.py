@@ -85,4 +85,32 @@ class Bridge(unittest.TestCase):
         small = pose(([220., 300.], [180., 300.]), ([320., 420.], [-60., 300.]))
         self.assertIsNone(body_motion.bridge(a, small, (61, 62)))
 
+
+def keypoints(points, score=.9):
+    """133 keypoints off-screen at score 0 except the given {index: (x, y)}."""
+    k = [[-1., -1.]]*133; s = [0.]*133
+    for i, xy in points.items():
+        k[i] = list(xy); s[i] = score
+    return dict(keypoints=k, scores=s)
+
+
+class Framing(unittest.TestCase):
+    UPPER = {1: (620, 200), 2: (660, 200), 5: (560, 420), 6: (720, 420), 7: (540, 600), 8: (740, 600), 9: (600, 700), 10: (700, 700)}
+
+    def test_framing_from_seen_joints(self):
+        self.assertEqual(body_motion.framing(keypoints(self.UPPER), 1280, 720), 'upper')
+        full = {**self.UPPER, 11: (600, 600), 12: (680, 600), 15: (600, 900), 16: (680, 900)}
+        self.assertEqual(body_motion.framing(keypoints(full), 1280, 1080), 'full')
+        guessed = {**self.UPPER, 15: (600, 700), 16: (680, 700)}  # ankles guessed at the bottom edge of an upper-body shot
+        self.assertEqual(body_motion.framing(keypoints(guessed, .4), 1280, 720), 'upper')
+        self.assertEqual(body_motion.framing(keypoints({1: (400, 300), 2: (880, 300)}), 1280, 720), 'face')
+        thigh = {**self.UPPER, 11: (590, 640), 12: (690, 640)}
+        self.assertEqual(body_motion.framing(keypoints(thigh), 1280, 1080), 'thigh')
+
+    def test_upper_body_names_arms_without_hips(self):
+        track = keypoints(self.UPPER)
+        self.assertFalse(body_motion.skeleton_check(track)[0])
+        self.assertEqual(body_motion.upper_check(track), (True, 'upper body'))
+        self.assertFalse(body_motion.upper_check(keypoints({5: (560, 420), 7: (540, 600)}))[0])
+
 if __name__ == '__main__': unittest.main()

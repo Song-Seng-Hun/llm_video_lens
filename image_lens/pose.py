@@ -285,6 +285,13 @@ def seed(pose_path, frame, job, evidence_dir, track_id=None, length=SEED['max_fr
     seeds = seed_points(track, packet['width'], packet['height'])
     from image_lens import body_motion
     plausible, reason = body_motion.skeleton_check(track)
+    shot = body_motion.framing(track, packet['width'], packet['height']); scope = 'full' if plausible else None
+    if not plausible and shot == 'upper':
+        # Hips below the frame: name the arms from the shoulders, leave the legs out.
+        plausible, why = body_motion.upper_check(track)
+        if plausible:
+            scope = 'upper'; reason = f'upper body (full check: {reason})'
+            seeds = {name: p for name, p in seeds.items() if name not in GROUPS['legs']}
     if not plausible:
         seeds = {name: p for name, p in seeds.items() if name in GROUPS['head']}
     from image_lens import onion
@@ -307,7 +314,7 @@ def seed(pose_path, frame, job, evidence_dir, track_id=None, length=SEED['max_fr
                              observation_scope='visible_surface_2d', anatomical_claims=False, common_metric_excluded_frames=[frame]))
     flagged = any(r['frame'] == frame for r in packet['flags']['frames'])
     return dict(schema='team-eye.observations/1', seed_source=dict(pose=str(pose_file), pose_sha256=paths.sha(pose_file),
-                track_id=track['track_id'], frame=frame, seed_frame_flagged=flagged, skeleton=dict(plausible=plausible, reason=reason),
+                track_id=track['track_id'], frame=frame, seed_frame_flagged=flagged, skeleton=dict(plausible=plausible, reason=reason, scope=scope, framing=shot),
                 basis='pose-model joints and eye-based hair geometry; candidate visible-surface seeds, not verified anatomy'),
                 jobs=jobs)
 

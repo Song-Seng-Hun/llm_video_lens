@@ -79,6 +79,35 @@ def _image(cv2, np, first, last, box, result, path):
     cv2.imwrite(str(path), picture)
 
 
+SHEET = dict(tile=360, label=20, columns=4, per_sheet=16)
+
+
+def sheets(root, items):
+    """Onion images of a whole look on a few contact sheets (time label above each), so an image reader sees the
+    gestures the text loses (heart hands, V signs on Seedance close-ups). items: [(start_s, end_s, image name)]."""
+    import cv2
+    import numpy as np
+    t, top = SHEET['tile'], SHEET['label']; written = []
+    for first in range(0, len(items), SHEET['per_sheet']):
+        tiles = []
+        for start, end, name in items[first:first+SHEET['per_sheet']]:
+            image = cv2.imread(str(root/name))
+            if image is None:
+                continue
+            h, w = image.shape[:2]; k = t/max(h, w)
+            image = cv2.resize(image, (max(1, int(w*k)), max(1, int(h*k))), interpolation=cv2.INTER_AREA)
+            tile = np.zeros((t+top, t, 3), np.uint8); tile[top:top+image.shape[0], :image.shape[1]] = image
+            cv2.putText(tile, f'{start:.2f}-{end:.2f}s', (4, 15), cv2.FONT_HERSHEY_SIMPLEX, .5, (255, 255, 255), 1)
+            tiles.append(tile)
+        if not tiles:
+            continue
+        tiles += [np.zeros_like(tiles[0])]*(-len(tiles) % SHEET['columns'])
+        rows = [np.hstack(tiles[i:i+SHEET['columns']]) for i in range(0, len(tiles), SHEET['columns'])]
+        path = root/f'onion-sheet-{len(written)+1}.jpg'
+        cv2.imwrite(str(path), np.vstack(rows)); written.append(path.name)
+    return written
+
+
 def lines(result, image_name=None):
     from image_lens import motion_report
     parts = []

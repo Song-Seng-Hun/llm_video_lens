@@ -4,7 +4,7 @@ limbs did on top of them, so one slide is not repeated for every tracked point. 
 pose differences between two frames: the path between them is not observed."""
 import math
 import re
-from image_lens import motion_report
+from image_lens import body_motion, motion_report
 
 DIGEST = dict(parts=3, same_share=.5, repeat_px=8., repeat_share=.25)
 ARM = ('손목', '팔꿈치', '엄지 끝', '검지 끝')
@@ -112,6 +112,8 @@ def window_line(done, fps, first=None):
     """One window. With `first` (the first window of the same repeated pose) only the differences are written."""
     w = done['window']; end = done.get('cut_after', w['end'])
     fields = [f"{w['seed']/fps:.2f}–{(end+1)/fps:.2f}s f{w['seed']}..{end}"]
+    if done.get('framing'):
+        fields.append(body_motion.FRAMING_KO[done['framing']] + (' (팔만)' if done.get('scope') == 'upper' else ''))
     cam = (done.get('camera') or {}).get('net')
     camera_text = f"카메라 {_dir(motion_report.direction(*cam))} {math.hypot(*cam):.0f}px" \
         if cam and math.hypot(*cam) >= motion_report.STROKE['major_min_px'] else None
@@ -192,8 +194,15 @@ def markdown(record, scan, full_name):
            '읽는 법: 한 줄 = 추적 구간 하나. 방향·좌우는 화면 기준. "전체"는 카메라와 몸 중심(어깨 가운데, 없으면 얼굴)의 이동이고, '
            '"몸 기준"은 그 위에 팔다리가 더 한 움직임(몸 중심 기준, 같은 쪽 팔·다리에서 같이 움직인 점은 한 줄). '
            '"높이별"은 사람 상자를 위→아래 5칸으로 나눈 이동(px, 0=8px 미만). 골격 신뢰가 낮으면 팔다리 이름 없이 "화면" 이동만. '
-           '"자세 A"는 처음과 끝 그림이 같은 구간이 다시 나온 것: 반복은 처음과 다른 점만 쓴다.',
+           '"자세 A"는 처음과 끝 그림이 같은 구간이 다시 나온 것: 반복은 처음과 다른 점만 쓴다. '
+           '시간 다음 칸은 구도(전신/무릎 위/상반신/얼굴 클로즈업, 포즈 관절이 화면 안에 있는지로 판단): 상반신·클로즈업이면 사람 상자가 화면 아래에서 잘려서 '
+           '높이별 아래 칸은 다리가 아니라 가슴·손이나 얼굴 아래쪽이고, "(팔만)"은 엉덩이 없이 어깨로 팔만 이름 붙였다는 뜻.',
            f"자세히: `image_lens focus --look <이 폴더> --shot <shot-id>` (또는 {full_name}). 점 이름·부위는 미검증, 수치는 원본 비교 전 후보.", '']
+    if record.get('scaled'):
+        out.insert(3, f"원본 {record['scaled']['from'][0]}×{record['scaled']['from'][1]}을 {record['scaled']['to'][0]}×{record['scaled']['to'][1]}로 줄여서 봄: px는 줄인 영상 기준.")
+    if record.get('onion_sheets'):
+        out.insert(-1, f"어니언 모음 그림: {', '.join(record['onion_sheets'])} (구간마다 청록=시작, 빨강=끝, 초록 화살표=높이별 이동). "
+                       '손 모양(하트·브이)처럼 글에 안 나오는 동작은 그림에서 본다.')
     windows = [d for s in record['shots'] for d in s['windows']]
     seen = {}
     for d in windows:

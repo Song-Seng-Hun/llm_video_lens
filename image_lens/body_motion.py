@@ -212,3 +212,47 @@ def skeleton_check(track):
     if arm > SKELETON['max_arm']:
         return False, f'arm segment {arm:.2f} shoulder widths'
     return True, 'ok'
+
+
+# Shot framing from which joints are on screen (Seedance: hips missing or guessed onto the chest dropped 37 of 43
+# windows to face-only). Eyes farther apart than this share of the frame width is a face close-up: Seedance face
+# close-ups had .37-.38, bust shots .14-.22.
+# On upper-body shots the pose model still guesses ankles at the frame bottom (scores .3-.5, shoulder to ankle
+# <=1.2 shoulder widths); real full-body Seedance frames had scores >=.8 and 2.8-4.6 widths.
+FRAMING = dict(face_eyes=.3, min_score=.30, border=.02, ankle_score=.6, legs=2.)
+FRAMING_KO = dict(full='전신', thigh='무릎 위', upper='상반신', face='얼굴 클로즈업')
+
+
+def framing(track, width, height):
+    """'full' when both ankles are surely on screen well below the shoulders, 'thigh' when the hips pass the full
+    skeleton check without feet, 'face' when the eyes are very far apart or no shoulder is seen, else 'upper'."""
+    k, s = track['keypoints'], track['scores']
+    seen = lambda i: s[i] >= FRAMING['min_score'] and FRAMING['border']*height <= k[i][1] <= (1-FRAMING['border'])*height
+    if min(s[1], s[2]) >= FRAMING['min_score'] and math.dist(k[1], k[2]) >= FRAMING['face_eyes']*width:
+        return 'face'
+    shoulders = math.dist(k[5], k[6])
+    if min(s[15], s[16]) >= FRAMING['ankle_score'] and seen(15) and seen(16) and shoulders \
+            and (k[15][1]+k[16][1]-k[5][1]-k[6][1])/2 >= FRAMING['legs']*shoulders:
+        return 'full'
+    if skeleton_check(track)[0]:
+        return 'thigh'  # hips and thighs pass the full check, feet out of the shot (AKAGE)
+    return 'upper' if seen(5) or seen(6) else 'face'
+
+
+def upper_check(track):
+    """(plausible, reason) for naming arm points when the hips are out of the shot: both shoulders, and every seen arm
+    joint with segments no longer than the full check allows."""
+    k, s = track['keypoints'], track['scores']
+    if min(s[5], s[6]) < SKELETON['min_score']:
+        return False, 'shoulders missing'
+    seen = [i for i in range(5, 11) if s[i] >= SKELETON['min_score']]
+    if sum(s[i] for i in seen)/len(seen) < SKELETON['mean_min']:
+        return False, f'arm joint score {sum(s[i] for i in seen)/len(seen):.2f}'
+    width = math.dist(k[5], k[6])
+    if not width:
+        return False, 'zero shoulder width'
+    pairs = [(a, b) for a, b in ((5, 7), (7, 9), (6, 8), (8, 10)) if a in seen and b in seen]
+    arm = max((math.dist(k[a], k[b]) for a, b in pairs), default=0.)/width
+    if arm > SKELETON['max_arm']:
+        return False, f'arm segment {arm:.2f} shoulder widths'
+    return True, 'upper body'

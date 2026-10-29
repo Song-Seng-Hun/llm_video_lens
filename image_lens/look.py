@@ -125,6 +125,31 @@ def _summary(report, window, group, md_path, traj, frame_motion=None):
                        lost=cut, camera_only_moves=with_camera, report=str(md_path), trajectory=str(traj))
 
 
+def fit(source, root, max_pixels=1920*1080):
+    """(video, scaled) where video fits the point tracker's pixel cap. A larger source is shrunk once into the output
+    directory (aspect kept, even sides); px in every report are then of that copy. scaled is None or {from, to}."""
+    import cv2
+    cap = cv2.VideoCapture(str(source))
+    try:
+        w, h, fps = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH)), int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT)), cap.get(cv2.CAP_PROP_FPS)
+        if w*h <= max_pixels:
+            return source, None
+        k = math.sqrt(max_pixels/(w*h)); size = (int(w*k)//2*2, int(h*k)//2*2)
+        copy = root/f'source-{size[0]}x{size[1]}.mp4'
+        writer = cv2.VideoWriter(str(copy), cv2.VideoWriter_fourcc(*'mp4v'), fps, size)
+        try:
+            while True:
+                ok, image = cap.read()
+                if not ok:
+                    break
+                writer.write(cv2.resize(image, size, interpolation=cv2.INTER_AREA))
+        finally:
+            writer.release()
+    finally:
+        cap.release()
+    return copy, {'from': [w, h], 'to': list(size)}
+
+
 def run(video, detector, pose_model, checkpoint, out, max_shots=LOOK['max_shots'], max_seconds=1800):
     started = time.monotonic()
     def remaining():
@@ -134,6 +159,7 @@ def run(video, detector, pose_model, checkpoint, out, max_shots=LOOK['max_shots'
     root.mkdir(parents=True)
     global LOG
     LOG = root/'steps.log'
+    source, scaled = fit(source, root)
     _step('scan', ['--video', source, '--out', root/'shots.json'])
     _step('pose', ['--shots', root/'shots.json', '--detector', detector, '--pose-model', pose_model, '--out', root/'pose.json',
                    '--max-seconds', max(1, min(1800, int(remaining())))])
@@ -196,6 +222,7 @@ def run(video, detector, pose_model, checkpoint, out, max_shots=LOOK['max_shots'
                 lines += body_motion.bridge_lines(done['bridge'])
             lines.append(f"- 구간 f{w['seed']}..{end} (점 배치 f{w['seed']}" + (f", {people}명 중 가장 큰 사람" if people > 1 else '') + ')')
             skeleton = receipt.get('skeleton') or dict(plausible=True); done['skeleton'] = skeleton['plausible']
+            done['framing'] = skeleton.get('framing'); done['scope'] = skeleton.get('scope')
             if not skeleton['plausible']:
                 lines.append(f"  - 골격 신뢰 낮음({skeleton['reason']}): 팔·다리 이름 없이 얼굴과 많이 움직인 곳(move-a…)만 봄")
             from image_lens import camera, motion_report
@@ -252,6 +279,7 @@ def run(video, detector, pose_model, checkpoint, out, max_shots=LOOK['max_shots'
                 try:
                     moving = cam if cam and math.hypot(*cam) >= motion_report.STROKE['major_min_px'] else None
                     done['bands'] = onion.bands(source, w['seed'], end, person['bbox'], moving, picture)
+                    done['onion'] = picture.name
                     lines += ['  '+l for l in onion.lines(done['bands'], picture.name)]
                 except Exception as error:  # OpenCV raises its own error type; the view is optional
                     entry['errors'].append(dict(window=w, step='onion', error=str(error)[:300]))
@@ -275,12 +303,15 @@ def run(video, detector, pose_model, checkpoint, out, max_shots=LOOK['max_shots'
             f"영상 {source.name}: {scan['source_frame_count']}프레임, {scan['fps']:g}fps, 장면 {len(segments)}개. 점은 포즈 기준 자동 배치(머리카락은 눈 기준 기하), 부위·동일인 미검증.",
             '경고는 "원본부터 비교하라"는 뜻이다. 가짜 움직임이라는 판정이 아니다. 자세한 수치는 장면별 report.json에 있다.', '']
     paths.write(root/'look-full.md', '\n'.join(head+lines).rstrip('\n')+'\n')
+    from image_lens import onion
+    sheets = onion.sheets(root, [(d['window']['seed']/scan['fps'], (d.get('cut_after', d['window']['end'])+1)/scan['fps'], d['onion'])
+                                 for s in shots for d in s['windows'] if d.get('onion')])
     from image_lens import motif
     for (done, _), label in zip(looks, motif.assign([l for _, l in looks])):
         if label:
             done['motif'] = label
     record = dict(schema='image-lens.look/1', source_video=str(source), source_sha256=scan['source_sha256'], params=LOOK,
-                  max_shots=max_shots, elapsed_seconds=round(time.monotonic()-started, 1), shots=shots)
+                  max_shots=max_shots, scaled=scaled, onion_sheets=sheets, elapsed_seconds=round(time.monotonic()-started, 1), shots=shots)
     paths.write_json(root/'look.json', record)
     from image_lens import digest
     look_md = paths.write(root/'look.md', digest.markdown(record, scan, 'look-full.md'))
