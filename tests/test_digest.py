@@ -49,4 +49,27 @@ class Lines(unittest.TestCase):
         self.assertNotIn('반대', digest._bands([band('맨 위', 15., 0.), band('아래', 12., 0.)]))
 
 
+class Repeats(unittest.TestCase):
+    def window(self, seed, wrist, motif='A'):
+        return dict(window=dict(seed=seed, end=seed+14), motif=motif, groups=[],
+                    body=dict(limit_px=12., centre_shift=dict(direction='down', distance_px=4.),
+                              limbs=[limb('wrist-l', '손목', '화면 왼쪽', 'up', wrist)]))
+
+    def test_repeat_says_only_what_differs(self):
+        first = self.window(32, 26.)
+        self.assertIn('자세 A 반복 (0.64s와 같음)', digest.window_line(self.window(93, 28.), 50, first))
+        line = digest.window_line(self.window(339, 60.), 50, first)
+        self.assertIn('다른 점: 왼팔(손목) 위 60px', line); self.assertIn('위 26px 없음', line)
+
+    def test_label_swap_is_not_a_difference(self):
+        first = self.window(32, 26.); again = self.window(93, 27.)
+        again['body']['limbs'] = [limb('wrist-r', '손목', '화면 오른쪽', 'up', 27.)]
+        self.assertIn('같음)', digest.window_line(again, 50, first))
+
+
+    def test_neighbouring_direction_is_not_a_difference(self):
+        first = self.window(32, 26.); again = self.window(93, 25.)
+        again['body']['limbs'] = [limb('wrist-l', '손목', '화면 왼쪽', 'up_left', 25.)]
+        self.assertIn('같음)', digest.window_line(again, 50, first))
+
 if __name__ == '__main__': unittest.main()

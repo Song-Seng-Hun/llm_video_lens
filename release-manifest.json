@@ -19,8 +19,8 @@
     "historical experiment outputs"
   ],
   "manifest_self_excluded": true,
-  "file_count": 111,
-  "total_bytes": 1080328,
+  "file_count": 113,
+  "total_bytes": 1090611,
   "files": [
     {
       "path": ".gitattributes",
@@ -34,8 +34,8 @@
     },
     {
       "path": "README.md",
-      "bytes": 17195,
-      "sha256": "7560af17afbc66486ba98d5312f44300cd89c146ca390b145073633a624aa120"
+      "bytes": 17977,
+      "sha256": "cbcdad1a490f2d47a7b3a9351fb7d992fa3f9fa0dc74f84fba3b1c7e17313757"
     },
     {
       "path": "docs/import-provenance.json",
@@ -109,8 +109,8 @@
     },
     {
       "path": "image_lens/digest.py",
-      "bytes": 9326,
-      "sha256": "26f144c54cf6f637abd160115cac175968f5b76c8a0992cef474f7ac385db222"
+      "bytes": 13645,
+      "sha256": "ab6c103ce7d274d23bc413db75a2fe30ec76e056100ff48a74b9d03ad1d44c82"
     },
     {
       "path": "image_lens/foreground_regions.py",
@@ -124,13 +124,18 @@
     },
     {
       "path": "image_lens/look.py",
-      "bytes": 19076,
-      "sha256": "3fc0d434d3bc431864bc3d4099ee4f2702b3aad2090b34fcedd433f8cd954fab"
+      "bytes": 19776,
+      "sha256": "3b5fc299cb7f0efec181e67791d362def987f86a2bb23f70a9478913525aedee"
     },
     {
       "path": "image_lens/mark.py",
       "bytes": 9359,
       "sha256": "94197c20106192ce7e772ae75190af9987f575b8f787eb956ee8e86eb9ec6d70"
+    },
+    {
+      "path": "image_lens/motif.py",
+      "bytes": 2261,
+      "sha256": "dd6d322b824676be11e2eb6a0d9730bccf812cb030925103baf5ce9937bc7d87"
     },
     {
       "path": "image_lens/motion_report.py",
@@ -549,8 +554,8 @@
     },
     {
       "path": "tests/test_digest.py",
-      "bytes": 3359,
-      "sha256": "e831dbf32ab4b7ff9f2c3eef43083b597e1d1506535605d85e22615fe138de78"
+      "bytes": 4668,
+      "sha256": "216c216e665959e6ca5879bdfd463f65e7f62a526494fd27e9a5a2674ee99ce5"
     },
     {
       "path": "tests/test_look.py",
@@ -561,6 +566,11 @@
       "path": "tests/test_mark.py",
       "bytes": 1479,
       "sha256": "b074dd0cb4ec4e03963d11e4ca0d4a9177e217af36449097c8d6c291b0d98bcc"
+    },
+    {
+      "path": "tests/test_motif.py",
+      "bytes": 912,
+      "sha256": "59feba6abf645d4cead6b52adcfcd6b2e3f58a5afa604ecfbfad857163c7840a"
     },
     {
       "path": "tests/test_motion_readability.py",

@@ -141,7 +141,7 @@ def run(video, detector, pose_model, checkpoint, out, max_shots=LOOK['max_shots'
     pose_packet, _ = paths.load(root/'pose.json', max_bytes=64*1024*1024)
     pose_frames = {f['frame']: f['tracks'] for f in pose_packet['frames']}
     flagged = {r['frame'] for r in pose_packet['flags']['frames']}
-    shots = []; lines = []; last_end = None
+    shots = []; lines = []; last_end = None; looks = []
     segments = scan['analysis_segments']
     for segment in segments[:max_shots]:
         sid = segment['segment_id']; s0, s1 = segment['start_frame'], segment['end_frame']
@@ -260,6 +260,13 @@ def run(video, detector, pose_model, checkpoint, out, max_shots=LOOK['max_shots'
                 lines.append(f"  - f{end} 뒤 점이 한꺼번에 끊김(그림 바뀜·화면 전환 추정): f{end+1}부터 점을 다시 놓음")
             if done['groups']:lines.append(f"  - 자세히: {base.name}-<head|arms|legs>.report.md, 그림 {base.name}-<묶음>-traj/trajectory.png")
             last_end = end if done['groups'] else None
+            if person:
+                from image_lens import motif
+                try:
+                    looks.append((done, dict(start=motif.thumb(source, w['seed'], person['bbox']), end=motif.thumb(source, end, person['bbox']),
+                                             frames=end-w['seed']+1)))
+                except Exception as error:  # OpenCV raises its own error type; without thumbs the window is never a repeat
+                    entry['errors'].append(dict(window=w, step='motif', error=str(error)[:300]))
             entry['windows'].append(done)
         lines.append('')
     if len(segments) > max_shots:
@@ -268,6 +275,10 @@ def run(video, detector, pose_model, checkpoint, out, max_shots=LOOK['max_shots'
             f"영상 {source.name}: {scan['source_frame_count']}프레임, {scan['fps']:g}fps, 장면 {len(segments)}개. 점은 포즈 기준 자동 배치(머리카락은 눈 기준 기하), 부위·동일인 미검증.",
             '경고는 "원본부터 비교하라"는 뜻이다. 가짜 움직임이라는 판정이 아니다. 자세한 수치는 장면별 report.json에 있다.', '']
     paths.write(root/'look-full.md', '\n'.join(head+lines).rstrip('\n')+'\n')
+    from image_lens import motif
+    for (done, _), label in zip(looks, motif.assign([l for _, l in looks])):
+        if label:
+            done['motif'] = label
     record = dict(schema='image-lens.look/1', source_video=str(source), source_sha256=scan['source_sha256'], params=LOOK,
                   max_shots=max_shots, elapsed_seconds=round(time.monotonic()-started, 1), shots=shots)
     paths.write_json(root/'look.json', record)
