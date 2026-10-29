@@ -121,8 +121,8 @@ def peak(video, start, end, bbox, image):
         ok, frame = cap.read()
     finally:
         cap.release()
-    if not ok:
-        return None
+    if not ok or image is None:
+        return n if ok else None
     onion = cv2.imread(str(image))
     panel = cv2.cvtColor(cv2.cvtColor(_crop(cv2, frame, bbox), cv2.COLOR_BGR2GRAY), cv2.COLOR_GRAY2BGR)
     if onion is not None and onion.shape[0] == panel.shape[0]:
@@ -146,35 +146,106 @@ def still(video, frame, bbox, image):
     return image.name
 
 
-SHEET = dict(tile=360, label=20, columns=4, per_sheet=16)
+SHEET = dict(tile=360, label=20, columns=4, rows=5, strip_height=200, gap_s=.05)
+
+
+def strip(video, start, end, bbox, image, count=5):
+    """`count` frames from start to end in order (evenly spaced, the far frame of `peak` in place of its nearest), side
+    by side, frame numbers on each: a turn shows as front, side, back phases in order, which one far frame cannot."""
+    import cv2
+    import numpy as np
+    picks = sorted({round(start+i*(end-start)/(count-1)) for i in range(count)})
+    far = peak(video, start, end, bbox, None)
+    if far is not None and far not in picks:
+        inner = picks[1:-1] or picks
+        picks = sorted(set(picks) - {min(inner, key=lambda n: abs(n-far))} | {far})
+    cap = cv2.VideoCapture(str(video)); panels = []
+    try:
+        for n in picks:
+            cap.set(cv2.CAP_PROP_POS_FRAMES, n)
+            ok, frame = cap.read()
+            if ok:
+                panel = _crop(cv2, frame, bbox)
+                cv2.putText(panel, f'f{n}', (6, 28), cv2.FONT_HERSHEY_SIMPLEX, .9, (0, 200, 255), 2)
+                panels.append(panel)
+    finally:
+        cap.release()
+    if not panels:
+        return None
+    cv2.imwrite(str(image), np.hstack([np.hstack([p, np.full((p.shape[0], 6, 3), 255, np.uint8)]) for p in panels]))
+    return dict(image=image.name, frames=picks)
 
 
 def sheets(root, items):
     """Onion images of a whole look on a few contact sheets (time label above each), so an image reader sees the
-    gestures the text loses (heart hands, V signs on Seedance close-ups). items: [(start_s, end_s, image name, note)]."""
+    gestures the text loses (heart hands, V signs on Seedance close-ups). items: [(start_s, end_s, image name, note)],
+    note '' for an onion image, 'still' for a short cut's still, 'strip' for a frame strip. Stills of back-to-back
+    cuts share one full-width row in time order (Seedance: a spin made of seven 3-6 frame cuts); a strip gets its own
+    row under its window. Rows, not tiles, are counted per sheet."""
     import cv2
     import numpy as np
-    t, top = SHEET['tile'], SHEET['label']; written = []
-    for first in range(0, len(items), SHEET['per_sheet']):
-        tiles = []
-        for start, end, name, note in items[first:first+SHEET['per_sheet']]:
-            image = cv2.imread(str(root/name))
-            if image is None:
-                continue
-            # Fit the width; tall pictures stop at 1.5 tiles. Rows take their tallest tile, so wide pictures leave no gap.
-            h, w = image.shape[:2]; k = min(t/w, 1.5*t/h)
-            image = cv2.resize(image, (max(1, int(w*k)), max(1, int(h*k))), interpolation=cv2.INTER_AREA)
-            tile = np.zeros((image.shape[0]+top, t, 3), np.uint8); tile[top:, :image.shape[1]] = image
-            cv2.putText(tile, f'{start:.2f}-{end:.2f}s {note}'.rstrip(), (4, 15), cv2.FONT_HERSHEY_SIMPLEX, .5, (255, 255, 255), 1)
-            tiles.append(tile)
-        if not tiles:
-            continue
-        tiles += [np.zeros((top, t, 3), np.uint8)]*(-len(tiles) % SHEET['columns'])
-        pad = lambda tile, height: np.vstack([tile, np.zeros((height-tile.shape[0], t, 3), np.uint8)])
-        rows = [np.hstack([pad(x, max(y.shape[0] for y in row)) for x in row])
-                for row in (tiles[i:i+SHEET['columns']] for i in range(0, len(tiles), SHEET['columns']))]
+    t, top = SHEET['tile'], SHEET['label']; width = t*SHEET['columns']
+    def read(name):
+        return cv2.imread(str(root/name))
+    def label(image, text):
+        tile = np.zeros((image.shape[0]+top, image.shape[1], 3), np.uint8); tile[top:] = image
+        cv2.putText(tile, text, (4, 15), cv2.FONT_HERSHEY_SIMPLEX, .5, (255, 255, 255), 1)
+        return tile
+    def fit(image, w, h):
+        k = min(w/image.shape[1], h/image.shape[0])
+        return cv2.resize(image, (max(1, int(image.shape[1]*k)), max(1, int(image.shape[0]*k))), interpolation=cv2.INTER_AREA)
+    def full_row(images, texts):
+        # One row across the sheet: equal height, shrunk until the row fits the sheet width.
+        height = SHEET['strip_height']
+        while True:
+            parts = [label(fit(i, 10**6, height), x) for i, x in zip(images, texts)]
+            if sum(p.shape[1] for p in parts)+4*len(parts) <= width or height < 40:
+                break
+            height = int(height*.85)
+        row = np.hstack([np.hstack([p, np.zeros((p.shape[0], 4, 3), np.uint8)]) for p in parts])[:, :width]
+        return np.hstack([row, np.zeros((row.shape[0], width-row.shape[1], 3), np.uint8)])
+    units = []  # ('tile', tile) or ('row', row)
+    i = 0
+    while i < len(items):
+        start, end, name, note = items[i]
+        if note == 'still':
+            run = [items[i]]
+            while i+1 < len(items) and items[i+1][3] == 'still' and items[i+1][0]-run[-1][1] <= SHEET['gap_s']:
+                i += 1; run.append(items[i])
+            images = [(read(n), f'{s:.2f}-{e:.2f}s still') for s, e, n, _ in run]
+            images = [x for x in images if x[0] is not None]
+            if len(images) > 1:
+                units.append(('row', full_row(*zip(*images))))
+            elif images:
+                units.append(('tile', label(fit(images[0][0], t, 1.5*t), images[0][1])))
+        else:
+            image = read(name)
+            if image is not None:
+                if note == 'strip':
+                    units.append(('row', full_row([image], [f'{start:.2f}-{end:.2f}s strip'])))
+                else:
+                    units.append(('tile', label(fit(image, t, 1.5*t), f'{start:.2f}-{end:.2f}s')))
+        i += 1
+    rows = []; pending = []
+    def flush():
+        if pending:
+            height = max(x.shape[0] for x in pending)
+            row = np.hstack([np.vstack([x, np.zeros((height-x.shape[0], x.shape[1], 3), np.uint8)]) for x in pending])
+            rows.append(np.hstack([row, np.zeros((height, width-row.shape[1], 3), np.uint8)]))
+            pending.clear()
+    for kind, image in units:
+        if kind == 'row':
+            flush(); rows.append(image)
+        else:
+            image = np.hstack([image, np.zeros((image.shape[0], t-image.shape[1], 3), np.uint8)])
+            pending.append(image)
+            if len(pending) == SHEET['columns']:
+                flush()
+    flush()
+    written = []
+    for first in range(0, len(rows), SHEET['rows']):
         path = root/f'onion-sheet-{len(written)+1}.jpg'
-        cv2.imwrite(str(path), np.vstack(rows)); written.append(path.name)
+        cv2.imwrite(str(path), np.vstack(rows[first:first+SHEET['rows']])); written.append(path.name)
     return written
 
 

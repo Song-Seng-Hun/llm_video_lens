@@ -7,7 +7,7 @@ import time
 from pathlib import Path
 from image_lens import paths
 
-LOOK = dict(max_shots=16, window_frames=160, min_frames=12, track_seconds=300, groups=('head', 'arms', 'hands', 'legs', 'move'))
+LOOK = dict(max_shots=16, window_frames=160, min_frames=12, track_seconds=300, strips=6, groups=('head', 'arms', 'hands', 'legs', 'move'))
 NAMES = dict(head='머리', arms='팔', hands='손끝', legs='다리', move='많이 움직인 곳', marked='찍은 점')
 STEP_ERRORS = (ValueError, OSError, KeyError, TypeError, ImportError, TimeoutError, OverflowError)
 
@@ -167,7 +167,7 @@ def run(video, detector, pose_model, checkpoint, out, max_shots=LOOK['max_shots'
     pose_packet, _ = paths.load(root/'pose.json', max_bytes=64*1024*1024)
     pose_frames = {f['frame']: f['tracks'] for f in pose_packet['frames']}
     flagged = {r['frame'] for r in pose_packet['flags']['frames']}
-    shots = []; lines = []; last_end = None; looks = []
+    shots = []; lines = []; last_end = None; looks = []; stripping = []
     segments = scan['analysis_segments']
     for segment in segments[:max_shots]:
         sid = segment['segment_id']; s0, s1 = segment['start_frame'], segment['end_frame']
@@ -294,6 +294,9 @@ def run(video, detector, pose_model, checkpoint, out, max_shots=LOOK['max_shots'
                     done['bands'] = onion.bands(source, w['seed'], end, person['bbox'], moving, picture)
                     done['onion'] = picture.name
                     done['peak'] = onion.peak(source, w['seed'], end, person['bbox'], picture)
+                    turns = [e['share'] for e in (done.get('events') or {}).get('width', []) if e['share'] >= body_motion.EVENTS['turn']]
+                    if turns:
+                        done['turn_share'] = max(turns); stripping.append((done, end, person['bbox'], base))
                     lines += ['  '+l for l in onion.lines(done['bands'], picture.name)]
                 except Exception as error:  # OpenCV raises its own error type; the view is optional
                     entry['errors'].append(dict(window=w, step='onion', error=str(error)[:300]))
@@ -318,9 +321,18 @@ def run(video, detector, pose_model, checkpoint, out, max_shots=LOOK['max_shots'
             '경고는 "원본부터 비교하라"는 뜻이다. 가짜 움직임이라는 판정이 아니다. 자세한 수치는 장면별 report.json에 있다.', '']
     paths.write(root/'look-full.md', '\n'.join(head+lines).rstrip('\n')+'\n')
     from image_lens import onion
+    # Frame strips for the largest shoulder-width swings only: on Seedance all 18 turn candidates got one, the sheets went
+    # from 8 to 14 and a fresh reader scored about the same (13 vs 12.5 of 21); hair and a cat on the shoulder swing too.
+    for done, end, bbox, base in sorted(stripping, key=lambda s: -s[0]['turn_share'])[:LOOK['strips']]:
+        try:
+            done['strip'] = onion.strip(source, done['window']['seed'], end, bbox, base.with_name(base.name+'-strip.jpg'))
+        except Exception as error:  # OpenCV raises its own error type; the strip is optional
+            done.setdefault('errors', []).append(dict(step='strip', error=str(error)[:300]))
     fps = scan['fps']
     sheets = onion.sheets(root, sorted([(d['window']['seed']/fps, (d.get('cut_after', d['window']['end'])+1)/fps, d['onion'], '')
                                         for s in shots for d in s['windows'] if d.get('onion')]
+                                       + [(d['window']['seed']/fps, (d.get('cut_after', d['window']['end'])+1)/fps, d['strip']['image'], 'strip')
+                                          for s in shots for d in s['windows'] if d.get('strip')]
                                        + [(k['frames'][0]/fps, (k['frames'][1]+1)/fps, k['still'], 'still')
                                           for s in shots for k in s['skipped'] if k.get('still')]))
     from image_lens import motif

@@ -81,11 +81,11 @@ class Repeats(unittest.TestCase):
 
 class Events(unittest.TestCase):
     def test_hand_face_shoulders_and_hidden_hands_are_said(self):
-        found = dict(hand_face=[dict(side='화면 오른쪽', frames=[60, 89], seconds=.5, region='볼')],
+        found = dict(hand_face=[dict(side='화면 오른쪽', frames=[60, 89], seconds=.5, region='볼', enters=False, exits=True)], lost_frames=12, turns=[],
                      shoulders=[dict(side='화면 왼쪽', rise=True, amount=.2, frames=[10, 20])], width=[dict(wider=True, share=.15, frames=[0, 30])],
                      hands_seen={'화면 왼쪽': .2, '화면 오른쪽': .9})
         text = ' | '.join(digest.events(found, 60))
-        self.assertIn('오른손이 얼굴(볼) 가까이 1.00–1.50s', text); self.assertIn('왼어깨 올라감 0.20', text)
+        self.assertIn('오른손이 얼굴(볼) 처음부터 가까이 1.00–1.50s, 떨어짐', text); self.assertIn('12프레임 끊김', text); self.assertIn('왼어깨 올라감 0.20', text)
         self.assertIn('넓어짐 15%', text); self.assertIn('왼손 대부분 안 보임: 멈춤 아님, 모름', text)
 
 

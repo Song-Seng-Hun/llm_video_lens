@@ -177,7 +177,8 @@ def events(found, fps):
     if not found:
         return []
     out = []
-    near = [f"{_side(e['side'])}손이 얼굴({e['region']}) 가까이 {e['frames'][0]/fps:.2f}–{(e['frames'][1]+1)/fps:.2f}s" for e in found['hand_face']]
+    near = [f"{_side(e['side'])}손이 얼굴({e['region']}) " + ('가까이 옴' if e.get('enters', True) else '처음부터 가까이')
+            + f" {e['frames'][0]/fps:.2f}–{(e['frames'][1]+1)/fps:.2f}s" + (', 떨어짐' if e.get('exits', True) else ', 끝까지') for e in found['hand_face']]
     if near:
         out.append('손-얼굴: ' + '; '.join(near[:DIGEST['parts']]) + (f" (+{len(near)-DIGEST['parts']})" if len(near) > DIGEST['parts'] else ''))
     moves = {}
@@ -185,12 +186,14 @@ def events(found, fps):
         moves.setdefault(e['side'], []).append(('올라감' if e['rise'] else '내려감') + f" {e['amount']:.2f}({e['frames'][0]/fps:.2f}s)")
     if moves:
         out.append('어깨: ' + '; '.join(f"{_side(side)}어깨 " + ' → '.join(m[:DIGEST['parts']]) for side, m in sorted(moves.items())))
-    if found.get('turn'):
-        e = max(found['width'], key=lambda e: e['share'])
-        out.append(f"몸 돌림 후보: 어깨 폭 크게 {'넓어짐' if e['wider'] else '좁아짐'}({e['frames'][0]/fps:.2f}–{(e['frames'][1]+1)/fps:.2f}s; 포즈가 튄 것일 수도), 어깨 높이는 안 씀")
+    if found.get('turns'):
+        out.append('몸 돌림 후보(어깨 폭 크게 변함, 포즈가 튄 것일 수도; 그동안 어깨 높이는 안 씀): '
+                   + ', '.join(f"{a/fps:.2f}–{(b+1)/fps:.2f}s" for a, b in found['turns'][:DIGEST['parts']]))
     elif found['width']:
         out.append('어깨 폭: ' + ' → '.join(f"{'넓어짐' if e['wider'] else '좁아짐'} {100*e['share']:.0f}%({e['frames'][0]/fps:.2f}s)"
                                            for e in found['width'][:DIGEST['parts']]))
+    if found.get('lost_frames', 0) >= max(3, round(.1*fps)):
+        out.append(f"처음 사람의 포즈 추적이 {found['lost_frames']}프레임 끊김: 그동안 모름")
     hidden = [_side(side) for side, share in sorted(found['hands_seen'].items()) if share < body_motion.EVENTS['hands_seen']]
     if hidden:
         out.append(f"{'·'.join(hidden)}손 대부분 안 보임: 멈춤 아님, 모름")
@@ -230,7 +233,7 @@ def markdown(record, scan, full_name):
         out.insert(3, f"원본 {record['scaled']['from'][0]}×{record['scaled']['from'][1]}을 {record['scaled']['to'][0]}×{record['scaled']['to'][1]}로 줄여서 봄: px는 줄인 영상 기준.")
     if record.get('onion_sheets'):
         out.insert(-1, f"어니언 모음 그림: {', '.join(record['onion_sheets'])} (구간마다 청록=시작, 빨강=끝, 초록 화살표=높이별 이동, 오른쪽 회색=시작과 가장 다른 가운데 프레임: 돌거나 갔다 돌아오는 동작은 여기서 보임; "
-                       '"still"=추적하기엔 짧은 컷의 한 장면). '
+                       '"still"=추적하기엔 짧은 컷의 한 장면, 붙어 있는 컷은 한 줄에 시간 순서; "strip"=몸 돌림 후보 구간의 프레임 5장을 시간 순서로). '
                        '손 모양(하트·브이)처럼 글에 안 나오는 동작은 그림에서 본다.')
     windows = [d for s in record['shots'] for d in s['windows']]
     seen = {}

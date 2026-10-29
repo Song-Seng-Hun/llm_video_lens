@@ -271,8 +271,11 @@ REGION_KO = ('이마·눈', '볼', '입·턱')
 
 
 def _person(tracks, track_id):
-    same = [t for t in tracks or [] if t.get('track_id') == track_id]
-    return same[0] if same else largest(tracks)
+    """The seed person on this frame; None when the tracker lost that id. Another detection is never taken as the
+    same person (it can be a second figure, or not a person at all)."""
+    if track_id is None:
+        return largest(tracks)
+    return next((t for t in tracks or [] if t.get('track_id') == track_id), None)
 
 
 def _runs(flags, gap):
@@ -349,7 +352,9 @@ def pose_events(pose_frames, window, fps):
         for a, b in _runs(near[s], EVENTS['gap_frames']):
             spots = sorted(where[s][n] for n in range(a, b+1) if n in where[s])
             if b-a+1 >= shortest:
-                hand_face.append(dict(side=sides[s], frames=[a, b], seconds=round((b-a+1)/fps, 2), region=REGION_KO[spots[len(spots)//2]]))
+                # Held from the seed frame is a pose with an unknown start, not a gesture made here; still worth saying.
+                hand_face.append(dict(side=sides[s], frames=[a, b], seconds=round((b-a+1)/fps, 2), region=REGION_KO[spots[len(spots)//2]],
+                                      enters=a > window['seed'], exits=b < window['end']))
     shoulders = []; width = []
     both = [n for n, p in people.items() if ok(p, 5) and ok(p, 6)]
     hips = [n for n in both if min(people[n]['scores'][11], people[n]['scores'][12]) >= EVENTS['hip_score']]
@@ -371,9 +376,10 @@ def pose_events(pose_frames, window, fps):
             base = sorted(ratio)[len(ratio)//2]
             width = [dict(wider=c > 0, share=round(abs(c), 2), frames=[scale[a], scale[b]])
                      for a, b, c in _zigzag([r/base for r in ratio], EVENTS['width_change'])]
-    # A large width swing is a turn (or a mislabelled, blurred pose): the shoulder points jump, so their heights mean nothing.
-    turn = any(e['share'] >= EVENTS['turn'] for e in width)
-    if turn:
-        shoulders = []
-    return dict(hand_face=sorted(hand_face, key=lambda e: e['frames'][0]), shoulders=sorted(shoulders, key=lambda e: e['frames'][0]),
-                width=width, turn=turn, hands_seen={sides[s]: round(seen[s]/max(1, len(people)), 2) for s in HANDS})
+    # A large width swing is a turn (or a mislabelled, blurred pose): the shoulder points jump, so heights that overlap
+    # it mean nothing. Only those are dropped; the rest of the window keeps its shoulder moves.
+    turns = [e['frames'] for e in width if e['share'] >= EVENTS['turn']]
+    shoulders = [e for e in shoulders if not any(e['frames'][0] <= b and a <= e['frames'][1] for a, b in turns)]
+    lost = window['end']-window['seed']+1-len(people)
+    return dict(lost_frames=lost, turns=turns, hand_face=sorted(hand_face, key=lambda e: e['frames'][0]), shoulders=sorted(shoulders, key=lambda e: e['frames'][0]),
+                width=width, hands_seen={sides[s]: round(seen[s]/max(1, len(people)), 2) for s in HANDS})

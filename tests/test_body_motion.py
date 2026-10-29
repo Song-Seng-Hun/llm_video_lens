@@ -129,7 +129,13 @@ class PoseEvents(unittest.TestCase):
         found = body_motion.pose_events(self.frames(joints), dict(seed=0, end=29), 60)
         self.assertEqual(len(found['hand_face']), 1)
         e = found['hand_face'][0]
-        self.assertEqual((e['frames'], e['side'], e['region']), ([10, 20], '화면 오른쪽', '볼'))
+        self.assertEqual((e['frames'], e['side'], e['region'], e['enters'], e['exits']), ([10, 20], '화면 오른쪽', '볼', True, True))
+
+    def test_another_detection_is_not_the_seed_person(self):
+        frames = self.frames(lambda f: {1: (640, 170), 2: (700, 170), 5: (560, 420), 6: (760, 420), 9: (560, 700), 10: (760, 700)})
+        for f in range(10, 20):
+            frames[f] = [dict(frames[f][0], track_id='cat')]
+        self.assertEqual(body_motion.pose_events(frames, dict(seed=0, end=29), 60)['lost_frames'], 10)
 
     def test_one_shoulder_rising_is_not_cancelled(self):
         def joints(f):
@@ -137,7 +143,7 @@ class PoseEvents(unittest.TestCase):
             return {1: (640, 170), 2: (700, 170), 5: (560, 420-lift), 6: (760, 420), 9: (560, 700), 10: (760, 700)}
         found = body_motion.pose_events(self.frames(joints), dict(seed=0, end=29), 60)
         moves = [(e['side'], e['rise']) for e in found['shoulders']]
-        self.assertEqual(moves, [('화면 왼쪽', True), ('화면 왼쪽', False)]); self.assertFalse(found['turn'])
+        self.assertEqual(moves, [('화면 왼쪽', True), ('화면 왼쪽', False)]); self.assertEqual(found['turns'], [])
         self.assertEqual(found['hands_seen'], {'화면 왼쪽': 1.0, '화면 오른쪽': 1.0})
 
     def test_hand_points_without_a_wrist_are_not_a_hand(self):
@@ -149,7 +155,7 @@ class PoseEvents(unittest.TestCase):
             half = 100 if f < 10 or f > 20 else 30  # shoulders collapse to a third of their width and come back
             return {1: (640, 170), 2: (700, 170), 5: (660-half, 420-(30 if f == 15 else 0)), 6: (660+half, 420)}
         found = body_motion.pose_events(self.frames(joints), dict(seed=0, end=29), 60)
-        self.assertTrue(found['turn']); self.assertEqual(found['shoulders'], [])
+        self.assertTrue(found['turns']); self.assertEqual(found['shoulders'], [])
 
     def test_unseen_hands_are_counted(self):
         found = body_motion.pose_events(self.frames(lambda f: {1: (640, 170), 2: (700, 170), 5: (560, 420), 6: (760, 420)}), dict(seed=0, end=29), 60)

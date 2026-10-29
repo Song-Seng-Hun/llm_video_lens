@@ -71,6 +71,10 @@ class Peak(unittest.TestCase):
             self.assertIn(onion.peak(video, 0, 20, bbox, image), (9, 10, 11))
             self.assertGreater(cv2.imread(str(image)).shape[1], 2*width)
             self.assertEqual(onion.still(video, 3, None, Path(d)/'s.jpg'), 's.jpg')
+            self.assertEqual(onion.strip(video, 0, 20, bbox, Path(d)/'t.jpg')['frames'][0], 0)
+            onion.still(video, 5, None, Path(d)/'s2.jpg')
+            sheets = onion.sheets(Path(d), [(0, .5, 'o.jpg', ''), (.5, .6, 's.jpg', 'still'), (.6, .7, 's2.jpg', 'still'), (0, .5, 't.jpg', 'strip')])
+            self.assertEqual(cv2.imread(str(Path(d)/sheets[0])).shape[1], onion.SHEET['tile']*onion.SHEET['columns'])
 
 
 if __name__ == '__main__': unittest.main()
