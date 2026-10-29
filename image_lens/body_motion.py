@@ -383,3 +383,101 @@ def pose_events(pose_frames, window, fps):
     lost = window['end']-window['seed']+1-len(people)
     return dict(lost_frames=lost, turns=turns, hand_face=sorted(hand_face, key=lambda e: e['frames'][0]), shoulders=sorted(shoulders, key=lambda e: e['frames'][0]),
                 width=width, hands_seen={sides[s]: round(seen[s]/max(1, len(people)), 2) for s in HANDS})
+
+
+# Several people (Kaguya live scene: two or three girls lean on, pull and point at each other; only the largest was
+# followed, and a girl falling backward read as a camera pan). Each person is followed by the pose tracker id alone;
+# relations are pose geometry in shoulder widths and are candidates. Overlapping figures often merge into one
+# detection box with a mixed skeleton (Kaguya f450-f530), so heavy box overlap is said, not hidden.
+PEOPLE = dict(max_people=3, presence=.5, min_area=.25, move=.5, distance=.5, touch_pad=.25, touch_seconds=.1,
+              upright_deg=30., fallen_deg=60., overlap_iou=.5, overlap_share=.5)
+
+
+def _iou(a, b):
+    w = max(0., min(a[2], b[2])-max(a[0], b[0])); h = max(0., min(a[3], b[3])-max(a[1], b[1]))
+    union = (a[2]-a[0])*(a[3]-a[1])+(b[2]-b[0])*(b[3]-b[1])-w*h
+    return w*h/union if union > 0 else 0.
+
+
+def _centre(t):
+    k, s = t['keypoints'], t['scores']
+    if min(s[5], s[6]) >= EVENTS['min_score']:
+        return _mean([k[5], k[6]]), math.dist(k[5], k[6])
+    x0, y0, x1, y1 = t['bbox']
+    return ((x0+x1)/2, (y0+y1)/2), None
+
+
+def people(pose_frames, window, fps, camera=None):
+    """Up to three people present in most of the window, named P1.. from screen left; per person the body-centre
+    shift (camera removed) and a fall candidate; per pair distance change, hand-on-body runs and box overlap."""
+    frames = range(window['seed'], window['end']+1)
+    tracks = {}
+    for n in frames:
+        for t in pose_frames.get(n) or []:
+            if t.get('track_id') is not None:
+                tracks.setdefault(t['track_id'], {})[n] = t
+    area = lambda t: (t['bbox'][2]-t['bbox'][0])*(t['bbox'][3]-t['bbox'][1])
+    median = lambda v: sorted(v)[len(v)//2]
+    found = {i: seen for i, seen in tracks.items() if len(seen) >= PEOPLE['presence']*len(frames)}
+    if not found:
+        return dict(people=[], relations=[])
+    big = max(median([area(t) for t in seen.values()]) for seen in found.values())
+    found = sorted(((i, seen) for i, seen in found.items() if median([area(t) for t in seen.values()]) >= PEOPLE['min_area']*big),
+                   key=lambda x: -median([area(t) for t in x[1].values()]))[:PEOPLE['max_people']]
+    found.sort(key=lambda x: median([(t['bbox'][0]+t['bbox'][2])/2 for t in x[1].values()]))
+    cam = camera or (0., 0.)
+    out = []
+    for number, (track_id, seen) in enumerate(found, 1):
+        first, last = min(seen), max(seen)
+        (a, wa), (b, wb) = _centre(seen[first]), _centre(seen[last])
+        size = median([w for w in (_centre(t)[1] for t in seen.values()) if w] or [math.dist(seen[first]['bbox'][:2], seen[first]['bbox'][2:])/4])
+        dx, dy = b[0]-a[0]-cam[0], b[1]-a[1]-cam[1]
+        person = dict(name=f'P{number}', track_id=track_id, frames=[first, last], seen=round(len(seen)/len(frames), 2), size_px=round(size, 1),
+                      bbox=seen[first]['bbox'], move=dict(direction=motion_report.direction(dx, dy), widths=round(math.hypot(dx, dy)/size, 2)))
+        # Torso lean from vertical (shoulder midpoint over hip midpoint), only where both pairs are seen.
+        lean = {}
+        for n, t in seen.items():
+            k, s = t['keypoints'], t['scores']
+            if min(s[5], s[6], s[11], s[12]) >= EVENTS['min_score']:
+                (sx, sy), (hx, hy) = _mean([k[5], k[6]]), _mean([k[11], k[12]])
+                lean[n] = math.degrees(math.atan2(abs(sx-hx), max(1e-6, hy-sy))) if hy > sy else 180.
+        if lean:
+            start = lean[min(lean)]; worst = max(lean, key=lean.get)
+            if start <= PEOPLE['upright_deg'] and lean[worst] >= PEOPLE['fallen_deg']:
+                person['fall'] = dict(frame=worst, degrees=round(lean[worst]))
+        out.append(person)
+    shortest = max(3, round(PEOPLE['touch_seconds']*fps))
+    relations = []
+    for i, p in enumerate(out):
+        for q in out[i+1:]:
+            a, b = tracks[p['track_id']], tracks[q['track_id']]
+            both = sorted(set(a) & set(b))
+            if not both:
+                continue
+            size = (p['size_px']+q['size_px'])/2
+            gap = lambda n: math.dist(_centre(a[n])[0], _centre(b[n])[0])/size
+            change = gap(both[-1])-gap(both[0])
+            rel = dict(pair=[p['name'], q['name']], frames=[both[0], both[-1]])
+            if abs(change) >= PEOPLE['distance']:
+                rel['distance'] = dict(closer=change < 0, widths=round(abs(change), 2))
+            overlap = sum(_iou(a[n]['bbox'], b[n]['bbox']) >= PEOPLE['overlap_iou'] for n in both)
+            rel['overlap'] = overlap >= PEOPLE['overlap_share']*len(both)
+            touches = []
+            for who, hand_track, body_track in ((p['name'], a, b), (q['name'], b, a)):
+                for wrist in (9, 10):
+                    on = {}
+                    for n in both:
+                        h, t = hand_track[n], body_track[n]
+                        k, s = t['keypoints'], t['scores']
+                        if h['scores'][wrist] < EVENTS['min_score'] or min(s[5], s[6]) < EVENTS['min_score']:
+                            continue
+                        width = math.dist(k[5], k[6]); pad = PEOPLE['touch_pad']*width
+                        low = max(k[11][1], k[12][1]) if min(s[11], s[12]) >= EVENTS['min_score'] else max(k[5][1], k[6][1])+width
+                        x, y = h['keypoints'][wrist]
+                        on[n] = min(k[5][0], k[6][0])-pad <= x <= max(k[5][0], k[6][0])+pad and min(k[5][1], k[6][1])-pad <= y <= low
+                    for lo, hi in _runs(on, EVENTS['gap_frames']):
+                        if hi-lo+1 >= shortest:
+                            touches.append(dict(hand=who, body=q['name'] if who == p['name'] else p['name'], frames=[lo, hi]))
+            rel['touch'] = sorted(touches, key=lambda e: e['frames'][0])
+            relations.append(rel)
+    return dict(people=out, relations=relations)

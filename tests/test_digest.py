@@ -89,4 +89,16 @@ class Events(unittest.TestCase):
         self.assertIn('넓어짐 15%', text); self.assertIn('왼손 대부분 안 보임: 멈춤 아님, 모름', text)
 
 
+
+class People(unittest.TestCase):
+    def test_people_and_relations_are_said(self):
+        found = dict(people=[dict(name='P1', move=dict(direction='left', widths=1.2), seen=1.),
+                             dict(name='P2', move=dict(direction='down', widths=.1), seen=.6, fall=dict(frame=30, degrees=70))],
+                     relations=[dict(pair=['P1', 'P2'], distance=dict(closer=True, widths=.8), overlap=True,
+                                     touch=[dict(hand='P2', body='P1', frames=[60, 89])])])
+        text = ' | '.join(digest.people(found, 60))
+        self.assertIn('사람 2명', text); self.assertIn('P1 왼쪽 1.2폭', text); self.assertIn('쓰러짐 후보(0.50s', text)
+        self.assertIn('P2 손이 P1 어깨·몸 쪽 1.00–1.50s', text); self.assertIn('다가감 0.8폭', text); self.assertIn('겹침', text)
+
+
 if __name__ == '__main__': unittest.main()

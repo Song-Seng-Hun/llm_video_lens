@@ -166,4 +166,33 @@ class PoseEvents(unittest.TestCase):
         self.assertEqual(body_motion._zigzag([0, .1, 0, .1], 1), [])
 
 
+
+class People(unittest.TestCase):
+    @staticmethod
+    def person(x, track, lean=0., wrist=None):
+        """Upright figure centred at x (shoulder width 100); `lean` shifts the shoulders sideways over the hips."""
+        j = {5: (x-50+lean, 300), 6: (x+50+lean, 300), 11: (x-40, 450), 12: (x+40, 450), 9: (x-60, 420), 10: (x+60, 420)}
+        if wrist:
+            j[10] = wrist
+        return dict(keypoints(j), track_id=track, bbox=[x-80, 200, x+80, 700])
+
+    def test_two_people_named_from_the_left_with_a_hand_on_a_shoulder(self):
+        frames = {n: [self.person(700, 'b', wrist=(410, 320) if n >= 10 else None), self.person(400, 'a')] for n in range(30)}
+        found = body_motion.people(frames, dict(seed=0, end=29), 60)
+        self.assertEqual([(p['name'], p['track_id']) for p in found['people']], [('P1', 'a'), ('P2', 'b')])
+        touch = found['relations'][0]['touch']
+        self.assertEqual((touch[0]['hand'], touch[0]['body'], touch[0]['frames']), ('P2', 'P1', [10, 29]))
+
+    def test_falling_backward_is_a_candidate_and_walking_closer_is_said(self):
+        frames = {n: [self.person(400, 'a'), self.person(800, 'b', lean=0 if n < 15 else 300)] for n in range(30)}
+        found = body_motion.people(frames, dict(seed=0, end=29), 60)
+        self.assertIn('fall', found['people'][1]); self.assertNotIn('fall', found['people'][0])
+        frames = {n: [self.person(400, 'a'), self.person(800-10*n, 'b')] for n in range(30)}
+        self.assertTrue(body_motion.people(frames, dict(seed=0, end=29), 60)['relations'][0]['distance']['closer'])
+
+    def test_one_person_has_no_relations(self):
+        found = body_motion.people({n: [self.person(400, 'a')] for n in range(30)}, dict(seed=0, end=29), 60)
+        self.assertEqual((len(found['people']), found['relations']), (1, []))
+
+
 if __name__ == '__main__': unittest.main()

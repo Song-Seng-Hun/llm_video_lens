@@ -131,6 +131,25 @@ def peak(video, start, end, bbox, image):
     return n
 
 
+def who(video, frame, people, image):
+    """The whole frame with each person's pose box and name (P1..), so an image reader can tell who is who."""
+    import cv2
+    cap = cv2.VideoCapture(str(video))
+    try:
+        cap.set(cv2.CAP_PROP_POS_FRAMES, frame)
+        ok, picture = cap.read()
+    finally:
+        cap.release()
+    if not ok:
+        return None
+    for p in people:
+        x0, y0, x1, y1 = map(int, p['bbox'])
+        cv2.rectangle(picture, (x0, y0), (x1, y1), (0, 0, 255), 6)
+        cv2.putText(picture, p['name'], (x0+12, y0+70), cv2.FONT_HERSHEY_SIMPLEX, 2.5, (0, 0, 255), 6)
+    cv2.imwrite(str(image), picture)
+    return image.name
+
+
 def still(video, frame, bbox, image):
     """One native frame (cropped to the padded person box when there is one) for a range too short to track."""
     import cv2

@@ -283,6 +283,13 @@ def run(video, detector, pose_model, checkpoint, out, max_shots=LOOK['max_shots'
                 done['body'] = body_motion.describe([t[3] for t in tracked], dict(w, end=end))
                 lines += ['  '+l for l in body_motion.lines(done['body'])]
             done['events'] = body_motion.pose_events(pose_frames, dict(w, end=end), fps)
+            done['people'] = body_motion.people(pose_frames, dict(w, end=end), fps, cam)
+            if len(done['people']['people']) > 1:
+                from image_lens import onion
+                try:
+                    done['who'] = onion.who(source, w['seed'], done['people']['people'], base.with_name(base.name+'-who.jpg'))
+                except Exception as error:  # OpenCV raises its own error type; the picture is optional
+                    entry['errors'].append(dict(window=w, step='who', error=str(error)[:300]))
             from image_lens import digest
             lines += ['  - '+f for f in digest.events(done['events'], fps)]
             person = body_motion.largest(pose_frames.get(w['seed']))
@@ -331,6 +338,8 @@ def run(video, detector, pose_model, checkpoint, out, max_shots=LOOK['max_shots'
     fps = scan['fps']
     sheets = onion.sheets(root, sorted([(d['window']['seed']/fps, (d.get('cut_after', d['window']['end'])+1)/fps, d['onion'], '')
                                         for s in shots for d in s['windows'] if d.get('onion')]
+                                       + [(d['window']['seed']/fps, (d.get('cut_after', d['window']['end'])+1)/fps, d['who'], 'who')
+                                          for s in shots for d in s['windows'] if d.get('who')]
                                        + [(d['window']['seed']/fps, (d.get('cut_after', d['window']['end'])+1)/fps, d['strip']['image'], 'strip')
                                           for s in shots for d in s['windows'] if d.get('strip')]
                                        + [(k['frames'][0]/fps, (k['frames'][1]+1)/fps, k['still'], 'still')

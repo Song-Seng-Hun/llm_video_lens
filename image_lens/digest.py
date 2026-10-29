@@ -154,6 +154,7 @@ def window_line(done, fps, first=None):
         if flow:
             fields.append('높이별: ' + flow)
     fields += events(done.get('events'), fps)
+    fields += people(done.get('people'), fps)
     notes = []
     if not done.get('skeleton', True):
         notes.append('골격 신뢰 낮음')
@@ -200,6 +201,31 @@ def events(found, fps):
     return out
 
 
+def people(found, fps):
+    """Fields for windows with several people: who is where, how each moved, falls, and pair relations."""
+    if not found or len(found['people']) < 2:
+        return []
+    each = []
+    for p in found['people']:
+        text = f"{p['name']} " + (f"{_dir(p['move']['direction'])} {p['move']['widths']:.1f}폭" if p['move']['widths'] >= body_motion.PEOPLE['move'] else '거의 그대로')
+        if p.get('fall'):
+            text += f", 쓰러짐 후보({p['fall']['frame']/fps:.2f}s 몸통 {p['fall']['degrees']}°)"
+        if p['seen'] < 1:
+            text += f", {100*p['seen']:.0f}%만 보임"
+        each.append(text)
+    out = [f"사람 {len(found['people'])}명(P1부터 화면 왼쪽, 몸 중심 이동은 어깨 폭 단위, 카메라 뺌): " + '; '.join(each)]
+    for r in found['relations']:
+        a, b = r['pair']; parts = []
+        if r.get('distance'):
+            parts.append(('다가감' if r['distance']['closer'] else '멀어짐') + f" {r['distance']['widths']:.1f}폭")
+        parts += [f"{t['hand']} 손이 {t['body']} 어깨·몸 쪽 {t['frames'][0]/fps:.2f}–{(t['frames'][1]+1)/fps:.2f}s(닿음 후보)" for t in r['touch'][:DIGEST['parts']]]
+        if r['overlap']:
+            parts.append('상자가 많이 겹침: 포즈가 섞였을 수 있음')
+        if parts:
+            out.append(f"{a}–{b}: " + ', '.join(parts))
+    return out
+
+
 def bridge_line(bridge):
     if not bridge or not bridge['limbs']:
         return None
@@ -233,7 +259,7 @@ def markdown(record, scan, full_name):
         out.insert(3, f"원본 {record['scaled']['from'][0]}×{record['scaled']['from'][1]}을 {record['scaled']['to'][0]}×{record['scaled']['to'][1]}로 줄여서 봄: px는 줄인 영상 기준.")
     if record.get('onion_sheets'):
         out.insert(-1, f"어니언 모음 그림: {', '.join(record['onion_sheets'])} (구간마다 청록=시작, 빨강=끝, 초록 화살표=높이별 이동, 오른쪽 회색=시작과 가장 다른 가운데 프레임: 돌거나 갔다 돌아오는 동작은 여기서 보임; "
-                       '"still"=추적하기엔 짧은 컷의 한 장면, 붙어 있는 컷은 한 줄에 시간 순서; "strip"=몸 돌림 후보 구간의 프레임 5장을 시간 순서로). '
+                       '"who"=사람이 여럿인 구간의 P1·P2 상자; "still"=추적하기엔 짧은 컷의 한 장면, 붙어 있는 컷은 한 줄에 시간 순서; "strip"=몸 돌림 후보 구간의 프레임 5장을 시간 순서로). '
                        '손 모양(하트·브이)처럼 글에 안 나오는 동작은 그림에서 본다.')
     windows = [d for s in record['shots'] for d in s['windows']]
     seen = {}
