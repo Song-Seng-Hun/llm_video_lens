@@ -6,7 +6,7 @@ import math
 import re
 from image_lens import motion_report
 
-DIGEST = dict(parts=3, bridge_limbs=2, same_share=.5)
+DIGEST = dict(parts=3, same_share=.5)
 ARM = ('손목', '팔꿈치', '엄지 끝', '검지 끝')
 LEG = ('허벅지', '무릎', '발목')
 
@@ -54,16 +54,24 @@ def _screen(groups):
 
 
 def _bands(bands):
+    """Per-band shifts, plus one sentence when bands go opposite ways sideways: in the blind test (AKAGE pose 1, head
+    right 22 / waist left 18-29) two readers given only the numbers did not read them as "the waist goes left"."""
     if not bands or all(b['dx'] is None for b in bands):
         return None
-    parts = []
+    parts = []; sides = {}
     for b in bands:
         if b['dx'] is None:
             parts.append('?')
         else:
-            d = math.hypot(b['dx'], b['dy'])
-            parts.append('0' if d < 8 else f"{_dir(motion_report.direction(b['dx'], b['dy']))} {d:.0f}")
-    return ' / '.join(parts)
+            d = math.hypot(b['dx'], b['dy']); direction = motion_report.direction(b['dx'], b['dy'])
+            parts.append('0' if d < 8 else f"{_dir(direction)} {d:.0f}")
+            side = 'right' if 'right' in direction else 'left' if 'left' in direction else None
+            if d >= 8 and side:
+                sides.setdefault('오른쪽' if side == 'right' else '왼쪽', []).append(b['band'])
+    text = ' / '.join(parts)
+    if len(sides) == 2:
+        text += ' (' + ', '.join(f"{'·'.join(names)} {side}" for side, names in sides.items()) + ': 높이에 따라 좌우가 반대)'
+    return text
 
 
 def window_line(done, fps):
@@ -118,7 +126,12 @@ def bridge_line(bridge):
     if not bridge or not bridge['limbs']:
         return None
     a, b = bridge['frames']
-    shown = sorted(bridge['limbs'], key=lambda l: -l['distance_px'])[:DIGEST['bridge_limbs']]
+    # The largest change on each screen side: by size alone both could be one arm, and the other hand's 294 px drop
+    # (AKAGE f61->f62) was lost in the blind test.
+    largest = {}
+    for l in sorted(bridge['limbs'], key=lambda l: -l['distance_px']):
+        largest.setdefault(l['side'], l)
+    shown = sorted(largest.values(), key=lambda l: -l['distance_px'])
     return (f"- 전환 f{a}→f{b} (앞뒤 자세 차이, 사이 경로 모름): "
             + '; '.join(f"{_side(l['side'])}{l['part']} {_dir(l['direction'])} {l['distance_px']:.0f}px" for l in shown))
 
