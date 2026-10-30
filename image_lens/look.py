@@ -304,8 +304,13 @@ def _run(video, detector, pose_model, checkpoint, out, max_shots=LOOK['max_shots
             except Exception as error:  # OpenCV raises its own error type; without thumbs the window is never a repeat
                 errors.append(dict(window=w, step='motif', error=str(error)[:300]))
         entry['errors'][at:at] = errors
-    segments = scan['analysis_segments']
-    for segment in segments[:max_shots]:
+    def seed(sid, w, i):
+        base = root/f'{sid}-w{i}'
+        return _step('seed', ['--pose', root/'pose.json', '--frame', w['seed'], '--job', f'{sid}-w{i}', '--length', w['end']-w['seed']+1,
+                              '--out', base.with_suffix('.obs.json'), '--evidence-dir', base.with_name(base.name+'-crops')])
+    ahead = None  # (sid, window, receipt, error): the next shot's first window, seeded while the child tracks
+    segments = scan['analysis_segments']; shown = segments[:max_shots]
+    for order, segment in enumerate(shown):
         sid = segment['segment_id']; s0, s1 = segment['start_frame'], segment['end_frame']
         fps = scan['fps']
         entry = dict(segment_id=sid, frames=[s0, s1], seconds=[round(s0/fps, 2), round((s1+1)/fps, 2)], windows=[], skipped=[], errors=[])
@@ -334,12 +339,16 @@ def _run(video, detector, pose_model, checkpoint, out, max_shots=LOOK['max_shots
             if remaining() < 60:
                 entry['errors'].append(dict(window=w, error='overall time budget exhausted')); lines.append('- 시간 예산 소진: 이후 장면 생략')
                 break
-            base = root/f'{sid}-w{i}'; job = f'{sid}-w{i}'; i += 1; start = w['end']+1
+            base = root/f'{sid}-w{i}'; i += 1; start = w['end']+1
             people = len(pose_frames[w['seed']])
             done = dict(window=w, groups=[]); tracked = []
             try:
-                receipt = _step('seed', ['--pose', root/'pose.json', '--frame', w['seed'], '--job', job, '--length', w['end']-w['seed']+1,
-                                         '--out', base.with_suffix('.obs.json'), '--evidence-dir', base.with_name(base.name+'-crops')])
+                if ahead and ahead[:2] == (sid, w):
+                    receipt, error = ahead[2:]; ahead = None
+                    if error:
+                        raise error
+                else:
+                    receipt = seed(sid, w, i-1)
             except STEP_ERRORS as error:
                 entry['errors'].append(dict(window=w, step='seed', error=str(error)[:300]))
                 lines += [f"- 구간 f{w['seed']}..{w['end']}", f'  - 점 배치 실패: {str(error)[:120]}']
@@ -359,6 +368,16 @@ def _run(video, detector, pose_model, checkpoint, out, max_shots=LOOK['max_shots
             # The child tracks this window while the last one is reported (clip B: 44 s tracking, 45 s of CPU work around it).
             if pending:
                 report(pending); pending = None
+            # A cut moves this shot's next window, but the next shot always starts at its first frame (clip B: 39 of 42
+            # windows): seed it while the child still tracks (25 s of waiting, 23 s of seeding).
+            after = shown[order+1] if order+1 < len(shown) else None
+            if not ahead and after and after['end_frame'] > after['start_frame'] and remaining() >= 60:
+                first, _ = next_window(after, after['start_frame'], pose_frames, flagged)
+                if first:
+                    try:
+                        ahead = (after['segment_id'], first, seed(after['segment_id'], first, 0), None)
+                    except STEP_ERRORS as error:
+                        ahead = (after['segment_id'], first, None, error)
             for name, group, stem, handle, error in queued:
                 try:
                     if error:

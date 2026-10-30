@@ -86,3 +86,38 @@ class Camera(unittest.TestCase):
         self.assertEqual(summary['camera_only_moves'], 0); self.assertEqual(len(summary['major_moves']), 1)
 
 if __name__ == '__main__': unittest.main()
+
+
+class Ahead(unittest.TestCase):
+    def test_next_shot_is_seeded_once_and_its_failure_stays_in_place(self):
+        import json, tempfile
+        from image_lens import paths
+        from tests.test_check import pan_video
+        with tempfile.TemporaryDirectory(dir=REPO/'workspace') as d:
+            paths.configure(d)
+            video = Path(d)/'pan.avi'; pan_video(video, frames=60)
+            segments = [dict(segment_id=f'shot-{k:04d}', start_frame=20*k, end_frame=20*k+19) for k in range(3)]
+            person = [dict(track_id='t', bbox=[100, 50, 300, 350], score=.9, keypoints=[[150+j%20*5, 60+j//20*40] for j in range(133)], scores=[.9]*133)]
+            calls = []
+            def step(command, arguments):
+                calls.append((command, *arguments[arguments.index('--frame')+1:][:1]) if command == 'seed' else (command,))
+                out = Path(arguments[arguments.index('--out')+1]) if '--out' in arguments else None
+                if command == 'scan':
+                    out.write_text(json.dumps(dict(fps=10, source_frame_count=60, source_sha256='0', analysis_segments=segments)))
+                elif command == 'pose':
+                    out.write_text(json.dumps(dict(frames=[dict(frame=n, tracks=person) for n in range(60)], flags=dict(frames=[]))))
+                elif command == 'seed' and arguments[arguments.index('--frame')+1] == 40:
+                    raise ValueError('no seed')
+                return dict(jobs=[])
+            plain = look._step, look.fit
+            look._step, look.fit = step, lambda source, root: (source, False)
+            try:
+                look._run(video, 'det', 'pose', 'ckpt', Path(d)/'look')
+            finally:
+                look._step, look.fit = plain
+            self.assertEqual([c for c in calls if c[0] == 'seed'], [('seed', 0), ('seed', 20), ('seed', 40)])
+            record = json.loads((Path(d)/'look'/'look.json').read_text())
+            self.assertEqual([len(s['errors']) for s in record['shots']], [0, 0, 1])
+            self.assertEqual(record['shots'][2]['errors'][0]['step'], 'seed')
+            text = (Path(d)/'look'/'look-full.md').read_text()
+            self.assertLess(text.index('## shot-0002'), text.index('점 배치 실패: no seed'))
