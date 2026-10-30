@@ -161,7 +161,7 @@ class Lan(unittest.TestCase):
     def test_production_config_refuses_loopback_and_overrides(self):
         d = Path(self.tmp.name)
         for change in (dict(test_mode=False), dict(test_mode=False, bind=['en0'], limits={}, allow='127.0.0.0/8', port=8766),
-                       dict(test_mode=False, bind=['en0'], allow='172.30.1.0/24', port=8766)):
+                       dict(test_mode=False, bind=['en0'], allow='192.0.2.0/24', port=8766)):
             with self.assertRaises(server.ConfigError):
                 server.load_config(private(d/'c.json', json.dumps(dict(self.cfg_raw, **change))))
 

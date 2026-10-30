@@ -43,7 +43,7 @@ at start and after each job).
 
 ## Install steps (user only; not done)
 
-Do these only after approving an always-on listener (RunAtLoad + KeepAlive, en0/en1, port 8766, 172.30.1.0/24).
+Do these only after approving an always-on listener (RunAtLoad + KeepAlive, en0/en1, port 8766, 192.0.2.0/24).
 
 1. Copy the server and a snapshot of image_lens, so a branch checked out in `~/dev` does not change the service:
    ```sh

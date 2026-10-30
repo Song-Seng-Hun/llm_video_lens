@@ -1,9 +1,9 @@
 #!/usr/bin/env node
 // Image Lens LAN API client (Node 22, no dependencies). Signs requests like the Music Lens client (lan/sign.py).
 // Config: %USERPROFILE%\.image-lens\client.json (or $IMAGE_LENS_CLIENT_CONFIG):
-//   {"host": "songseunghun-ui-MacStudio.local", "port": 8766, "client": "claude-window",
+//   {"host": "<mac-host>.local", "port": 8766, "client": "claude-window",
 //    "key_path": "...\\.music-lens\\keys\\mac.key", "ca_path": "...\\.music-lens\\mac-cert.pem",
-//    "pin_sha256": "<sha256 of the server certificate DER, hex>", "addresses": ["172.30.1.x"]}
+//    "pin_sha256": "<sha256 of the server certificate DER, hex>", "addresses": ["192.0.2.x"]}
 // `addresses` is optional: connect to these IPs (TLS name stays `host`) when the .local name does not resolve.
 // Output: one JSON line on stdout. Exit 0 ok, 1 HTTP/runtime error, 2 usage/config, 3 queue busy.
 import { createHash, createHmac, randomBytes } from 'node:crypto';

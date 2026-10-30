@@ -142,7 +142,7 @@ def load_config(path):
     try:
         allow = ipaddress.ip_network(raw.get("allow"), strict=True)
     except (TypeError, ValueError):
-        raise ConfigError("allow must be an IPv4 network like 172.30.1.0/24")
+        raise ConfigError("allow must be an IPv4 network like 192.0.2.0/24")
     if allow.version != 4 or (not test_mode and (allow.prefixlen < 24 or not allow.is_private or allow.is_loopback)):
         raise ConfigError("allow must be a private LAN /24 or narrower, never loopback")
     cfg["allow"] = allow
