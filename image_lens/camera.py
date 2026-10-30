@@ -55,37 +55,43 @@ _LAST = []
 
 
 def _path(video, start, end):
+    from concurrent.futures import ThreadPoolExecutor
     import cv2
     import numpy as np
     cap = cv2.VideoCapture(str(video))
-    orb = cv2.ORB_create(CAMERA['features']); matcher = cv2.BFMatcher(cv2.NORM_HAMMING, crossCheck=True)
-    result = {}
+    grays = []
     try:
         cap.set(cv2.CAP_PROP_POS_FRAMES, start)
-        start_ref = last = None
         for n in range(start, end+1):
             ok, bgr = cap.read()
             if not ok:
                 break
-            gray = cv2.cvtColor(cv2.resize(bgr, None, fx=CAMERA['scale'], fy=CAMERA['scale']), cv2.COLOR_BGR2GRAY)
-            keys, desc = orb.detectAndCompute(gray, None)
-            if start_ref is None:
-                start_ref = last = (keys, desc, np.eye(3), 0.); centre = (gray.shape[1]/2, gray.shape[0]/2)
-                result[n] = (0., 0., 1.)
-                continue
-            ref = start_ref
-            M = _step(cv2, np, matcher, ref, keys, desc, gray.shape)
-            if M is None and last is not start_ref and last[3] >= CAMERA['rekey_px']:
-                ref = last
-                M = _step(cv2, np, matcher, ref, keys, desc, gray.shape, CAMERA['chain_spread'])
-            if M is None:
-                continue
-            total = np.vstack([M, [0, 0, 1]]) @ ref[2]
-            x, y = total[0, 0]*centre[0]+total[0, 1]*centre[1]+total[0, 2], total[1, 0]*centre[0]+total[1, 1]*centre[1]+total[1, 2]
-            result[n] = ((x-centre[0])/CAMERA['scale'], (y-centre[1])/CAMERA['scale'], math.hypot(total[0, 0], total[1, 0]))
-            last = (keys, desc, total, math.hypot(*result[n][:2]))
+            grays.append(cv2.cvtColor(cv2.resize(bgr, None, fx=CAMERA['scale'], fy=CAMERA['scale']), cv2.COLOR_BGR2GRAY))
     finally:
         cap.release()
+    # ORB per frame is independent and gives the same points from a fresh detector, so it runs in threads (clip B
+    # window: 0.14 -> 0.02 s); matching and RANSAC stay in frame order.
+    with ThreadPoolExecutor(8) as pool:
+        found = list(pool.map(lambda gray: cv2.ORB_create(CAMERA['features']).detectAndCompute(gray, None), grays))
+    matcher = cv2.BFMatcher(cv2.NORM_HAMMING, crossCheck=True)
+    result = {}
+    start_ref = last = None
+    for n, gray, (keys, desc) in zip(range(start, end+1), grays, found):
+        if start_ref is None:
+            start_ref = last = (keys, desc, np.eye(3), 0.); centre = (gray.shape[1]/2, gray.shape[0]/2)
+            result[n] = (0., 0., 1.)
+            continue
+        ref = start_ref
+        M = _step(cv2, np, matcher, ref, keys, desc, gray.shape)
+        if M is None and last is not start_ref and last[3] >= CAMERA['rekey_px']:
+            ref = last
+            M = _step(cv2, np, matcher, ref, keys, desc, gray.shape, CAMERA['chain_spread'])
+        if M is None:
+            continue
+        total = np.vstack([M, [0, 0, 1]]) @ ref[2]
+        x, y = total[0, 0]*centre[0]+total[0, 1]*centre[1]+total[0, 2], total[1, 0]*centre[0]+total[1, 1]*centre[1]+total[1, 2]
+        result[n] = ((x-centre[0])/CAMERA['scale'], (y-centre[1])/CAMERA['scale'], math.hypot(total[0, 0], total[1, 0]))
+        last = (keys, desc, total, math.hypot(*result[n][:2]))
     return result
 
 
