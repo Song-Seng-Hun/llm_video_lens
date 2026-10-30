@@ -25,7 +25,7 @@ def _speed(stroke):
     text = motion_report.speed_text(stroke.get('speeds'))
     if not text:
         return ''
-    return f"({text}" + (', 그 전은 구간 밖이라 모름)' if stroke.get('from_start') else ')')
+    return f"({text}" + (', 앞선 동작은 모름)' if stroke.get('from_start') else ')')
 
 
 def limbs(body):
@@ -43,7 +43,8 @@ def limbs(body):
     for g in groups.values():
         lead = max(g['limbs'], key=lambda l: (l.get('travel_px', 0.), l['strokes'][0]['distance_px']))
         first = lead['strokes'][0]
-        path = ' → '.join(f"{_dir(s['direction'])} {s['distance_px']:.0f}px{_speed(s)}" for s in lead['strokes'])
+        path = ''.join(('' if not i else ' → ' if s.get('run') == lead['strokes'][i-1].get('run') else ' / 관측 끊김 / ')
+                       + f"{_dir(s['direction'])} {s['distance_px']:.0f}px{_speed(s)}" for i, s in enumerate(lead['strokes']))
         names = '·'.join(dict.fromkeys(p.replace(' 끝', '') for p in [lead['part']]+g['parts']))
         label = f"{g['key']}({names})" if g['kind'] else g['key']
         axis = '' if not lead['axis_px'] else f", 몸 {'바깥' if lead['axis_px'] > 0 else '쪽'}으로"
@@ -102,7 +103,7 @@ def _differences(done, first):
     if a and b:
         ca, cb = a['centre_shift'], b['centre_shift']
         moved = lambda c, body: c['distance_px'] >= body['limit_px']
-        if moved(ca, a) != moved(cb, b) or (moved(ca, a) and (ca['direction'] != cb['direction'] or not _close(ca['distance_px'], cb['distance_px']))):
+        if ca is not None and (cb is None or moved(ca, a) != moved(cb, b) or (moved(ca, a) and (ca['direction'] != cb['direction'] or not _close(ca['distance_px'], cb['distance_px'])))):
             out.append(f"몸 {_dir(ca['direction'])} {ca['distance_px']:.0f}px" if moved(ca, a) else '몸 그대로')
         mine, theirs = limbs(a), limbs(b)
         turn = lambda m, o: min((motion_report.DIRECTIONS.index(m['direction'])-motion_report.DIRECTIONS.index(o['direction'])) % 8,
@@ -113,7 +114,7 @@ def _differences(done, first):
             if not any(same(m, o) for o in theirs):
                 out.append(m['text'])
         for o in theirs:
-            if not any(same(m, o) for m in mine):
+            if not a.get('incomplete') and not any(same(m, o) for m in mine):
                 out.append(f"{o['label']} {_dir(o['direction'])} {o['distance']:.0f}px 없음")
     ba, bb = done.get('bands') or [], first.get('bands') or []
     if len(ba) == len(bb) and any(x['dx'] is not None and y['dx'] is not None and math.dist((x['dx'], x['dy']), (y['dx'], y['dy']))
@@ -171,7 +172,8 @@ def window_line(done, fps, first=None):
         body = done.get('body')
         if body:
             c = body['centre_shift']
-            whole.append(f"몸 {_dir(c['direction'])} {c['distance_px']:.0f}px{_speed(c)}" if c['distance_px'] >= body['limit_px'] else '몸 그대로')
+            whole.append('몸 관측 끊김·기준점 변경, 전체 이동 모름' if c is None else
+                         f"몸 {_dir(c['direction'])} {c['distance_px']:.0f}px{_speed(c)}" if c['distance_px'] >= body['limit_px'] else '몸 그대로')
         if whole:
             fields.append('전체: ' + ', '.join(whole))
         if body:
@@ -180,8 +182,8 @@ def window_line(done, fps, first=None):
                 shown = [f['text'] for f in found[:DIGEST['parts']]]
                 fields.append('몸 기준: ' + '; '.join(shown) + (f" (+{len(found)-DIGEST['parts']})" if len(found) > DIGEST['parts'] else ''))
             elif not body.get('unknown') and not body.get('uncertain'):
-                fields.append('몸 기준: 원시 추적 큰 이동 미검출(실제 동작은 모름)'
-                              if (done.get('body_geometry') or {}).get('source') == 'raw_tracker_source_switch'
+                fields.append('몸 기준: 관측된 연속 구간에서 큰 이동 미검출(실제 동작은 모름)'
+                              if body.get('incomplete') or (done.get('body_geometry') or {}).get('source') in ('raw_tracker_source_switch', 'per_joint_source_stable')
                               else f"몸 기준: 팔다리 {body['limit_px']:.0f}px 미만")
         else:
             moves = _screen(done.get('groups', []))
@@ -190,7 +192,7 @@ def window_line(done, fps, first=None):
                          + f" {_dir(m['direction'])} {m['distance_px']:.0f}px" + (f"({motion_report.speed_text(m['speeds'])})" if m.get('speeds') else '')
                          for m in moves[:DIGEST['parts']]]
                 fields.append('화면: ' + '; '.join(shown) + (f" (+{len(moves)-DIGEST['parts']})" if len(moves) > DIGEST['parts'] else ''))
-            elif (done.get('body_geometry') or {}).get('source') == 'raw_tracker_source_switch':
+            elif (done.get('body_geometry') or {}).get('source') in ('raw_tracker_source_switch', 'per_joint_source_stable'):
                 fields.append('몸 기준: 원시 기준점 부족, 움직임 모름')
             elif done.get('groups'):
                 fields.append('화면: 24px 이상 이동 없음')
@@ -212,7 +214,12 @@ def window_line(done, fps, first=None):
             if not body:
                 notes.append('원시 기준점 부족, 몸 동작 모름')
             elif not body.get('limbs') and not body.get('unknown') and not body.get('uncertain'):
-                notes.append('원시 추적 큰 이동 미검출(실제 동작은 모름)')
+                notes.append('관측된 연속 구간에서 큰 이동 미검출(실제 동작은 모름)')
+    body = done.get('body')
+    if body and body.get('incomplete'):
+        notes.append('일부 관측 끊김·짧은 관측: 그 사이 동작 모름')
+    if first is not None and body and body.get('centre_shift') is None:
+        notes.append('몸 전체 이동 모름')
     if done.get('chibi'):
         notes.append('SD 체형: 팔다리 이름 안 붙임')
     elif not done.get('skeleton', True):

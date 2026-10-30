@@ -28,7 +28,7 @@ class Limbs(unittest.TestCase):
     def test_stroke_from_the_window_start_says_its_start_is_unseen(self):
         body = dict(limbs=[limb('wrist-r', '손목', '화면 오른쪽', 'up', 40., speeds=[20., 3.])])
         body['limbs'][0]['strokes'][0]['from_start'] = True
-        self.assertIn('위 40px(속도 20→3 px/f, 그 전은 구간 밖이라 모름)', digest.limbs(body)[0]['text'])
+        self.assertIn('위 40px(속도 20→3 px/f, 앞선 동작은 모름)', digest.limbs(body)[0]['text'])
 
 
 class Lines(unittest.TestCase):
@@ -84,6 +84,11 @@ class Repeats(unittest.TestCase):
         self.assertIn('자세 A 반복 (0.64s와 같음)', digest.window_line(self.window(93, 28.), 50, first))
         line = digest.window_line(self.window(339, 60.), 50, first)
         self.assertIn('다른 점: 왼팔(손목) 위 60px', line); self.assertIn('위 26px 없음', line)
+
+    def test_known_repeat_centre_is_printed_when_first_was_unknown(self):
+        first=self.window(0,26.);first['body']['centre_shift']=None
+        again=self.window(32,26.);again['body']['centre_shift']=dict(direction='right',distance_px=200.)
+        self.assertIn('몸 오른쪽 200px',digest.window_line(again,50,first))
 
     def test_label_swap_is_not_a_difference(self):
         first = self.window(32, 26.); again = self.window(93, 27.)
