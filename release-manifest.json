@@ -20,7 +20,7 @@
   ],
   "manifest_self_excluded": true,
   "file_count": 115,
-  "total_bytes": 1150643,
+  "total_bytes": 1152739,
   "files": [
     {
       "path": ".gitattributes",
@@ -34,8 +34,8 @@
     },
     {
       "path": "README.md",
-      "bytes": 22843,
-      "sha256": "9b1062a16259542a47c310e6d2e0932a5548ca24ec67b080b8f436997f46310f"
+      "bytes": 23091,
+      "sha256": "db1048a5adae060d38ed89ae866b72b2b1f3f0b0ae5d5950b28d76cd1f30b8a6"
     },
     {
       "path": "docs/import-provenance.json",
@@ -104,13 +104,13 @@
     },
     {
       "path": "image_lens/cli.py",
-      "bytes": 19063,
-      "sha256": "f1073b2b9fc0b75835cbbff9296f3af325c97f2fc4619017facec278270120c7"
+      "bytes": 19083,
+      "sha256": "25d07231d946ae75d033d291b91e6965eedf86f3d3cc615c8e36bd5d17d047d4"
     },
     {
       "path": "image_lens/digest.py",
-      "bytes": 19427,
-      "sha256": "d0c0e22748808ad85d005c55efcdba6e1c0f33e9beb3324cacb7c076936cb9cf"
+      "bytes": 19847,
+      "sha256": "c54c66f81b411192579c710882b6c12c34b2a8e15613c4589e05a9aa6a5075f4"
     },
     {
       "path": "image_lens/foreground_regions.py",
@@ -124,8 +124,8 @@
     },
     {
       "path": "image_lens/look.py",
-      "bytes": 25008,
-      "sha256": "c4098b534b3892d3b551526bb64431f600ebb86c5467c1a386be002755b8e3b8"
+      "bytes": 25020,
+      "sha256": "df1f4d0c88cf355c713c42d9a5944c793dfe5aaa0c9746ad00e19c99ec5b16ef"
     },
     {
       "path": "image_lens/mark.py",
@@ -514,8 +514,8 @@
     },
     {
       "path": "image_lens/zoom.py",
-      "bytes": 5615,
-      "sha256": "1e53bd9e221fb74dfa7d554477cc81abb4d60c95c24fb9b171617595513f1a44"
+      "bytes": 6016,
+      "sha256": "a74073aaece632a77db61346ce13837d606d44a1316546c2a7d2fc7a3ebf307c"
     },
     {
       "path": "image_lens_cli.py",
@@ -594,8 +594,8 @@
     },
     {
       "path": "tests/test_zoom.py",
-      "bytes": 2820,
-      "sha256": "cf83a4b9e8748062adee62319f875d292d66c1a6c97f32ce39ddc1f19cdc933b"
+      "bytes": 3815,
+      "sha256": "220c994e1b34812ae6edfcb96d565848f333dd5b76d44ca551b0947b90fe926d"
     }
   ]
 }

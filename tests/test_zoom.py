@@ -41,6 +41,10 @@ class Run(unittest.TestCase):
             self.assertTrue((Path(d)/'a'/'zoom-2.jpg').is_file())
             with self.assertRaises(ValueError):
                 zoom.run(video, Path(d)/'c', at=['1-2'], even=True)
+            with self.assertRaises(ValueError):  # starts after the 10 s video ends
+                zoom.run(video, Path(d)/'e', at=['18-22'])
+            late = zoom.run(video, Path(d)/'f', at=['8-12'])
+            self.assertEqual(late['sheets'][0]['span'], '8-9.90s'); self.assertEqual(late['sheets'][0]['frames'][-1], 99)
 
 
 class Overview(unittest.TestCase):
@@ -58,3 +62,13 @@ class Overview(unittest.TestCase):
             record = dict(source_video=str(video), shots=[], frame_sheets=names)
             text = digest.markdown(record, dict(fps=10, source_frame_count=200), 'look-full.md')
             self.assertIn('전체 화면 모음: frame-sheet-1.jpg, frame-sheet-2.jpg', text)
+
+
+class FailedWindow(unittest.TestCase):
+    def test_failed_seed_is_unknown_and_not_counted(self):
+        failed = dict(window=dict(seed=176, end=196), groups=[])
+        record = dict(source_video='v.mp4', shots=[dict(segment_id='shot-0001', frames=[176, 196], seconds=[7.34, 8.22],
+                                                        windows=[failed], skipped=[], errors=[dict(step='seed')])])
+        text = digest.markdown(record, dict(fps=24, source_frame_count=200), 'look-full.md')
+        self.assertIn('추적 결과 없음: 움직임 모름', text); self.assertNotIn('이동 없음', text)
+        self.assertIn('추적된 구간 0/200프레임', text)

@@ -148,8 +148,10 @@ def window_line(done, fps, first=None):
                 shown = [f"{m['point']} {_dir(m['direction'])} {m['distance_px']:.0f}px" + (f", {motion_report.EASE_KO[m['ease']]}" if m.get('ease') else '')
                          for m in moves[:DIGEST['parts']]]
                 fields.append('화면: ' + '; '.join(shown) + (f" (+{len(moves)-DIGEST['parts']})" if len(moves) > DIGEST['parts'] else ''))
-            else:
+            elif done.get('groups'):
                 fields.append('화면: 24px 이상 이동 없음')
+            else:  # seed or every track failed: nothing was measured, which is not stillness
+                fields.append('추적 결과 없음: 움직임 모름')
         flow = _bands(done.get('bands'))
         if flow:
             fields.append('높이별: ' + flow)
@@ -243,11 +245,11 @@ def bridge_line(bridge):
 def markdown(record, scan, full_name):
     fps = scan['fps']; total = scan['source_frame_count']
     covered = sum(min(d.get('cut_after', d['window']['end']), d['window']['end'])-d['window']['seed']+1
-                  for s in record['shots'] for d in s['windows'])
+                  for s in record['shots'] for d in s['windows'] if d.get('groups'))
     skipped = [k for s in record['shots'] for k in s['skipped']]
     out = ['# 영상 움직임 요약', '',
            f"영상 {record['source_video'].rsplit('/', 1)[-1]}: {total}프레임, {fps:g}fps, 장면 {len(record['shots'])}개. "
-           f"추적 구간 {covered}/{total}프레임, 건너뜀 {len(skipped)}곳.",
+           f"추적된 구간 {covered}/{total}프레임, 건너뜀 {len(skipped)}곳.",
            '읽는 법: 한 줄 = 추적 구간 하나. 방향·좌우는 화면 기준. "전체"는 카메라와 몸 중심(어깨 가운데, 없으면 얼굴)의 이동이고, '
            '"몸 기준"은 그 위에 팔다리가 더 한 움직임(몸 중심 기준, 같은 쪽 팔·다리에서 같이 움직인 점은 한 줄). '
            '"높이별"은 사람 상자를 위→아래 5칸으로 나눈 이동(px, 0=8px 미만). 골격 신뢰가 낮으면 팔다리 이름 없이 "화면" 이동만. '
@@ -262,7 +264,7 @@ def markdown(record, scan, full_name):
                        '"who"=사람이 여럿인 구간의 P1·P2 상자; "still"=추적하기엔 짧은 컷의 한 장면, 붙어 있는 컷은 한 줄에 시간 순서; "strip"=몸 돌림 후보 구간의 프레임 5장을 시간 순서로). '
                        '손 모양(하트·브이)처럼 글에 안 나오는 동작은 그림에서 본다.')
     if record.get('frame_sheets'):
-        out.insert(-1, f"전체 화면 모음: {', '.join(record['frame_sheets'])} (영상 처음부터 끝까지 {zoom.ZOOM['every_s']:g}초 간격, 장마다 시간 표시: "
+        out.insert(-1, f"전체 화면 모음: {', '.join(record['frame_sheets'])} (전 구간 균등 추출, 최대 {zoom.ZOOM['max_overview']}장, 장마다 시간 표시; 사이에 빠진 빠른 동작은 여기 안 나옴: "
                        '사람끼리 하는 동작(당기기·기대기·찌르기)과 넘어짐은 포즈 상자가 합쳐져 글에 안 나오니 여기서 본다.)')
     windows = [d for s in record['shots'] for d in s['windows']]
     seen = {}
@@ -294,6 +296,8 @@ def markdown(record, scan, full_name):
             prev = done
         if s['errors']:
             out.append(f"- 오류 {len(s['errors'])}건 (look.json)")
+    if record.get('errors'):
+        out.append(f"전체 오류 {len(record['errors'])}건: " + ', '.join(e['step'] for e in record['errors']) + ' (look.json)')
     return '\n'.join(out).rstrip('\n')+'\n'
 
 

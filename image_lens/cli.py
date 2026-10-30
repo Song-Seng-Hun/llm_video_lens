@@ -163,7 +163,7 @@ def dispatch(command, arguments):
         ap = parser(command, 'Second read: dense whole frames for at most two spans the reader could not tell, at a fixed frame budget.')
         ap.add_argument('--video', required=True); ap.add_argument('--out', required=True, help='new output directory')
         ap.add_argument('--at', action='append', default=[], help='start-end seconds, at most 4 s; repeat once more at most')
-        ap.add_argument('--even', action='store_true', help='control: the same frame budget spread evenly over the clip')
+        ap.add_argument('--even', action='store_true', help='control: 24 frames spread evenly over the clip, as many as two full --at spans')
         a = ap.parse_args(arguments)
         return zoom.run(a.video, a.out, a.at, a.even)
     if command == 'look':

@@ -360,4 +360,4 @@ def run(video, detector, pose_model, checkpoint, out, max_shots=LOOK['max_shots'
     from image_lens import digest
     look_md = paths.write(root/'look.md', digest.markdown(record, scan, 'look-full.md'))
     return dict(status='written', output=str(look_md), shots=len(shots), windows=sum(len(s['windows']) for s in shots),
-                errors=sum(len(s['errors']) for s in shots), elapsed_seconds=record['elapsed_seconds'])
+                errors=sum(len(s['errors']) for s in shots)+len(errors), elapsed_seconds=record['elapsed_seconds'])

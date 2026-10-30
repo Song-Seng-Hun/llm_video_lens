@@ -74,7 +74,8 @@ def overview_count(count, fps):
 
 
 def overview(video, root):
-    """Whole frames every ZOOM['every_s'] seconds over the whole clip (at most ZOOM['max_overview']), 12 per sheet, as
+    """Whole frames spread evenly over the whole clip, about one per ZOOM['every_s'] seconds up to ZOOM['max_overview']
+    (longer clips get wider gaps), 12 per sheet, as
     frame-sheet-N.jpg: what people do to each other and falls, which one merged pose box cannot show."""
     import cv2
     cap = cv2.VideoCapture(str(video))
@@ -106,8 +107,13 @@ def run(video, out, at=(), even=False):
             numbers = picks(0, count-1, ZOOM['budget']); half = len(numbers)//2
             groups = [('even', numbers[:half]), ('even', numbers[half:])]
         else:
-            groups = [(f'{a:g}-{b:g}s', picks(min(round(a*fps), count-1), min(round(b*fps), count-1), ZOOM['frames']))
-                      for a, b in spans(at)]
+            groups = []
+            for a, b in spans(at):
+                first, last = round(a*fps), min(round(b*fps), count-1)
+                if first > count-1:
+                    raise ValueError(f'span {a:g}-{b:g}s starts after the video ends ({count/fps:.2f} s)')
+                # A span running past the end is cut there; the name says the frames actually shown.
+                groups.append((f'{a:g}-{last/fps:.2f}s' if last < round(b*fps) else f'{a:g}-{b:g}s', picks(first, last, ZOOM['frames'])))
         root.mkdir(parents=True)
         written = _write(cap, fps, groups, root, 'zoom')
     finally:
