@@ -336,7 +336,7 @@ def gap_seeds(video, start, end, bbox, names):
     kept = {start: first}; prev = first
     for n, bgr in zip(range(start+1, end+1), window[1:]):
         image = cv2.cvtColor(bgr, cv2.COLOR_BGR2GRAY)
-        if (cv2.absdiff(prev, image)[y0:y1, x0:x1] > GAPS['diff']).mean() > GAPS['switch_share']:
+        if (cv2.absdiff(prev[y0:y1, x0:x1], image[y0:y1, x0:x1]) > GAPS['diff']).mean() > GAPS['switch_share']:
             break
         kept[n] = prev = image
     end = max(kept)
@@ -344,26 +344,35 @@ def gap_seeds(video, start, end, bbox, names):
         return {}
     later = sorted({start+(end-start)//3, start+2*(end-start)//3, end} - {start})
     moves = camera.path(video, start, end)
-    outline = cv2.dilate(cv2.Canny(first, *GAPS['edge']), np.ones((3, 3), np.uint8)) > 0
+    # Gaps are found in the box plus a zero margin, not the whole frame (whole-frame masks per gap were 0.23 of 0.37 s per
+    # call on clip B). The margin is wider than the opening and distance-transform steps, so they see the same zeros
+    # around the box as on the whole frame; the outline is still traced on the whole frame. Same seeds on 6 clips.
+    ox, oy, ex, ey = max(0, x0-4), max(0, y0-4), min(w, x1+4), min(h, y1+4)
+    outline = (cv2.dilate(cv2.Canny(first, *GAPS['edge']), np.ones((3, 3), np.uint8)) > 0)[oy:ey, ox:ex]
+    base = first[y0:y1, x0:x1]
     found = []
     for n in later:
-        image = kept[n]; shift = camera.between(moves, start, n)
+        shift = camera.between(moves, start, n)
         if shift and math.hypot(*shift) >= motion_report.STROKE['major_min_px']:
-            image = cv2.warpAffine(image, np.float32([[1, 0, -shift[0]], [0, 1, -shift[1]]]), (w, h), borderMode=cv2.BORDER_REPLICATE)
-        mask = np.zeros((h, w), np.uint8)
-        mask[y0:y1, x0:x1] = cv2.absdiff(first, image)[y0:y1, x0:x1] > GAPS['diff']
+            image = cv2.warpAffine(kept[n], np.float32([[1, 0, x0+shift[0]], [0, 1, y0+shift[1]]]), (x1-x0, y1-y0),
+                                   flags=cv2.INTER_LINEAR | cv2.WARP_INVERSE_MAP, borderMode=cv2.BORDER_REPLICATE)
+        else:
+            image = kept[n][y0:y1, x0:x1]
+        mask = np.zeros((ey-oy, ex-ox), np.uint8)
+        mask[y0-oy:y1-oy, x0-ox:x1-ox] = cv2.absdiff(base, image) > GAPS['diff']
         mask = cv2.morphologyEx(mask, cv2.MORPH_OPEN, np.ones((3, 3), np.uint8))
         depth = cv2.distanceTransform(mask, cv2.DIST_L2, 5)
-        count, labels = cv2.connectedComponents(mask)
+        count, labels, stats, _ = cv2.connectedComponentsWithStats(mask)
         for i in range(1, count):
-            region = labels == i
-            if region.sum() < GAPS['min_area']:
+            sx, sy, sw, sh, area = stats[i]
+            if area < GAPS['min_area']:
                 continue
-            on_outline = np.where(region & outline, depth, 0)
+            region = labels[sy:sy+sh, sx:sx+sw] == i; d = depth[sy:sy+sh, sx:sx+sw]
+            on_outline = np.where(region & outline[sy:sy+sh, sx:sx+sw], d, 0)
             if on_outline.max() < GAPS['min_half_px']:
                 continue  # an arrival gap: nothing of the start frame to follow there
             y, x = np.unravel_index(on_outline.argmax(), on_outline.shape)
-            found.append((2*float(depth[region].max()), int(x), int(y), n))
+            found.append((2*float(d[region].max()), int(x+sx+ox), int(y+sy+oy), n))
     found.sort(reverse=True)
     candidates = []
     for c in found:

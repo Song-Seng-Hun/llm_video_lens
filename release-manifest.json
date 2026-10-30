@@ -20,7 +20,7 @@
   ],
   "manifest_self_excluded": true,
   "file_count": 133,
-  "total_bytes": 1409832,
+  "total_bytes": 1411032,
   "files": [
     {
       "path": ".gitattributes",
@@ -79,8 +79,8 @@
     },
     {
       "path": "docs/look-notes.md",
-      "bytes": 21669,
-      "sha256": "50665061d12ef3cab3a537d7d60a49a4008e6fe57bca130a4b5263045014bee9"
+      "bytes": 22107,
+      "sha256": "b0b7638b470fcb38bfa3de631fbdf2c94f6fe716be98b3e8010b557d272b59ac"
     },
     {
       "path": "docs/provenance.md",
@@ -194,8 +194,8 @@
     },
     {
       "path": "image_lens/onion.py",
-      "bytes": 20851,
-      "sha256": "84162c0fb0c26af1411fa892ac64b9884f42a507c8763b16f63e1d2c26019878"
+      "bytes": 21613,
+      "sha256": "7ce4c36cdf74f9f62141e9ebb56a664d08b453a801eae81d129f74bd3c2b2ba7"
     },
     {
       "path": "image_lens/part_regions.py",
