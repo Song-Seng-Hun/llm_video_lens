@@ -20,7 +20,7 @@
   ],
   "manifest_self_excluded": true,
   "file_count": 132,
-  "total_bytes": 1364185,
+  "total_bytes": 1368884,
   "files": [
     {
       "path": ".gitattributes",
@@ -79,8 +79,8 @@
     },
     {
       "path": "docs/look-notes.md",
-      "bytes": 12536,
-      "sha256": "abf87da3896faf6491e461ca17e08e09070a7355b7ab7982f75332de0805a477"
+      "bytes": 13627,
+      "sha256": "282cb648d87f3305e36fbfa0f7995af81d90638176aafd4a8858902fdba54b73"
     },
     {
       "path": "docs/provenance.md",
@@ -129,8 +129,8 @@
     },
     {
       "path": "image_lens/check.py",
-      "bytes": 9195,
-      "sha256": "85de93f69bb609ce455b5ffd21edb5e026a001f067ed358afcb4415b93591a0b"
+      "bytes": 9200,
+      "sha256": "01f6f1204df830a805dea11b5d245e7f3778c983ccbdc0e005d333f3f5ad3282"
     },
     {
       "path": "image_lens/checkpoint-manifest.json",
@@ -144,8 +144,8 @@
     },
     {
       "path": "image_lens/digest.py",
-      "bytes": 22545,
-      "sha256": "6609f29e215fe9e74ef1fe7b8ba89ba1efcc2aae0a6e1ca0e61ccc6485eb980c"
+      "bytes": 22584,
+      "sha256": "31545b11d2520ef04f36f091b6b9c411c366d3b8532086424b8a0f7473541ef8"
     },
     {
       "path": "image_lens/foreground_regions.py",
@@ -204,8 +204,8 @@
     },
     {
       "path": "image_lens/pose.py",
-      "bytes": 21111,
-      "sha256": "8c5c632b0af9e32e41a8fcc7c87063ae1b78b0a30ea71906d208b27fb4604bf3"
+      "bytes": 23324,
+      "sha256": "67154c7bac027bb0ae34bddc08b04d3dd782f9b35419a1d6e9b781a7debb2bb2"
     },
     {
       "path": "image_lens/run_point_tracker.py",
@@ -669,8 +669,8 @@
     },
     {
       "path": "tests/test_pose.py",
-      "bytes": 8284,
-      "sha256": "adb86f02b4e1b52c4578a8756eb4d374825c53716a33b0de4f806ea38f706f4e"
+      "bytes": 9635,
+      "sha256": "4f5a3e9aa28d115b7bb9ea77a5d20dd010b5fcc69e91c3f927f8f344c3dfac2b"
     },
     {
       "path": "tests/test_zoom.py",

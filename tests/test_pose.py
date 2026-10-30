@@ -19,6 +19,28 @@ def track(track_id='shot-0000/1', box=(100., 100., 500., 900.), dx=0., score=.9)
     return dict(track_id=track_id, bbox=[box[0]+dx, box[1], box[2]+dx, box[3]], keypoints=k, scores=s)
 
 
+
+class Split(unittest.TestCase):
+    """The pose call is faked: each crop gets a head at the given nose x and eye distance."""
+    def run_split(self, heads, box=(0., 0., 1000., 600.)):
+        import numpy as np
+        def fake(image, bboxes):
+            k = np.zeros((len(bboxes), 133, 2), np.float32); s = np.full((len(bboxes), 133), .9, np.float32)
+            for i, (x, eyes) in enumerate(heads):
+                k[i, pose.BODY['nose']] = (x, 200); k[i, pose.BODY['eye_l']] = (x+eyes/2, 180); k[i, pose.BODY['eye_r']] = (x-eyes/2, 180)
+            return k, s
+        boxes = np.array([box], np.float32); conf = np.array([.85], np.float32)
+        return pose._split(None, boxes, conf, np.zeros((1, 133, 2), np.float32), np.zeros((1, 133), np.float32), fake)
+
+    def test_two_far_heads_split_the_box(self):
+        boxes, conf, _, _, split = self.run_split([(200, 100), (800, 100)])
+        self.assertEqual(split, 1); self.assertEqual(boxes.tolist(), [[0, 0, 600, 600], [400, 0, 1000, 600]])
+
+    def test_same_head_tall_box_and_eye_sized_heads_stay(self):
+        self.assertEqual(self.run_split([(500, 100), (510, 100)])[4], 0)
+        self.assertEqual(self.run_split([(200, 100), (800, 100)], box=(0., 0., 500., 900.))[4], 0)
+        self.assertEqual(self.run_split([(200, 40), (800, 40)])[4], 0)  # a close-up's two eyes, not two faces
+
 class Seeds(unittest.TestCase):
     def test_hair_sits_above_eyes_and_beside_them(self):
         seeds = pose.seed_points(track(), 1440, 1080)
