@@ -287,6 +287,10 @@ raise SystemExit(main(['--workspace', sys.argv[2], 'prepare', '--queries', 'quer
             self.assertEqual((e[0], failed[0], f[0]), (0, 1, 0)); self.assertEqual(e[1], failed[1]); self.assertNotEqual(f[1], e[1])
             with self.assertRaises(ValueError):
                 worker.result(jobs[0])
+            # Both replies already waiting: the second is taken at once, not after its budget runs out.
+            import time
+            jobs = [worker.submit(command, [name], .3) for name in ('g', 'h')]; time.sleep(.5)
+            self.assertEqual([worker.result(job)[0] for job in jobs], [0, 0])
         finally:
             worker.close()
 

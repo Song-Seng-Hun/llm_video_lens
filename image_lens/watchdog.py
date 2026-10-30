@@ -4,6 +4,7 @@ import os
 import select
 import signal
 import subprocess
+import time
 
 
 class ChildTimeout(TimeoutError):
@@ -54,6 +55,7 @@ class Worker:
         self.process = None
         self.command = None
         self.pending = []
+        self.buffer = b''
 
     def run(self, command, arguments, max_seconds):
         return self.result(self.submit(command, arguments, max_seconds))
@@ -74,11 +76,11 @@ class Worker:
         if self.process is not None and self.process.poll() is not None:
             self.process = None
         if self.process is None:
-            self.command = job[0]
+            self.command = job[0]; self.buffer = b''
             self.process = subprocess.Popen([*job[0], '--serve'], stdin=subprocess.PIPE, stdout=subprocess.PIPE,
-                                            text=True, start_new_session=True)
+                                            bufsize=0, start_new_session=True)
         try:
-            self.process.stdin.write(json.dumps(job[1])+'\n')
+            self.process.stdin.write((json.dumps(job[1])+'\n').encode())
             self.process.stdin.flush()
         except BaseException:
             self._drop()
@@ -90,11 +92,21 @@ class Worker:
         process = self.process
         try:
             # The deadline starts when the parent waits for this job: never sooner than the job could have started.
-            ready, _, _ = select.select([process.stdout], [], [], job[2])
-            if not ready:
-                self._drop()
-                raise ChildTimeout(process.pid, '', '')
-            line = process.stdout.readline()
+            # Replies are read raw into self.buffer: a buffered readline could take the next reply too, where select()
+            # no longer sees it (clip B: the parent then waited out the 300 s budget on a reply it already had).
+            deadline = time.monotonic()+job[2]
+            while b'\n' not in self.buffer:
+                ready, _, _ = select.select([process.stdout], [], [], max(0, deadline-time.monotonic()))
+                if not ready:
+                    self._drop()
+                    raise ChildTimeout(process.pid, '', '')
+                chunk = os.read(process.stdout.fileno(), 1 << 16)
+                if not chunk:
+                    break
+                self.buffer += chunk
+            line, newline, self.buffer = self.buffer.partition(b'\n')
+            if not newline:
+                line = b''
         except ChildTimeout:
             raise
         except BaseException:
