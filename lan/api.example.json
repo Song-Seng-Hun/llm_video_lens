@@ -1,0 +1,17 @@
+{
+  "bind": ["en0", "en1"],
+  "port": 8766,
+  "allow": "172.30.1.0/24",
+  "clients": {
+    "claude-window": "/Users/songseunghun/.music-lens/keys/claude-window.key",
+    "codex-window": "/Users/songseunghun/.music-lens/keys/codex-window.key"
+  },
+  "cert": "/Users/songseunghun/.music-lens/tls/server.pem",
+  "key": "/Users/songseunghun/.music-lens/tls/server.key",
+  "root": "/Users/songseunghun/AI-Look",
+  "python": "/path/to/runtime/bin/python",
+  "repo": "/Users/songseunghun/tools/image-lens/app",
+  "detector": "/path/to/yolox_humanart.onnx",
+  "pose_model": "/path/to/rtmw133.onnx",
+  "checkpoint": "/path/to/scaled_offline.pth"
+}

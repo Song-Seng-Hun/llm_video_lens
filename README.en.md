@@ -95,6 +95,7 @@ python -m image_lens --workspace W mark --video V --shots W/look/shots.json --fr
 ## More
 
 - [Full guide](docs/guide.md): every command and option, the full way to read `look.md`, output files, the brief format, jobs and tracking, pose seeds
+- [LAN API](lan/README.md): a server and client for running this Mac's `look` and `at` from another PC on the home LAN
 - [look notes](docs/look-notes.md): `look`'s limits and the checks behind them
 - [Limitations](docs/limitations.md) · [Verification](docs/verification.md) · [Provenance and licenses](docs/provenance.md) · [Job contract](docs/jobs.md)
 - Run the tests: `python -B -m unittest discover -s tests -v`
