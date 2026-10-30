@@ -1,6 +1,7 @@
 """Whole-frame trajectory sheet and appearance-change candidates for one motion report.
 Reads the pinned source only; no tracking, interpolation, gap filling or automatic redraw/action decision."""
 import copy,hashlib,math
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 CHANGE=dict(thumb=(160,120),min_mean_abs_diff=12.,median_factor=4.,max_candidates=6)
@@ -64,16 +65,10 @@ def render(report,packet,directory,root,source_video,pose_flags=None):
     # Every group of one window asks for the same frames: the last window's checked frames and change candidates are kept.
     stat=Path(source_video).stat();key=(str(source_video),stat.st_dev,stat.st_ino,stat.st_size,stat.st_mtime_ns,stat.st_ctime_ns,start,end,w,h)
     if _WINDOW[:1]!=[key]:
-        cap=cv2.VideoCapture(str(source_video));frames=[]
-        try:
-            if not cap.isOpened():raise ValueError('source cannot be decoded')
-            cap.set(cv2.CAP_PROP_POS_FRAMES,start)
-            for n in range(start,end+1):
-                ok,bgr=cap.read()
-                if not ok or round(cap.get(cv2.CAP_PROP_POS_FRAMES))!=n+1 or bgr.shape[:2]!=(h,w):raise ValueError('source decode geometry/index mismatch')
-                frames.append(bgr)
-        finally:cap.release()
-        small=[cv2.resize(cv2.cvtColor(bgr,cv2.COLOR_BGR2GRAY),CHANGE['thumb'],interpolation=cv2.INTER_AREA) for bgr in frames]
+        from image_lens import frames as shared
+        frames=shared.checked(source_video,start,end,w,h,'source decode geometry/index mismatch')
+        # Each thumb is independent; threads give the same pixels (clip B: 7.4 s of serial resizing per look).
+        with ThreadPoolExecutor(8) as pool:small=list(pool.map(lambda bgr:cv2.resize(cv2.cvtColor(bgr,cv2.COLOR_BGR2GRAY),CHANGE['thumb'],interpolation=cv2.INTER_AREA),frames))
         _WINDOW[:]=[key,frames,change_candidates(small,start)]
     frames=_WINDOW[1];full={n:Image.fromarray(frames[n-start][:,:,::-1].copy()) for n in set(picks)|{start}}
     changes=copy.deepcopy(_WINDOW[2]);pose=pose_overlay(pose_flags,start,end,changes['candidates'])

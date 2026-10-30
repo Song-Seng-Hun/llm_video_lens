@@ -2,7 +2,7 @@ import json
 import tempfile
 import unittest
 from pathlib import Path
-from image_lens import camera, check, digest, paths
+from image_lens import camera, check, digest, frames, paths
 
 REPO = Path(__file__).resolve().parents[1]
 
@@ -35,6 +35,25 @@ class Path_(unittest.TestCase):
             self.assertEqual(kept, fresh); self.assertEqual(max(kept), 20)
             kept[20] = None  # callers get their own copy
             self.assertEqual(camera.path(video, 0, 20), fresh)
+
+
+class Frames(unittest.TestCase):
+    def test_a_kept_window_gives_the_frames_of_a_fresh_read(self):
+        with tempfile.TemporaryDirectory(dir=REPO/'workspace') as d:
+            video = Path(d)/'pan.avi'; pan_video(video)
+            frames.window(video, 0, 39)
+            kept = frames.window(video, 5, 20); frames._LAST.clear(); fresh = frames.window(video, 5, 20)
+            self.assertEqual(len(kept), 16); self.assertTrue(all((a == b).all() for a, b in zip(kept, fresh)))
+            self.assertEqual(len(frames.checked(video, 0, 39, 640, 360, 'bad')), 40)
+            with self.assertRaises(ValueError):
+                frames.checked(video, 30, 45, 640, 360, 'past the end')
+
+    def test_a_rewritten_source_is_read_again(self):
+        with tempfile.TemporaryDirectory(dir=REPO/'workspace') as d:
+            video = Path(d)/'pan.avi'; pan_video(video)
+            old = frames.window(video, 0, 9)
+            pan_video(video, step=40); new = frames.window(video, 0, 9)
+            self.assertFalse((old[5] == new[5]).all())
 
 
 class Describe(unittest.TestCase):

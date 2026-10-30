@@ -58,17 +58,8 @@ def _path(video, start, end):
     from concurrent.futures import ThreadPoolExecutor
     import cv2
     import numpy as np
-    cap = cv2.VideoCapture(str(video))
-    grays = []
-    try:
-        cap.set(cv2.CAP_PROP_POS_FRAMES, start)
-        for n in range(start, end+1):
-            ok, bgr = cap.read()
-            if not ok:
-                break
-            grays.append(cv2.cvtColor(cv2.resize(bgr, None, fx=CAMERA['scale'], fy=CAMERA['scale']), cv2.COLOR_BGR2GRAY))
-    finally:
-        cap.release()
+    from image_lens import frames
+    grays = [cv2.cvtColor(cv2.resize(bgr, None, fx=CAMERA['scale'], fy=CAMERA['scale']), cv2.COLOR_BGR2GRAY) for bgr in frames.window(video, start, end)]
     # ORB per frame is independent and gives the same points from a fresh detector, so it runs in threads (clip B
     # window: 0.14 -> 0.02 s); matching and RANSAC stay in frame order.
     with ThreadPoolExecutor(8) as pool:
