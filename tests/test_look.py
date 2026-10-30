@@ -89,35 +89,60 @@ if __name__ == '__main__': unittest.main()
 
 
 class Ahead(unittest.TestCase):
-    def test_next_shot_is_seeded_once_and_its_failure_stays_in_place(self):
-        import json, tempfile
+    def look(self, d, said, code=0):
+        """look._run on a 60-frame pan with three 20-frame shots; the fake pose child writes parts 0..39 and 40..59 and
+        pose.json, then prints `said` (a list of lines, or None for the two part lines). Returns the seed calls."""
+        import json, subprocess, sys
         from image_lens import paths
         from tests.test_check import pan_video
+        paths.configure(d)
+        video = Path(d)/'pan.avi'; pan_video(video, frames=60)
+        segments = [dict(segment_id=f'shot-{k:04d}', start_frame=20*k, end_frame=20*k+19) for k in range(3)]
+        person = [dict(track_id='t', bbox=[100, 50, 300, 350], score=.9, keypoints=[[150+j%20*5, 60+j//20*40] for j in range(133)], scores=[.9]*133)]
+        def packet(lo, hi):
+            return json.dumps(dict(native_range=[lo, hi], frames=[dict(frame=n, tracks=person) for n in range(lo, hi+1)], flags=dict(frames=[])))
+        calls = []
+        def step(command, arguments):
+            if command == 'seed':
+                calls.append((arguments[arguments.index('--frame')+1], Path(arguments[arguments.index('--pose')+1]).name))
+            out = Path(arguments[arguments.index('--out')+1]) if '--out' in arguments else None
+            if command == 'scan':
+                out.write_text(json.dumps(dict(fps=10, source_frame_count=60, source_sha256='0', analysis_segments=segments)))
+            elif command == 'seed' and arguments[arguments.index('--frame')+1] == 40:
+                raise ValueError('no seed')
+            return dict(jobs=[])
+        def pose_child(arguments):
+            parts = Path(arguments[arguments.index('--parts-dir')+1]); parts.mkdir()
+            lines = said
+            if lines is None:
+                lines = []
+                for lo, hi in ((0, 39), (40, 59)):
+                    (parts/f'pose-f{lo}-f{hi}.json').write_text(packet(lo, hi)); lines.append(json.dumps(dict(pose_part=str(parts/f'pose-f{lo}-f{hi}.json'))))
+                Path(arguments[arguments.index('--out')+1]).write_text(packet(0, 59))
+            return subprocess.Popen([sys.executable, '-c', f'import sys; print({chr(10).join(["load model"]+lines)!r}); sys.exit({code})'],
+                                    stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
+        plain = look._step, look.fit, look._pose_child
+        look._step, look.fit, look._pose_child = step, lambda source, root: (source, False), pose_child
+        try:
+            look.run(video, 'det', 'pose', 'ckpt', Path(d)/'look')
+        finally:
+            look._step, look.fit, look._pose_child = plain
+        return calls
+
+    def test_shots_are_seeded_from_their_pose_part_once_and_a_failure_stays_in_place(self):
+        import json, tempfile
         with tempfile.TemporaryDirectory(dir=REPO/'workspace') as d:
-            paths.configure(d)
-            video = Path(d)/'pan.avi'; pan_video(video, frames=60)
-            segments = [dict(segment_id=f'shot-{k:04d}', start_frame=20*k, end_frame=20*k+19) for k in range(3)]
-            person = [dict(track_id='t', bbox=[100, 50, 300, 350], score=.9, keypoints=[[150+j%20*5, 60+j//20*40] for j in range(133)], scores=[.9]*133)]
-            calls = []
-            def step(command, arguments):
-                calls.append((command, *arguments[arguments.index('--frame')+1:][:1]) if command == 'seed' else (command,))
-                out = Path(arguments[arguments.index('--out')+1]) if '--out' in arguments else None
-                if command == 'scan':
-                    out.write_text(json.dumps(dict(fps=10, source_frame_count=60, source_sha256='0', analysis_segments=segments)))
-                elif command == 'pose':
-                    out.write_text(json.dumps(dict(frames=[dict(frame=n, tracks=person) for n in range(60)], flags=dict(frames=[]))))
-                elif command == 'seed' and arguments[arguments.index('--frame')+1] == 40:
-                    raise ValueError('no seed')
-                return dict(jobs=[])
-            plain = look._step, look.fit
-            look._step, look.fit = step, lambda source, root: (source, False)
-            try:
-                look._run(video, 'det', 'pose', 'ckpt', Path(d)/'look')
-            finally:
-                look._step, look.fit = plain
-            self.assertEqual([c for c in calls if c[0] == 'seed'], [('seed', 0), ('seed', 20), ('seed', 40)])
+            calls = self.look(d, None)
+            self.assertEqual(calls, [(0, 'pose-f0-f39.json'), (20, 'pose-f0-f39.json'), (40, 'pose-f40-f59.json')])
             record = json.loads((Path(d)/'look'/'look.json').read_text())
             self.assertEqual([len(s['errors']) for s in record['shots']], [0, 0, 1])
             self.assertEqual(record['shots'][2]['errors'][0]['step'], 'seed')
             text = (Path(d)/'look'/'look-full.md').read_text()
             self.assertLess(text.index('## shot-0002'), text.index('점 배치 실패: no seed'))
+            self.assertIn('load model', (Path(d)/'look'/'steps.log').read_text())
+
+    def test_a_failed_pose_child_fails_the_look_with_its_error(self):
+        import json, tempfile
+        with tempfile.TemporaryDirectory(dir=REPO/'workspace') as d:
+            with self.assertRaisesRegex(ValueError, 'pose wall budget exhausted'):
+                self.look(d, [json.dumps(dict(status='failed', error='pose wall budget exhausted'))], code=1)

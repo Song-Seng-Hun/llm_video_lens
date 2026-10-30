@@ -2,6 +2,7 @@
 Runs the existing public steps in order with their own guards; a failed shot is recorded and the next one continues."""
 import json
 import math
+import os
 import signal
 import time
 from pathlib import Path
@@ -47,6 +48,32 @@ def _finish(handle):
     from image_lens import cli, watchdog
     with LOG.open('a') as log, contextlib.redirect_stdout(log):
         return cli.finish_track(watchdog.shared.result(handle))
+
+
+def _pose_child(arguments):
+    """Start the pose step as its own process: it announces each part packet on stdout while it poses the rest."""
+    import subprocess
+    import sys
+    with LOG.open('a') as log:
+        print(json.dumps(dict(step='pose', arguments=[str(a) for a in arguments])), file=log, flush=True)
+    return subprocess.Popen([sys.executable, '-I', '-B', str(Path(__file__).resolve().parents[1]/'image_lens_cli.py'),
+                             '--workspace', str(paths.workspace_root()), 'pose', *[str(a) for a in arguments]],
+                            stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, start_new_session=True)
+
+
+POSER = None
+
+
+def _stop_pose():
+    global POSER
+    poser, POSER = POSER, None
+    if poser is not None and poser.poll() is None:
+        try:
+            os.killpg(poser.pid, signal.SIGKILL)
+        except ProcessLookupError:
+            pass
+    if poser is not None:
+        poser.communicate()
 
 
 def next_window(segment, start, pose_frames, flagged, length=LOOK['window_frames'], min_frames=LOOK['min_frames']):
@@ -178,6 +205,7 @@ def run(*args, **kwargs):
         return _run(*args, **kwargs)
     finally:
         watchdog.shared.close(); watchdog.shared = None
+        _stop_pose()
 
 
 def _run(video, detector, pose_model, checkpoint, out, max_shots=LOOK['max_shots'], max_seconds=1800):
@@ -191,12 +219,43 @@ def _run(video, detector, pose_model, checkpoint, out, max_shots=LOOK['max_shots
     LOG = root/'steps.log'
     source, scaled = fit(source, root)
     _step('scan', ['--video', source, '--out', root/'shots.json'])
-    _step('pose', ['--shots', root/'shots.json', '--detector', detector, '--pose-model', pose_model, '--out', root/'pose.json',
-                   '--max-seconds', max(1, min(1800, int(remaining())))])
+    # Pose runs in its own process and hands over runs of whole shots as it goes, so the first shots are seeded and
+    # tracked while it poses the rest (clip B side by side: pose 28 -> 38 s, tracking 35 -> 41 s, 63 -> 41 s in all).
+    global POSER
+    POSER = _pose_child(['--shots', root/'shots.json', '--detector', detector, '--pose-model', pose_model, '--out', root/'pose.json',
+                         '--max-seconds', max(1, min(1800, int(remaining()))), '--parts-dir', root/'pose-parts'])
     scan, _ = paths.load(root/'shots.json')
-    pose_packet, _ = paths.load(root/'pose.json', max_bytes=64*1024*1024)
-    pose_frames = {f['frame']: f['tracks'] for f in pose_packet['frames']}
-    flagged = {r['frame'] for r in pose_packet['flags']['frames']}
+    pose_frames = {}; flagged = set(); posed = []  # posed: (first, last, packet path)
+    def take(path):
+        packet, _ = paths.load(path, max_bytes=64*1024*1024)
+        pose_frames.update({f['frame']: f['tracks'] for f in packet['frames']})
+        flagged.update(r['frame'] for r in packet['flags']['frames'])
+        posed.append((*packet['native_range'], path))
+    def covered(frame):
+        return next((p for lo, hi, p in posed if lo <= frame <= hi), None)
+    def pose_for(frame):
+        """The pose packet holding `frame`: a part, or pose.json when the clip fits in one; waits for the child's line."""
+        failed = None
+        while covered(frame) is None:
+            line = POSER.stdout.readline()
+            if not line:
+                if POSER.wait() or failed or not (root/'pose.json').is_file():
+                    raise ValueError((failed or {}).get('error', 'pose step failed'))
+                if posed:
+                    raise ValueError('pose parts do not cover the clip')
+                take(root/'pose.json')
+                continue
+            with LOG.open('a') as log:
+                log.write(line)
+            try:
+                said = json.loads(line)
+            except ValueError:
+                continue  # model loaders print plain lines
+            if type(said) is dict and 'pose_part' in said:
+                take(Path(said['pose_part']))
+            elif type(said) is dict and said.get('status') == 'failed':
+                failed = said
+        return covered(frame)
     shots = []; lines = []; last_end = None; looks = []; stripping = []
     pending = None
     def report(window):
@@ -250,7 +309,7 @@ def _run(video, detector, pose_model, checkpoint, out, max_shots=LOOK['max_shots
                 _step('analyze', ['--tracks', stem.with_suffix('.tracks.json'), '--shots', root/'shots.json',
                                   '--report-bindings', binding, '--start', w['seed'], '--end', end,
                                   '--format', 'json', '--out', stem.with_suffix('.report.json'),
-                                  '--trajectory-dir', stem.with_name(stem.name+'-traj'), '--pose', root/'pose.json'])
+                                  '--trajectory-dir', stem.with_name(stem.name+'-traj'), '--pose', pose_for(w['seed'])])
                 found, _ = paths.load(stem.with_suffix('.report.json'))
                 from image_lens import motion_report
                 md = paths.write(stem.with_suffix('.report.md'), motion_report.markdown(found))
@@ -306,12 +365,15 @@ def _run(video, detector, pose_model, checkpoint, out, max_shots=LOOK['max_shots
         entry['errors'][at:at] = errors
     def seed(sid, w, i):
         base = root/f'{sid}-w{i}'
-        return _step('seed', ['--pose', root/'pose.json', '--frame', w['seed'], '--job', f'{sid}-w{i}', '--length', w['end']-w['seed']+1,
+        return _step('seed', ['--pose', pose_for(w['seed']), '--frame', w['seed'], '--job', f'{sid}-w{i}', '--length', w['end']-w['seed']+1,
                               '--out', base.with_suffix('.obs.json'), '--evidence-dir', base.with_name(base.name+'-crops')])
     ahead = None  # (sid, window, receipt, error): the next shot's first window, seeded while the child tracks
     segments = scan['analysis_segments']; shown = segments[:max_shots]
     for order, segment in enumerate(shown):
         sid = segment['segment_id']; s0, s1 = segment['start_frame'], segment['end_frame']
+        if pending and covered(s1) is None:
+            report(pending); pending = None  # report the last window while this shot is still being posed
+        pose_for(s1)
         fps = scan['fps']
         entry = dict(segment_id=sid, frames=[s0, s1], seconds=[round(s0/fps, 2), round((s1+1)/fps, 2)], windows=[], skipped=[], errors=[])
         shots.append(entry)
@@ -371,7 +433,7 @@ def _run(video, detector, pose_model, checkpoint, out, max_shots=LOOK['max_shots
             # A cut moves this shot's next window, but the next shot always starts at its first frame (clip B: 39 of 42
             # windows): seed it while the child still tracks (25 s of waiting, 23 s of seeding).
             after = shown[order+1] if order+1 < len(shown) else None
-            if not ahead and after and after['end_frame'] > after['start_frame'] and remaining() >= 60:
+            if not ahead and after and after['end_frame'] > after['start_frame'] and covered(after['end_frame']) and remaining() >= 60:
                 first, _ = next_window(after, after['start_frame'], pose_frames, flagged)
                 if first:
                     try:
@@ -398,6 +460,12 @@ def _run(video, detector, pose_model, checkpoint, out, max_shots=LOOK['max_shots
         lines.append('')
     if pending:
         report(pending)
+    pose_for(scan['source_frame_count']-1)  # pose.json covers the whole clip, past --max-shots too
+    if posed[-1][2] != root/'pose.json':
+        with LOG.open('a') as log:
+            log.writelines(POSER.stdout)  # its receipt: the child writes pose.json after its last part
+        if POSER.wait() or not (root/'pose.json').is_file():
+            raise ValueError('pose step failed after its last part')
     if len(segments) > max_shots:
         lines.append(f'생략된 장면 {len(segments)-max_shots}개 (--max-shots {max_shots}).')
     head = ['# 영상 움직임 자세히 (요약은 look.md)', '',

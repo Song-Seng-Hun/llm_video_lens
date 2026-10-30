@@ -106,6 +106,13 @@ class Flags(unittest.TestCase):
         rows = [(0, [track()]), (5, [track(dx=300.)]), (6, [track('shot-0000/9', dx=600.)])]
         self.assertEqual(pose.flags(self.frames(rows))['frames'], [])
 
+    def test_parts_cut_at_a_shot_flag_as_the_whole(self):
+        # look's pose parts end at cuts: track IDs carry the shot, so no jump is read across the cut.
+        rows = [(0, [track()]), (1, [track(dx=300.)]), (2, [track('shot-0001/1', dx=900.)]), (3, [track('shot-0001/1', dx=1200.), track('shot-0001/2', dx=1250.)])]
+        whole = pose.flags(self.frames(rows))['frames']
+        self.assertEqual(pose.flags(self.frames(rows[:2]))['frames']+pose.flags(self.frames(rows[2:]))['frames'], whole)
+        self.assertEqual([r['frame'] for r in whole], [1, 3])
+
     def test_overlay_ranges_and_nearby_candidates(self):
         flags = dict(path='p', sha256='0'*64, native_range=[0, 99], params=pose.FLAGS,
                      frames=[dict(frame=n, people=3, overlapping_people=True, skeleton_jump=None) for n in (40, 41, 42)])

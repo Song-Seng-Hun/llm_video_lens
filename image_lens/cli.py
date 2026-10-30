@@ -191,15 +191,23 @@ def dispatch(command, arguments):
         ap.add_argument('--pose-model', help='default: models.json'); ap.add_argument('--out', required=True)
         ap.add_argument('--start', type=int, default=0); ap.add_argument('--end', type=int)
         ap.add_argument('--max-seconds', type=int, default=300)
+        ap.add_argument('--parts-dir', help="new directory for packets of whole-shot runs, each announced on stdout as it is written (look's pose child)")
         a = models(ap.parse_args(arguments), 'detector', 'pose_model')
         paths.confined(a.out, new=True)
+        part = None
+        if a.parts_dir:
+            parts = paths.confined(a.parts_dir, new=True)
+            def part(packet):
+                lo, hi = packet['native_range']
+                written = paths.write(parts/f'pose-f{lo}-f{hi}.json', json.dumps(packet, ensure_ascii=False, allow_nan=False, separators=(',', ':'))+'\n')
+                print(json.dumps(dict(pose_part=str(written), frames=[lo, hi])), flush=True)
         if not 1 <= a.max_seconds <= 1800:
             raise ValueError('wall budget must be 1..1800 seconds')
         import signal
         if hasattr(signal, 'SIGALRM'):
             signal.signal(signal.SIGALRM, lambda *_: (_ for _ in ()).throw(TimeoutError('pose wall budget exhausted')))
             signal.alarm(a.max_seconds)
-        result = pose.run(str(paths.confined(a.shots, exists=True)), a.detector, a.pose_model, a.start, a.end)
+        result = pose.run(str(paths.confined(a.shots, exists=True)), a.detector, a.pose_model, a.start, a.end, part)
         # Compact: indented keypoints are ~4x larger and would hit the 64 MiB read cap on long clips.
         output = paths.write(a.out, json.dumps(result, ensure_ascii=False, allow_nan=False, separators=(',', ':'))+'\n')
         return dict(status='written', output=str(output), frames=len(result['frames']), flagged_frames=len(result['flags']['frames']),
