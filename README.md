@@ -9,184 +9,94 @@
 
 # LLM Image Lens
 
-LLM이 영상을 볼 수 있게 해 주는 명령줄 도구입니다. 모든 답은 원본 프레임을 근거로 하며, 다시 확인할 수 있는 위치를 함께 남깁니다. 샷 경계를 찾고, 원본 프레임 몇 장을 모아 보고, 2D 화면에서 무엇이 얼마나 움직였는지를 확실한 만큼만 적은 보고서를 읽을 수 있습니다. 샷 요약(brief)과 목록(catalog)에는 원본 프레임·PTS 범위, 원본 해시, 빠진 구간, 원래 결과 파일의 위치가 들어갑니다. 자세(pose), 동작, 같은 사람인지 판별, 완급(easing)을 정확히 맞힌다고 주장하지는 않습니다.
+영상을 AI(LLM)가 읽을 수 있는 짧은 글과 확인용 그림으로 바꿔 주는 명령줄 도구입니다. 샷을 나누고, 샷마다 몸과 카메라가 어떻게 움직였는지 적으며, 모든 내용을 원본 프레임 번호로 되짚을 수 있게 남깁니다.
 
-기본 기능은 검증해 둔 엔진을 그대로 씁니다. 프레임 비교, 원본 전체를 기준으로 한 컷 검출, 점의 움직임 타이밍, 지정한 인물·특징 보고서, 원본 색 영역, 그리고 단색 배경에서 인물만 떼어 보는 검사(선택)입니다. 기본으로는 이미지를 **한 장도** 내보내지 않습니다. 원본 프레임은 요청해도 모두 합쳐 8장까지이고, 비교는 원본 2장과 차이를 보여 주는 그림 1장을 씁니다.
+## 이게 뭔가요
 
-> `docs/` 안의 자세한 문서는 영어입니다.
+사람이나 캐릭터가 나오는 영상을 AI 에이전트가 다룰 수 있게 정리해 주는 도구입니다. 영상 하나를 넣으면 샷(컷)마다 몸·팔·다리·카메라의 움직임을 짧은 글(`look.md`)로 적고, 확인용 그림을 함께 만듭니다. 결과 파일은 사람이 열어 읽어도 됩니다.
 
-## 설치 없이 실행
+확실하지 않은 부분은 지어내지 않습니다. 점을 놓친 구간은 "모름"으로 적고, 도구 스스로 불안하다고 본 구간은 맨 위 "먼저 확인할 곳"에 모읍니다.
 
-표준 라이브러리만 쓰는 명령은 Python 3.11 이상이 필요합니다. 디코딩·렌더링 명령에는 `requirements.txt`가 더 필요하며, 의존성·체크포인트·미디어는 들어 있지 않습니다. 추출(extraction)을 검증한 환경은 macOS arm64의 Python 3.12입니다. Windows에서의 핵심 동작과 설치한 wheel 실행은 검증되지 않았고, 실험적 추적(tracking)에는 POSIX 부모 감시(watchdog) 프로세스가 필요합니다.
+## 주요 기능
 
-저장소 안에서:
+- **한 번에 요약 (`look`)**: 영상 하나를 샷별 움직임 요약 `look.md`와 그림 자료로 바꿉니다. 결과 글은 한국어입니다.
+- **구간 질문 (`at`)**: "18~22초에 무슨 일이 있었지?"처럼 4초 이내 구간의 근거만 모아 줍니다.
+- **샷 나누기와 목록 (`scan`, `brief`, `catalog`)**: 컷 경계를 찾고, 샷마다 원본 프레임 범위와 빠진 구간을 담은 목록을 만듭니다.
+- **프레임 비교 (`compare`, `zoom`)**: 두 프레임의 차이를 그림으로 보거나, 짧은 구간을 촘촘한 프레임으로 봅니다.
+- **직접 점 찍기 (`grid`, `mark`)**: 소품이나 자세 모델이 모르는 부분에 직접 점을 찍고 이름을 붙여 추적합니다.
+- **닫힌 작업 공간**: 입력과 출력은 작업 공간 폴더 안에서만 읽고 씁니다. 덮어쓰기와 심볼릭 링크가 낀 경로는 거부합니다.
 
-```sh
-python -m image_lens --help
-python -m image_lens --workspace /path/to/workspace scan --video input.mp4 --out shots.json
-python -m image_lens --workspace /path/to/workspace brief --shots shots.json --out brief.json
-python -m image_lens --workspace /path/to/workspace catalog --shots shots.json --offset 0 --limit 8 --format markdown --out brief.md
-python -m image_lens --workspace /path/to/workspace compare --shots shots.json --frames 5,6 --evidence-dir comparison --out comparison.json
-```
+## 빠른 시작
 
-다른 폴더에서 실행할 때는(격리 모드 Python 포함) 실행 스크립트를 절대 경로로 부릅니다.
+1. Python 3.11 이상에서 의존성을 설치합니다. `look`은 자세 추정과 점 추적을 함께 쓰므로 두 묶음이 모두 필요합니다.
 
-```sh
-python -I /path/to/llm_image_lens/image_lens_cli.py --workspace /path/to/workspace brief --shots shots.json --out brief.json
-```
+   ```sh
+   pip install -r requirements-pose.txt -r requirements-tracking.txt
+   ```
 
-설치하면 `image-lens` 명령을 쓸 수 있습니다(선택). 추가 기능 묶음은 `.[core]`, `.[tracking]`, `.[pose]`입니다. 기본 설치에는 따로 필요한 의존성이 없고, 버전을 고정한 PySceneDetect 소스는 저장소에 이미 들어 있습니다. 공식 사용법은 공개 CLI이며, 엔진별 main은 내부용입니다.
+2. 모델 파일 세 개를 직접 준비합니다. 사람 검출(YOLOX HumanArt, ONNX), 전신 자세(RTMW 133 키포인트, ONNX), 점 추적(CoTracker 체크포인트)입니다. 저장소에 들어 있지 않고, 자동으로 내려받지도 않습니다.
+3. 작업 공간 폴더(기본값은 저장소 안의 `workspace/`)에 영상을 복사하고, `workspace/models.json`에 모델 경로를 적습니다.
 
-데이터와 출력의 상대 경로는 모두 작업 공간(workspace)을 기준으로 하며, 기본값은 `<repository>/workspace`입니다. 원본 영상은 그 안에 직접 복사해 두어야 합니다. 입력과 출력은 작업 공간 밖으로 나갈 수 없고, 심볼릭 링크가 낀 경로와 덮어쓰기는 거부합니다. 작업 공간 밖에서 읽을 수 있는 것은 체크포인트 파일 하나뿐입니다(선택). 작업 공간, 영상, 모델, 생성된 이미지와 결과는 Git이 무시합니다.
+   ```json
+   {"detector": "/models/yolox_humanart.onnx", "pose_model": "/models/rtmw133.onnx", "checkpoint": "/models/scaled_offline.pth"}
+   ```
 
-## 요약(brief) 읽기
+4. 저장소 폴더에서 실행합니다. 아래의 `W`는 작업 공간 폴더 경로입니다.
 
-`brief`와 `catalog`는 같은 제한된 스키마 `image-lens.brief/1`을 출력합니다. 기본으로 샷 8행을 돌려주고(최대 16행), `next_offset`과 생략된 개수로 페이지 나누기가 드러납니다. 원본 PTS 배열은 원시 스캔 위치(locator)에 그대로 둡니다. 검증된 요약을 내기 전에 원본 바이트와 현재 검출기 헬퍼·소스 고정값(pin)이 일치해야 합니다. 일부만 스캔한 원본은 일부라고 명시하고, 불완전한 디코드 패킷은 거부합니다. 해시 검사는 파일과 출처가 맞는지 확인할 뿐, 검출한 컷이 맞다는 것까지 보장하지는 않습니다.
+   ```sh
+   python -m image_lens --workspace W look --video clip.mp4 --out look-clip
+   ```
 
-선택 사항인 `--report report.json`은 지원되는 캐시된 움직임 보고서 중에서, 고정된 원본 트랙과 바인딩으로부터 정확한 표준(canonical) 스캔 기준으로 다시 계산할 수 있는 것만 더합니다. 없거나, 오래되었거나, 지원되지 않거나, 컷을 넘나드는 보고서는 `not_admitted`로 표시되고 그 구간은 알 수 없음으로 남습니다. 보고서 참조는 최대 8개입니다. brief는 LLM/API 호출, 네트워크, 이미지 생성, 원시 좌표 덤프, 모델 불러오기를 하지 않습니다. 보고서 안의 라벨은 믿을 수 없는 인용 데이터로 다룹니다.
+5. 결과 폴더의 `look.md`를 엽니다. 맨 위 "먼저 확인할 곳"부터 보세요.
 
-움직임을 알려면 샷마다 원본을 새로 보고 다시 추적해야 합니다. 프레임이 하나뿐인 샷은 살펴보기만 할 수 있습니다. 컷이나 디졸브를 놓칠 수 있으며, 컷이 검출되지 않았다고 해서 연속성이나 동일성이 증명되지는 않습니다. 클립 전체를 오프라인으로 추론한 좌표를 잘라 와서 샷 단위 추적이라고 부르지 마세요.
+## 사용 예
 
-## 새 작업(job)과 선택적 추적
+### 영상 하나를 요약해서 읽기
 
-[작업 계약](docs/jobs.md)을 보세요. `prepare`는 새 질의(query) 패킷과 표준 전체 원본 스캔을 받아 샷 단위 작업 하나를 검증하고, 바꿀 수 없는 새 고정본(freeze)을 만듭니다. 기본값으로는 검증만 허용합니다. `validate`는 원본 바이트, 질의, vendor·헬퍼 고정값, 디코드/PTS와 컷을 **Torch를 불러오지 않고**, 체크포인트 없이, 트랙을 만들지 않고 검사합니다. 핵심 디코드 의존성이 필요합니다.
+`look.md`는 추적한 구간마다 한 줄입니다. 한 줄에는 다음이 들어갑니다.
 
-```sh
-python -m image_lens --workspace /path/to/workspace prepare --queries queries.json --shots shots.json --job shot0 --out job.freeze.json
-python -m image_lens --workspace /path/to/workspace validate --queries queries.json --frozen job.freeze.json --job shot0 --out unused-tracks.json
-```
+- 샷 구도: 전신, 무릎 위, 상반신, 얼굴 클로즈업
+- 화면 전체(카메라)와 몸 중심의 움직임
+- 팔·다리 같은 부위가 몸을 기준으로 한 움직임과 속도. 예: "속도 9→5→3→1 px/f"
+- 점을 놓친 곳, 그림이 바뀐 곳, 같은 자세의 반복 같은 읽기 표시
 
-실험적 추론에는 `--allow-tracking`으로 따로 준비한 고정본, 명시적인 로컬 체크포인트, 고정된 실행 시간 예산이 필요합니다. 고정본 하나로는 한 번만 실행할 수 있고(모델을 불러오기 직전에 사용 처리), 실패해도 자동으로 다시 시도하지 않습니다. 예산 시간이 지나면 CLI 부모 프로세스가 자기 자식 프로세스 그룹을 종료하고 회수합니다. 내려받기는 일어나지 않습니다. CoTracker 소스와 체크포인트에는 원저작자의 비상업적 이용 조건이 붙어 있습니다. 이번 추출을 검증하면서 신경망 추론은 실행하지 않았습니다.
+함께 만들어지는 그림도 있습니다.
 
-```sh
-python -m image_lens --workspace /path/to/workspace prepare --queries queries.json --shots shots.json --job shot0 --allow-tracking --max-seconds 120 --out tracking.freeze.json
-python -m image_lens --workspace /path/to/workspace track --queries queries.json --frozen tracking.freeze.json --job shot0 --max-seconds 120 --checkpoint /path/to/scaled_offline.pth --out tracks.json
-```
+- `<window>-onion.jpg`: 첫 프레임과 마지막 프레임을 겹치고 움직임을 화살표로 그린 그림
+- `frame-sheet-N.jpg`: 영상 전체에서 고르게 뽑은 프레임 모음
+- `check-sheet-N.jpg`: "먼저 확인할 곳" 구간의 촘촘한 프레임
 
-관찰된 표면 트랙은 실제 엔진으로 골라서 분석할 수 있습니다.
+### 궁금한 구간만 묻기
 
-```sh
-python -m image_lens --workspace /path/to/workspace analyze --tracks tracks.json --shots shots.json --point surface0 --start 0 --end 30 --out timing.json
-python -m image_lens analyze --help
-```
-
-LLM이 읽을 보고서라면 `--report-bindings bindings.json --format markdown --trajectory-dir traj`를 붙이세요. 그러면 Markdown 앞부분에 굵은 획(stroke)이 나옵니다. 중앙값 필터를 거친 경로를 모서리와 멈춤에서 나눈 것으로, 가장 큰 단위의 절반 이상이면 주요(major) 획입니다. `traj/trajectory.png`에는 프레임 전체 기준의 경로(이른 쪽 파랑, 늦은 쪽 빨강), 획·타임라인 띠, 자르지 않은 프레임 최대 4장이 나옵니다. 같은 실행에서 외형 변화 후보도 나열합니다. 연속 프레임의 회색조 차이가 튀는 곳으로, `compare --frames a,b`로 확인할 대상입니다. 주요 획이 후보와 겹치면 표시해 둡니다. 잔상(echo)이나 다시 그리기 때문에 점이 튈 수 있기 때문입니다. 획은 `brief`에서 다시 계산되지만, 그림과 후보는 다시 계산되지 않습니다.
-
-## 명령 하나로: look
-
-`look`은 영상 하나를 샷별 짧은 움직임 요약으로 바꿔 새 디렉터리 하나에 모아 줍니다.
-
-```sh
-python -m image_lens --workspace W look --video clip.mp4 --out look-clip
-```
-
-모델 경로는 `<workspace>/models.json`([모델 경로](#모델-경로) 참고)에서 읽거나 `--detector`, `--pose-model`, `--checkpoint`로 줍니다. 정확한 기준값과 그 근거가 된 확인 결과는 [look 노트](docs/look-notes.md)(영어)에 있습니다.
-
-### 실행하는 일
-
-- `scan`, `pose`를 한 번 돌린 뒤, 샷마다 자세를 기준으로 `seed` / `prepare` / `track` / `bind` / `analyze`를 돌립니다. 기본은 처음 16개 샷이고, `--max-shots`로 256개까지 늘릴 수 있습니다.
-- 긴 샷(160프레임 넘음)은 여러 구간으로 나눕니다. 한 그룹의 점 중 절반 이상이 구간이 끝나기 한참 전에 멈추면 그림이 바뀐 것으로 보고, 바로 다음 프레임부터 새 구간을 시작합니다.
-- 한 프레임짜리 샷, 쓸 만한 자세 추적이 없는 샷, 너무 짧은 끝부분은 이유를 적고 건너뜁니다.
-- 중간에 실패한 단계는 기록만 하고 계속 진행합니다. 추적하지 못한 구간에는 "추적 결과 없음: 움직임 모름"이라고 씁니다.
-- `--max-seconds`는 단계 사이에서만 확인하므로, 한 단계만큼 시간을 넘길 수 있습니다.
-- 1920×1080보다 큰 영상은 먼저 `source-<w>x<h>.mp4`로 줄여서 씁니다. 이때 보고서의 px는 줄인 영상 기준입니다.
-
-### 결과 파일
-
-| 파일 | 내용 |
-|---|---|
-| `look.md` | 가장 먼저 읽을 파일입니다. 추적 구간마다 한 줄입니다. |
-| `look-full.md` | 그룹별 주요 움직임, 함께 움직인 점, 경고 수, 전체 보고서 링크. `focus --look <dir> --shot shot-0007`로 샷 하나만 볼 수 있습니다. |
-| `look.json`, `steps.log` | 같은 내용을 데이터로 담은 파일과, 단계마다 남긴 실행 기록입니다. |
-| `<window>-onion.jpg`, `onion-sheet-N.jpg`, `frame-sheet-N.jpg`, `check-sheet-N.jpg` | 그림 자료입니다(아래 참고). |
-
-### look.md 읽는 법
-
-맨 위의 **먼저 확인할 곳**에는 도구가 스스로 불안하다고 본 구간이 최대 네 곳 나옵니다. 사람 상자가 겹친 곳, 추적이나 포즈가 끊긴 곳, 포즈가 없어 글에 빠진 곳, 짧은 컷이 이어진 곳 같은 데이고, 각 구간을 `check-sheet-N.jpg`의 촘촘한 프레임으로 볼 수 있습니다. 여기 없는 곳도 틀릴 수 있습니다. 두 사람이 한 상자로 합쳐진 장면(Kaguya 18~22초)은 이 목록에 잡히지 않았으니, 프레임 시트도 함께 보세요.
-
-그 아래로 구간마다 한 줄이 샷 구도(전신, 무릎 위, 상반신, 얼굴 클로즈업)로 시작하고, 이어서 다음 내용이 나옵니다.
-
-- **전체**: 화면 전체(카메라)와 몸 중심이 어떻게 움직였는지 한 번만 말합니다.
-- **몸 기준**: 그 위에서 팔, 다리, 이름 없는 점이 각각 무엇을 했는지 몸 중심을 기준으로 말합니다. 방향이 꺾이면 "아래 → 위"처럼 나눠 쓰고, "몸 쪽으로/바깥으로"는 몸의 중심선에서 가까워지거나 멀어졌다는 뜻입니다. 왼쪽·오른쪽은 화면 기준입니다.
-- **속도**: 주요 움직임마다 시간 순서로 속도를 최대 다섯 개 붙입니다(예: "속도 9→5→3→1 px/f"). 완급은 이 숫자를 보고 판단하세요. 구간 첫 프레임에서 이미 움직이고 있었다면 시작 부분은 못 봤다고 적습니다.
-- **화면 전체**: 카메라가 24 px 이상 움직였을 때 나옵니다. 속도를 시간 순서로 붙이고, 갔다가 돌아온 움직임("오른쪽 80px까지 갔다 돌아옴")과 줌("줌 인 ×1.25")도 적습니다. 카메라를 따라 움직이기만 한 것은 빼고 씁니다. 프레임을 절반도 맞추지 못하면 "카메라 모름"이라고 적는데, 이때 화면 이동에는 카메라 움직임이 섞여 있을 수 있습니다.
-- **높이별 흐름**: 사람 영역을 위아래 다섯 칸으로 나눠 칸마다 얼마나 움직였는지 보여 줍니다. 이름 붙은 점이 없어도 되므로, 치마 속에서 내민 엉덩이나 소품의 움직임도 잡힙니다.
-- **많이 움직인 곳**(`move-a`…): 모양이 가장 많이 바뀐 곳에 자동으로 찍은 이름 없는 점입니다.
-
-줄을 읽는 방법이 달라지는 표시도 있습니다.
-
-- "전환": 그림이 바뀐 곳입니다. 두 프레임의 자세 차이만 적었고, 그 사이 움직임은 보지 못했습니다.
-- "f<N> 뒤로 점 k/n개 끊김": 점을 놓쳤습니다. 그 뒤는 멈춘 것이 아니라 모르는 것으로 읽으세요.
-- "골격 신뢰 낮음": 자세 골격이 이상해서 얼굴에만 이름을 붙이고 몸 기준 부분은 건너뛰었습니다. "(팔만)"은 상반신 샷이라 팔만 봤다는 뜻입니다.
-- "자세 A": 앞에서 나온 자세가 다시 나왔다는 뜻입니다. 처음 나올 때만 전부 적고, 반복될 때는 달라진 점만 적습니다.
-- 자세 이벤트: 손이 얼굴 근처에 있음(이마·눈/볼/입·턱), 어깨가 올라가고 내려감, "몸 돌림 후보"(몸을 돌렸을 수 있음), "대부분 안 보임: 멈춤 아님, 모름", "포즈 추적이 N프레임 끊김".
-- "사람 N명": 여러 사람이 나올 때 사람별 움직임, 넘어졌을 가능성, 닿았을 가능성, 박스가 겹친 곳을 적습니다.
-
-### 그림 자료
-
-- `<window>-onion.jpg`: 첫 프레임을 청록, 마지막 프레임을 빨강으로 겹치고, 칸별 이동을 화살표로 그립니다. 오른쪽 회색 칸에는 첫 프레임과 가장 다른 프레임을 보여 줘서, 갔다가 돌아온 움직임을 멈춘 것으로 착각하지 않게 합니다. 부위마다 대표 점의 위치를 프레임마다 흰 테두리 점으로 찍습니다(시작은 큰 원, 끝은 큰 네모). 점 간격이 넓으면 빠르고, 좁으면 느린 것입니다.
-- `onion-sheet-N.jpg`: 한 번 실행한 어니언 이미지를 시간 범위와 함께 모은 시트입니다. 추적하기엔 너무 짧은 구간은 "still" 한 장으로 넣고, 몸을 돌렸을 가능성이 가장 큰 구간 여섯 개는 다섯 프레임 띠로 넣습니다.
-- `frame-sheet-N.jpg`: 영상 전체에서 약 1.25초마다 한 장씩, 최대 96장을 고르게 뽑은 전체 프레임입니다.
-- `check-sheet-N.jpg`: "먼저 확인할 곳" 구간마다 한 장씩, 촘촘한 프레임을 시간 순서로 보여 줍니다.
-- `zoom --video <clip> --out <dir> --at 18-22`: 4초 이내 구간을 최대 두 곳까지 촘촘한 프레임으로 보여 줍니다. 읽는 쪽은 자기가 틀린 곳을 잘 골라내지 못하므로, 프레임 시트를 먼저 보세요.
-
-### 구간 하나 묻기: at
-
-"18~22초에 무슨 일이 있었지?"처럼 궁금한 구간이 생기면, 요약 전체를 다시 읽지 말고 그 구간만 물어보세요.
+요약 전체를 다시 읽지 말고 그 구간만 물어보세요. 구간은 4초 이내여야 합니다.
 
 ```bash
 python -m image_lens --workspace W at --look W/look-clip --span 18-22 --out W/at-18-22
 ```
 
-`at.md`에는 그 구간에 걸친 줄, 건너뛴 컷, 전환, "먼저 확인할 곳" 표시와 함께 열어 볼 그림 이름이 모입니다. `at-frames-1.jpg`는 그 구간의 촘촘한 프레임 12장입니다. 구간은 4초 이내여야 합니다. 질문은 읽는 쪽이 정하고, 도구는 그 구간의 근거만 모아 줍니다.
+`at.md`에 그 구간에 걸친 줄과 표시, 열어 볼 그림 이름이 모이고, `at-frames-1.jpg`에 촘촘한 프레임 12장이 담깁니다.
 
-### 자세 시드가 안 될 때: grid와 mark
+### 자세 모델이 모르는 부분 추적하기
 
-소품, 특이한 자세, 자세 모델이 이름을 모르는 부분은 에이전트가 직접 점을 찍고 이름을 붙일 수 있습니다.
+`grid`로 좌표 눈금을 그린 프레임을 보고, `mark`로 점을 찍어 추적합니다. 점은 최대 8개까지 찍을 수 있고, 이름은 ASCII로 붙입니다.
 
 ```bash
 python -m image_lens --workspace W grid --video V --frame 572 --box 100,250,1000,1000 --out W/grid-f572.jpg
 python -m image_lens --workspace W mark --video V --shots W/look/shots.json --frame 572 --end 599 --point hammer-stripe=430,680 --point eye=322,738 --checkpoint C --out W/mark-s19
 ```
 
-- `grid`는 원본 프레임 위에 좌표를 읽을 수 있는 눈금(확대 영역에서는 50 px, 그 밖에서는 100 px 간격)을 그립니다.
-- `mark`는 각 점을 15 px 안에서 가장 추적하기 좋은 모서리로 옮기고(`--no-snap`을 주면 그대로 둠), 점을 표시한 크롭을 근거로 저장한 뒤 추적해서 `mark.md`와 프레임별 좌표 파일 `mark.tracks.json`을 씁니다.
-- 이름은 ASCII로 최대 8개입니다. 해부학적으로 확인된 이름이 아니라 에이전트가 보고 붙인 이름입니다.
+## 현재 상태와 한계
 
-### 모델 경로
+- 검증한 환경은 macOS arm64의 Python 3.12입니다. Windows에서의 동작과 설치한 패키지(wheel) 실행은 검증되지 않았고, 점 추적에는 POSIX 환경이 필요합니다.
+- 자세, 동작, 같은 사람인지 판별, 완급(easing)을 정확히 맞힌다고 주장하지 않습니다. "먼저 확인할 곳"에 없는 구간도 틀릴 수 있으니 프레임 시트를 함께 보세요.
+- 모델 파일은 직접 준비해야 합니다. CoTracker 소스와 체크포인트에는 비상업적 이용 조건이 있고, 자세 모델 가중치의 라이선스는 확인되지 않았습니다.
+- 1920×1080보다 큰 영상은 줄여서 처리합니다. 이때 보고서의 px 값은 줄인 영상 기준입니다.
 
-`look`, `pose`, `mark`에서 모델 경로를 생략하면 `<workspace>/models.json`에서 읽습니다.
+## 더 보기
 
-```json
-{"detector": "/models/yolox_humanart.onnx", "pose_model": "/models/rtmw133.onnx", "checkpoint": "/models/scaled_offline.pth"}
-```
+자세한 문서는 영어입니다.
 
-명령줄에서 준 값이 우선합니다. 작업 공간은 Git에 올라가지 않으므로 기기마다 따로 둡니다.
-
-## 자세(pose)에서 전신 시드 만들기 (선택)
-
-`pose`는 표준 스캔에 로컬 전신 자세 모델을 돌립니다. YOLOX HumanArt 사람 박스, RTMW 133개 키포인트(rtmlib, ONNX Runtime CPU), 검출된 컷마다 초기화되는 ByteTrack ID를 씁니다. ONNX 파일 두 개는 사용자가 직접 준비하며 크기와 SHA256으로 고정합니다. 아무것도 내려받거나 포함하지 않으며, 가중치 라이선스는 확인되지 않았습니다. 같은 환경에 `requirements-pose.txt`를 설치하세요. 패킷은 자세 계층 자체를 믿기 어려운 프레임도 표시합니다. 사람 박스가 겹치는 경우(잔상 복사본, 잔영)와 한 트랙 안에서 몸 골격이 튀는 경우입니다.
-
-`seed`는 그 패킷의 한 프레임을 새 관찰 작업들로 바꿉니다. 12점 표면 계약에 맞도록 그룹마다 하나씩 만듭니다: `<job>-head`(코, 눈, 앞·위·옆 머리카락), `<job>-arms`, `<job>-legs`. 머리카락 점은 눈으로 세운 머리 좌표계(눈 사이 거리와, 코에서 멀어지는 위쪽 방향) 위의 기하 위치라서, 검출된 머리카락이 아니라 표면 점 후보입니다. 화면 밖 관절은 가장자리에 붙은 채로 돌아오기 때문에, 프레임 가장자리 근처 관절은 뺍니다. 시드마다 표시를 해 둔 원본 크롭이 고정된 시각 참조로 붙습니다. 추적하기 전에 꼭 보세요. `bind`는 추적이 끝난 작업 하나의 보고서 바인딩을 씁니다.
-
-```sh
-python -m image_lens --workspace W pose --shots shots.json --detector /models/yolox_humanart.onnx --pose-model /models/rtmw133.onnx --out pose.json
-python -m image_lens --workspace W seed --pose pose.json --frame 215 --job s7 --out s7.obs.json --evidence-dir s7-crops
-# s7-head, s7-arms, s7-legs 를 각각 prepare/track 한 다음:
-python -m image_lens --workspace W bind --queries s7.obs.json --tracks s7-head.tracks.json --job s7-head --out s7-head.bindings.json
-python -m image_lens --workspace W analyze --tracks s7-head.tracks.json --shots shots.json --report-bindings s7-head.bindings.json --start 215 --end 307 --format markdown --trajectory-dir s7-head-traj --pose pose.json --out s7-head.md
-```
-
-`--pose`를 주면 궤적 그림에 자세가 불안한 프레임이 표시되고(타임라인의 주황색), 그 근처의 변화 후보에 태그가 붙습니다. 경고는 묶여서, 후보나 자세 불안 구간과 겹치는 큰 획을 한 줄에 모두 적습니다. 점이 둘보다 많으면 주요 획에만 라벨을 달고, Markdown 앞부분에 점마다 한 줄 요약과 "함께 움직임" 줄(방향이 같고 시간이 겹치며 크기가 비슷한 여러 점의 주요 획)이 나옵니다. 점별 속도 구간, 단계, 길이 비교는 JSON에 남습니다. 눈동자는 모델링하지 않으며, 눈 점은 그려진 눈 영역을 따라갑니다.
-
-분석 도움말에는 검토 대상 고르기, 명시적인 특징 바인딩, 원본 색 영역 보고서, 선택적인 전경 검사도 있습니다. 해석하기 전에 [한계](docs/limitations.md)를 읽어 주세요.
-
-## 검증과 출처
-
-```sh
-python -B -m unittest discover -s tests -v
-# 선택: 핵심 의존성 스모크 테스트 (새 출력 폴더로)
-python -I -B tests/smoke_runtime.py --workspace workspace/NEW_SMOKE_DIRECTORY
-```
-
-[검증](docs/verification.md)은 테스트한 CLI·안전장치와, 실행하지 않은 추론 및 플랫폼 범위를 나눠 적습니다. [출처와 라이선스](docs/provenance.md)에는 원본 해시, 상위 저장소 고정값, 제한적 로딩 패치, 직접 작성한 코드의 라이선스 경계가 있습니다. 과거 실험 미디어, 픽스처, 기록, 결과, 버린 자동 분류기는 선택된 실행 경로가 아닙니다.
+- [전체 안내](docs/guide.md): 모든 명령과 옵션, `look.md` 읽는 법 전체, 결과 파일 목록, brief 형식, 작업(job)과 추적, 자세 시드
+- [look 노트](docs/look-notes.md): `look`의 기준값과 그 근거가 된 확인 기록
+- [한계](docs/limitations.md) · [검증](docs/verification.md) · [출처와 라이선스](docs/provenance.md) · [작업 계약](docs/jobs.md)
+- 테스트 실행: `python -B -m unittest discover -s tests -v`
