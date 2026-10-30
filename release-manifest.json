@@ -1,6 +1,6 @@
 {
   "schema": "image-lens.source-release/1",
-  "date_kst": "2026-10-29",
+  "date_kst": "2026-10-30",
   "source_only": true,
   "authored_code_license": "not granted by this extraction; preserve owner decision",
   "vendor_licenses": {
@@ -19,8 +19,8 @@
     "historical experiment outputs"
   ],
   "manifest_self_excluded": true,
-  "file_count": 100,
-  "total_bytes": 984294,
+  "file_count": 105,
+  "total_bytes": 1093450,
   "files": [
     {
       "path": ".gitattributes",
@@ -33,9 +33,29 @@
       "sha256": "0e19822010301a9f3a5880d71ce22f16a6461f6bf086242da94645fb26be8af0"
     },
     {
+      "path": "README.en.md",
+      "bytes": 10439,
+      "sha256": "cc391bb48e2ce8a4f71417d07ed11d417dccf7ef0406ded1c46261c1e94fc20f"
+    },
+    {
+      "path": "README.ja.md",
+      "bytes": 14121,
+      "sha256": "6eebdd768d4f3a24383a1a490a30cea0d2da88745f89858222ba2f1d2e6f4f2c"
+    },
+    {
       "path": "README.md",
-      "bytes": 9880,
-      "sha256": "0dc5e0a9e352cf6d4c2eb5aeb022f4162e33b52613f4ba821b32340f26de67d9"
+      "bytes": 12757,
+      "sha256": "6e82daa505431bece57fc2d426f839a0b62997fb0e146cb947ff4f2d04c03978"
+    },
+    {
+      "path": "assets/banner-dark.svg",
+      "bytes": 28585,
+      "sha256": "6e21b1c148e7774f4e698df6f15941a7269cfe4918d98ac5165dc4a186bd3d0c"
+    },
+    {
+      "path": "assets/banner-light.svg",
+      "bytes": 28584,
+      "sha256": "4c2abc36a5e23ea59c90866f3c2c7c2a638fd2e9794e9b8cf6f65a9173792796"
     },
     {
       "path": "docs/import-provenance.json",
@@ -521,6 +541,11 @@
       "path": "tests/test_pose.py",
       "bytes": 7631,
       "sha256": "57c5766aaf083ed3c34359aaf8f7d228105565d99bac289381252e0dbd06e07b"
+    },
+    {
+      "path": "tools/build_banner.py",
+      "bytes": 24550,
+      "sha256": "273a65b56c1778445659cf8d7f7874396326a60f33eeb7eae658d25e273d4938"
     }
   ]
 }

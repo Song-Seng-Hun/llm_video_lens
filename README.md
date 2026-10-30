@@ -1,5 +1,12 @@
 <p align="center"><b>한국어</b> · <a href="README.en.md">English</a> · <a href="README.ja.md">日本語</a></p>
 
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="assets/banner-dark.svg">
+    <img src="assets/banner-light.svg" width="640" alt="픽셀아트 배너. 돋보기가 컷이 하나 있는 필름 띠의 여덟 프레임을 차례로 읽으면, 프레임마다 자세 키포인트와 파랑에서 빨강으로 변하는 추적 점이 찍히고, Claude가 BRIEF에 한 줄씩 적으며, TRACK 패널에 컷에서 끊긴 점의 경로가 그려집니다.">
+  </picture>
+</p>
+
 # LLM Image Lens
 
 LLM이 영상을 살펴볼 수 있게 해 주는, 원본에 묶인(source-bound) 영상 검사 CLI입니다. 샷 경계를 찾고, 원본 프레임 몇 장을 모은 작은 묶음(contact)을 요청하고, 보수적인 2D 표면 움직임 보고서를 읽을 수 있습니다. 이번 릴리스에서 제한적으로 나아진 점은 간결한 샷 요약(brief)과 목록(catalog)입니다. 원본 프레임/PTS 범위, 원본 해시, 빠진 구간, 원시 산출물의 정확한 위치(locator)를 담습니다. 자세(pose), 동작, 동일인 판별, 이징(easing)의 정확도가 나아졌다고 주장하지는 않습니다.

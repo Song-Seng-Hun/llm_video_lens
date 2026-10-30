@@ -1,5 +1,12 @@
 <p align="center"><a href="README.md">한국어</a> · <b>English</b> · <a href="README.ja.md">日本語</a></p>
 
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="assets/banner-dark.svg">
+    <img src="assets/banner-light.svg" width="640" alt="Pixel-art banner: a lens reads the eight frames of a film strip with one cut; each frame gets pose keypoints and a tracked point that turns from blue to red, Claude adds a line to the BRIEF, and the TRACK panel draws the point's path, broken at the cut.">
+  </picture>
+</p>
+
 # LLM Image Lens
 
 A source-bound video inspection CLI for an LLM: locate shot boundaries, request a small original-frame contact, and read conservative 2D surface-motion reports. The bounded improvement in this release is a compact shot brief/catalog, with native frame/PTS ranges, source hashes, missing coverage and exact raw-artifact locators. No pose, action, identity or easing accuracy improvement is claimed.

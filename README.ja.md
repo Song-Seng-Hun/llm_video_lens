@@ -1,5 +1,12 @@
 <p align="center"><a href="README.md">한국어</a> · <a href="README.en.md">English</a> · <b>日本語</b></p>
 
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="assets/banner-dark.svg">
+    <img src="assets/banner-light.svg" width="640" alt="ピクセルアートのバナー。虫めがねがカットをひとつ含むフィルムの 8 フレームを順に読むと、各フレームに姿勢のキーポイントと青から赤へ変わる追跡点が付き、Claude が BRIEF に 1 行ずつ書き、TRACK パネルにカットで途切れた点の経路が描かれます。">
+  </picture>
+</p>
+
 # LLM Image Lens
 
 LLM が動画を確かめられるようにする、元データに結び付いた（source-bound）動画検査 CLI です。ショット境界を見つけ、元フレーム数枚の小さなまとめ（contact）を要求し、控えめな 2D 表面の動きレポートを読むことができます。今回のリリースで限定的に改善したのは、簡潔なショット要約（brief）と一覧（catalog）です。元のフレーム／PTS 範囲、元データのハッシュ、欠けている区間、生の成果物の正確な位置（locator）を含みます。姿勢（pose）、動作、同一人物の判定、イージング（easing）の精度が上がったとは主張しません。
