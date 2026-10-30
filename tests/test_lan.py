@@ -143,6 +143,9 @@ class Lan(unittest.TestCase):
         try:
             self.assertEqual(again.jobs['a'*32]['error']['code'], 'interrupted')
             self.assertNotIn('b'*32, again.jobs); self.assertFalse(old_look.exists())
+            # An `at` lock goes with its job.
+            again.jobs['c'*32] = dict(id='c'*32, state='done', finished=1.); again.at_locks[('c'*32, '1-3')] = object()
+            again.cleanup(); self.assertEqual(again.at_locks, {})
         finally:
             again.close()
             with self.app.lock:
