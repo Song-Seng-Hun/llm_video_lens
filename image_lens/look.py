@@ -241,9 +241,11 @@ def run(video, detector, pose_model, checkpoint, out, max_shots=LOOK['max_shots'
             except Exception as error:  # OpenCV raises its own error type; a missing estimate only disables the filter
                 frame_motion = None; entry['errors'].append(dict(window=w, step='camera', error=str(error)[:300]))
             cam = camera.between(frame_motion, w['seed'], end)
-            done['camera'] = dict(net=cam, frames=len(frame_motion or {}))
-            if cam and math.hypot(*cam) >= motion_report.STROKE['major_min_px']:
-                lines.append(f"  - 화면 전체: {motion_report.KO[motion_report.direction(*cam)]} {math.hypot(*cam):.0f}px (카메라·배경 이동 추정; 이것만 따라간 이동은 아래에서 뺌)")
+            done['camera'] = camera.describe(frame_motion, w['seed'], end, motion_report.STROKE['major_min_px'])
+            from image_lens import digest
+            camera_text = digest.camera(done['camera'], fps)
+            if camera_text:
+                lines.append(f"  - 화면 전체: {camera_text} (카메라·배경 이동 추정; 카메라만 따라간 이동은 아래에서 뺌)")
             # Move candidates: report one per group that moved together (see onion.parts); the rest stay in the tracks file.
             from image_lens import onion
             for k, (name, group, stem, tracks) in enumerate(tracked):
@@ -358,7 +360,14 @@ def run(video, detector, pose_model, checkpoint, out, max_shots=LOOK['max_shots'
         if label:
             done['motif'] = label
     record = dict(schema='image-lens.look/1', source_video=str(source), source_sha256=scan['source_sha256'], params=LOOK,
-                  max_shots=max_shots, scaled=scaled, onion_sheets=sheets, frame_sheets=frame_sheets, errors=errors, elapsed_seconds=round(time.monotonic()-started, 1), shots=shots)
+                  max_shots=max_shots, scaled=scaled, onion_sheets=sheets, frame_sheets=frame_sheets, errors=errors, shots=shots)
+    from image_lens import check
+    record['check'] = check.spans(record, fps)
+    try:
+        check.sheets(source, root, record['check'])
+    except Exception as error:  # OpenCV raises its own error type; the sheets are optional
+        errors.append(dict(step='check_sheets', error=str(error)[:300]))
+    record['elapsed_seconds'] = round(time.monotonic()-started, 1)
     paths.write_json(root/'look.json', record)
     from image_lens import digest
     look_md = paths.write(root/'look.md', digest.markdown(record, scan, 'look-full.md'))

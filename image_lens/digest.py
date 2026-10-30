@@ -123,15 +123,40 @@ def _differences(done, first):
     return out
 
 
+def camera(cam, fps):
+    """The whole-frame motion as one phrase, or None when it did not move."""
+    if not cam:
+        return None
+    least = motion_report.STROKE['major_min_px']
+    net = cam.get('net')
+    if 'known' not in cam:  # look.json from before camera.describe: the net shift only
+        return f"카메라 {_dir(motion_report.direction(*net))} {math.hypot(*net):.0f}px" if net and math.hypot(*net) >= least else None
+    if cam.get('unknown'):
+        return f"카메라 모름({100*cam['known']:.0f}%만 맞춤)"
+    parts = []
+    if net and math.hypot(*net) >= least:
+        parts.append(f"카메라 {_dir(motion_report.direction(*net))} {math.hypot(*net):.0f}px"
+                     + (f"({motion_report.speed_text(cam['speeds'])})" if cam.get('speeds') else ''))
+    if cam.get('back'):
+        b = cam['back']
+        parts.append(f"카메라 {_dir(motion_report.direction(b['dx'], b['dy']))} {math.hypot(b['dx'], b['dy']):.0f}px까지 갔다 돌아옴({b['frame']/fps:.2f}s)")
+    if cam.get('zoom'):
+        parts.append(('줌 인' if cam['zoom'] > 1 else '줌 아웃') + f" ×{cam['zoom']:.2f}")
+    elif cam.get('zoom_back'):
+        z = cam['zoom_back']
+        parts.append(('줌 인' if z['scale'] > 1 else '줌 아웃') + f" ×{z['scale']:.2f}까지 갔다 돌아옴({z['frame']/fps:.2f}s)")
+    if parts and cam.get('until'):
+        parts[-1] += f" (f{cam['until']}까지만 맞춤)"
+    return ', '.join(parts) or None
+
+
 def window_line(done, fps, first=None):
     """One window. With `first` (the first window of the same repeated pose) only the differences are written."""
     w = done['window']; end = done.get('cut_after', w['end'])
     fields = [f"{w['seed']/fps:.2f}–{(end+1)/fps:.2f}s f{w['seed']}..{end}"]
     if done.get('framing'):
         fields.append(body_motion.FRAMING_KO[done['framing']] + (' (팔만)' if done.get('scope') == 'upper' else ''))
-    cam = (done.get('camera') or {}).get('net')
-    camera_text = f"카메라 {_dir(motion_report.direction(*cam))} {math.hypot(*cam):.0f}px" \
-        if cam and math.hypot(*cam) >= motion_report.STROKE['major_min_px'] else None
+    camera_text = camera(done.get('camera'), fps)
     if first is not None:
         fw = first['window']
         diff = _differences(done, first)
@@ -270,6 +295,7 @@ def markdown(record, scan, full_name):
            '"(속도 9→5→1 px/f)"는 그 이동을 시간 순서로 나눈 프레임당 속도(앞이 크면 느려짐, 뒤가 크면 빨라짐; 몸 기준은 몸 중심을 뺀 속도). '
            '"높이별"은 사람 상자를 위→아래 5칸으로 나눈 이동(px, 0=8px 미만). 골격 신뢰가 낮으면 팔다리 이름 없이 "화면" 이동만. '
            '"자세 A"는 처음과 끝 그림이 같은 구간이 다시 나온 것: 반복은 처음과 다른 점만 쓴다. '
+           '"카메라 모름"이면 화면 이동에 카메라 움직임이 섞였을 수 있다. '
            '어깨는 엉덩이(없으면 눈) 기준 높이 변화, 숫자는 어깨 폭 단위. 어깨 폭은 눈 사이 거리 기준: 넓어짐=가슴 폄·카메라 쪽으로 돎, 좁아짐=웅크림·옆으로 돎. 시간 다음 칸은 구도(전신/무릎 위/상반신/얼굴 클로즈업, 포즈 관절이 화면 안에 있는지로 판단): 상반신·클로즈업이면 사람 상자가 화면 아래에서 잘려서 '
            '높이별 아래 칸은 다리가 아니라 가슴·손이나 얼굴 아래쪽이고, "(팔만)"은 엉덩이 없이 어깨로 팔만 이름 붙였다는 뜻.',
            f"자세히: `image_lens focus --look <이 폴더> --shot <shot-id>` (또는 {full_name}). 점 이름·부위는 미검증, 수치는 원본 비교 전 후보.", '']
@@ -283,6 +309,8 @@ def markdown(record, scan, full_name):
     if record.get('frame_sheets'):
         out.insert(-1, f"전체 화면 모음: {', '.join(record['frame_sheets'])} (전 구간 균등 추출, 최대 {zoom.ZOOM['max_overview']}장, 장마다 시간 표시; 사이에 빠진 빠른 동작은 여기 안 나옴: "
                        '사람끼리 하는 동작(당기기·기대기·찌르기)과 넘어짐은 포즈 상자가 합쳐져 글에 안 나오니 여기서 본다.)')
+    from image_lens import check
+    out += check.lines(record.get('check'))
     windows = [d for s in record['shots'] for d in s['windows']]
     seen = {}
     for d in windows:

@@ -5,7 +5,7 @@ from pathlib import Path
 import sys
 from image_lens import paths
 
-COMMANDS = ('look', 'scan', 'compare', 'brief', 'catalog', 'pose', 'seed', 'bind', 'prepare', 'validate', 'track', 'analyze', 'grid', 'mark', 'focus', 'zoom')
+COMMANDS = ('look', 'scan', 'compare', 'brief', 'catalog', 'pose', 'seed', 'bind', 'prepare', 'validate', 'track', 'analyze', 'grid', 'mark', 'focus', 'zoom', 'at')
 
 
 def parser(command, description):
@@ -166,6 +166,13 @@ def dispatch(command, arguments):
         ap.add_argument('--even', action='store_true', help='control: 24 frames spread evenly over the clip, as many as two full --at spans')
         a = ap.parse_args(arguments)
         return zoom.run(a.video, a.out, a.at, a.even)
+    if command == 'at':
+        from image_lens import check
+        ap = parser(command, 'Everything a look run has on one span the reader asks about, with dense frames of the span.')
+        ap.add_argument('--look', required=True, help='look output directory'); ap.add_argument('--span', required=True, help='start-end seconds, at most 4 s')
+        ap.add_argument('--out', required=True, help='new output directory')
+        a = ap.parse_args(arguments)
+        return check.at(a.look, a.span, a.out)
     if command == 'look':
         from image_lens import look
         ap = parser(command, 'One-command look: scan, pose, pose-seeded tracking per shot window, one short look.md.')
