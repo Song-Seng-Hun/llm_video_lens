@@ -308,7 +308,7 @@ def markdown(record, scan, full_name):
                        '손 모양(하트·브이)처럼 글에 안 나오는 동작은 그림에서 본다.')
     if record.get('frame_sheets'):
         out.insert(-1, f"전체 화면 모음: {', '.join(record['frame_sheets'])} (전 구간 균등 추출, 최대 {zoom.ZOOM['max_overview']}장, 장마다 시간 표시; 사이에 빠진 빠른 동작은 여기 안 나옴: "
-                       '사람끼리 하는 동작(당기기·기대기·찌르기)과 넘어짐은 포즈 상자가 합쳐져 글에 안 나오니 여기서 본다.)')
+                       '사람끼리 하는 동작(당기기·기대기·찌르기)과 넘어짐은 포즈 상자가 합쳐지면 글에 안 나오거나 엉뚱한 사람에게 붙으니 여기서 본다.)')
     from image_lens import check
     out += check.lines(record.get('check'))
     windows = [d for s in record['shots'] for d in s['windows']]

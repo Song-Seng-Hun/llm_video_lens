@@ -1,8 +1,8 @@
 """Where the text is most likely wrong, so the reader looks there first. A reader does not pick the spans it got wrong
 (clip D 18-22 s, a pull and a fall in one merged pose box, was written confidently as an arm around the shoulder and
-not chosen for zoom), so the tool ranks its own warning signs and shows those spans as dense frames. It does not catch
-that case: the merged box reads as one person with ordinary warnings, ranked below the top four on the existing run,
-so frame-sheet-N.jpg stays the guard against it.
+not chosen for zoom), so the tool ranks its own warning signs and shows those spans as dense frames. Since pose.py
+splits merged boxes, that window reads as two people with a fall candidate, but it still scores 6 and is not in the
+top four, so frame-sheet-N.jpg stays the guard against it.
 `at` gives everything the look has on one span the reader asks about."""
 from image_lens import zoom
 

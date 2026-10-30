@@ -11,6 +11,12 @@ PARAMS = dict(det_score=.10, det_nms=.45, det_input=[640, 640], pose_input=[192,
               lost_track_buffer=30, minimum_matching_threshold=.8, tracker_reset='every canonical shot',
               max_frames=9000, keypoint_schema='coco133')
 FLAGS = dict(overlap_iou=.10, jump_diagonals=.15, min_score=.30)
+# The detector (NMS baked into the ONNX) returns one box for two people pressed together. A box wider than tall is posed
+# again as a left and a right crop: two confident heads far apart mean two people, and the crops replace the box.
+# Each head's eye distance must be a face-sized share of the box: on a clip B close-up of one face (0.05 of the box)
+# the two crops found the two eyes as two heads; real pairs were 0.08 or more. Fit on clip D 18-22 s, clip A's
+# stacked copies and that one close-up.
+SPLIT = dict(min_detection=.30, crop=.60, head_score=.45, head_gap=.35, min_eyes=.06)
 SEED = dict(min_score=.30, max_frames=160, border_px=32, uncertainty_px=(8., 24.))
 BODY = dict(nose=0, eye_l=1, eye_r=2, ear_l=3, ear_r=4, shoulder_l=5, shoulder_r=6, elbow_l=7, elbow_r=8,
             wrist_l=9, wrist_r=10, hip_l=11, hip_r=12, knee_l=13, knee_r=14, ankle_l=15, ankle_r=16)
@@ -118,11 +124,12 @@ def run(shots, detector, pose_model, start=0, end=None):
                 keypoints = np.empty((0, 133, 2), np.float32); scores = np.empty((0, 133), np.float32)
             if keypoints.shape != (len(boxes), 133, 2) or scores.shape != (len(boxes), 133):
                 raise ValueError('unexpected pose shape')
+            boxes, conf, keypoints, scores, split = _split(image, boxes, conf, keypoints, scores, pose)
             if not all(np.isfinite(a).all() for a in (boxes, conf, keypoints, scores)):
                 raise ValueError('nonfinite model output')
             tracks = tracker.update_with_detections(supervision.Detections(
                 xyxy=boxes, confidence=conf, class_id=np.zeros(len(boxes), int), data=dict(keypoints=keypoints, scores=scores)))
-            frames.append(dict(frame=n, pts_seconds=scan['native_pts_seconds'][n], segment_id=segment, detections=len(boxes), tracks=[
+            frames.append(dict(frame=n, pts_seconds=scan['native_pts_seconds'][n], segment_id=segment, detections=len(boxes)-split, split_boxes=split, tracks=[
                 dict(track_id=f'{segment}/{int(tracks.tracker_id[j])}', bbox=[round(float(v), 2) for v in tracks.xyxy[j]],
                      detection_score=round(float(tracks.confidence[j]), 4),
                      keypoints=[[round(float(x), 2), round(float(y), 2)] for x, y in tracks.data['keypoints'][j]],
@@ -132,12 +139,35 @@ def run(shots, detector, pose_model, start=0, end=None):
     return dict(schema='image-lens.pose/1', source_video=str(video), source_sha256=scan['source_sha256'],
                 width=scan['width'], height=scan['height'], fps=fps, native_range=[start, end],
                 canonical_shots=dict(path=str(scan_path), sha256=paths.sha(scan_path)),
-                models={k: dict(path=str(v), sha256=MODELS[k][1]) for k, v in models.items()}, params=PARAMS,
+                models={k: dict(path=str(v), sha256=MODELS[k][1]) for k, v in models.items()}, params=dict(PARAMS, split=SPLIT),
                 runtime=dict(onnxruntime=onnxruntime.__version__, supervision=supervision.__version__, opencv=cv2.__version__),
                 pose_module_sha256=paths.sha(__file__), elapsed_seconds=round(time.monotonic()-started, 3),
                 flags=flags(frames), frames=frames,
                 limitations=['human-trained model on drawn characters: face/hand points are rough; hair and pupils are not modelled',
-                             'overlapping copies (echo, afterimage) can merge into one wrong skeleton without any flag'])
+                             'overlapping copies (echo, afterimage) can merge into one wrong skeleton without any flag',
+                             'a merged box is split only in two, left and right, when both crops find a head; split skeletons see half a box'])
+
+
+def _split(image, boxes, conf, keypoints, scores, pose):
+    """Replace each merged two-person box by its left and right crops; returns the arrays and how many boxes were split."""
+    import numpy as np
+    head = [BODY['nose'], BODY['eye_l'], BODY['eye_r']]
+    out = []; split = 0
+    for j, (x0, y0, x1, y1) in enumerate(boxes):
+        w = x1-x0
+        if conf[j] >= SPLIT['min_detection'] and w > y1-y0:
+            crops = np.array([[x0, y0, x0+SPLIT['crop']*w, y1], [x1-SPLIT['crop']*w, y0, x1, y1]], np.float32)
+            k, s = pose(image, bboxes=crops)
+            if (k.shape == (2, 133, 2) and min(s[0][head].min(), s[1][head].min()) >= SPLIT['head_score']
+                    and k[1][BODY['nose']][0]-k[0][BODY['nose']][0] >= SPLIT['head_gap']*w
+                    and min(math.dist(k[i][BODY['eye_l']], k[i][BODY['eye_r']]) for i in (0, 1)) >= SPLIT['min_eyes']*w):
+                out += [(crops[i], conf[j], k[i], s[i]) for i in (0, 1)]; split += 1
+                continue
+        out.append((boxes[j], conf[j], keypoints[j], scores[j]))
+    if not split:
+        return boxes, conf, keypoints, scores, 0
+    return (np.array([o[0] for o in out], np.float32), np.array([o[1] for o in out], np.float32),
+            np.array([o[2] for o in out], np.float32), np.array([o[3] for o in out], np.float32), split)
 
 
 def _iou(a, b):
