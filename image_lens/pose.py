@@ -6,10 +6,10 @@ from pathlib import Path
 from image_lens import paths, shot_boundaries
 
 MODELS = dict(detector=(101400344, '3dea6513388889f0fff4b77bf7a26013600321b9eb9ceb0e9a400a82572f5f23'),
-              pose=(228708578, '9a9bc17c13ff0a1e37507f45a037a21bc410cd08374b0e664c57d0080843aa58'))
-PARAMS = dict(det_score=.10, det_nms=.45, det_input=[640, 640], pose_input=[192, 256], track_activation=.25,
+              pose=(229320930, 'bd033156e5104c4f5d2edfe0453e02661e30a2f3da453ec93c8764d561b83054'))
+PARAMS = dict(det_score=.10, det_nms=.45, det_input=[640, 640], pose_input=[288, 384], track_activation=.25,
               lost_track_buffer=30, minimum_matching_threshold=.8, tracker_reset='every canonical shot',
-              max_frames=9000, keypoint_schema='coco133')
+              max_frames=9000, keypoint_schema='coco133', pose_score_scale=6.2)
 FLAGS = dict(overlap_iou=.10, jump_diagonals=.15, min_score=.30)
 # The detector (NMS baked into the ONNX) returns one box for two people pressed together. A box wider than tall is posed
 # again as a left and a right crop: two confident heads far apart mean two people, and the crops replace the box.
@@ -109,12 +109,17 @@ def run(shots, detector, pose_model, start=0, end=None, part=None):
     det.session = onnxruntime.InferenceSession(str(models['detector']), providers=[
         ('CoreMLExecutionProvider', dict(ModelFormat='MLProgram', RequireStaticInputShapes='1', ModelCacheDirectory=_coreml_cache('detector'))),
         'CPUExecutionProvider'])
-    pose = RTMPose(str(models['pose']), model_input_size=tuple(PARAMS['pose_input']), to_openpose=False, backend='onnxruntime', device='cpu')
-    pose.session = onnxruntime.InferenceSession(str(models['pose']), providers=[
+    estimator = RTMPose(str(models['pose']), model_input_size=tuple(PARAMS['pose_input']), to_openpose=False, backend='onnxruntime', device='cpu')
+    estimator.session = onnxruntime.InferenceSession(str(models['pose']), providers=[
         ('CoreMLExecutionProvider', dict(ModelCacheDirectory=_coreml_cache('pose'))), 'CPUExecutionProvider'])
     # Pose on CoreML (29 -> 8 ms a crop, keypoints within 0.01).
-    if any(m.session.get_providers() != ['CoreMLExecutionProvider', 'CPUExecutionProvider'] for m in (det, pose)):
+    if any(m.session.get_providers() != ['CoreMLExecutionProvider', 'CPUExecutionProvider'] for m in (det, estimator)):
         raise ValueError('unexpected execution provider')
+    # RTMW-l 384 scores run about 6.2x the earlier RTMW 256x192 ones at every quantile (seven clips, 90k body joints), so they
+    # are divided back to the 0..1 scale every score threshold was calibrated on.
+    def pose(image, bboxes):
+        k, s = estimator(image, bboxes=bboxes)
+        return k, s/PARAMS['pose_score_scale']
     segments = {n: s['segment_id'] for s in scan['analysis_segments'] for n in range(s['start_frame'], s['end_frame']+1)}
     fps = scan['fps']; frames = []; tracker = None; segment = None; parted = 0
     def packet(rows):
