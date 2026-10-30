@@ -19,8 +19,8 @@
     "historical experiment outputs"
   ],
   "manifest_self_excluded": true,
-  "file_count": 113,
-  "total_bytes": 1140009,
+  "file_count": 115,
+  "total_bytes": 1147453,
   "files": [
     {
       "path": ".gitattributes",
@@ -34,8 +34,8 @@
     },
     {
       "path": "README.md",
-      "bytes": 22033,
-      "sha256": "0bc7a4c6bcbb3ec87be9aa32d34448aeff568be48e3d406e39209a436aca9bc1"
+      "bytes": 22618,
+      "sha256": "188cb900c8f8ddbe5d7cd85d9f4bc44ea2a70b43fc3955d14db3342ffa5dc339"
     },
     {
       "path": "docs/import-provenance.json",
@@ -104,8 +104,8 @@
     },
     {
       "path": "image_lens/cli.py",
-      "bytes": 18396,
-      "sha256": "ed2d57578ea595a77168fc1255dcba1b4c96c63bc7f0d9dc5088dcf9333f4bc9"
+      "bytes": 19063,
+      "sha256": "f1073b2b9fc0b75835cbbff9296f3af325c97f2fc4619017facec278270120c7"
     },
     {
       "path": "image_lens/digest.py",
@@ -513,6 +513,11 @@
       "sha256": "decb9ea9b4211f089a04a41867f09de46e5bd697ba25251db9dffdbf5089fbea"
     },
     {
+      "path": "image_lens/zoom.py",
+      "bytes": 4382,
+      "sha256": "5e269be83d7088136825540398b1256f8f90414caf94bdb23b8839cf5924eded"
+    },
+    {
       "path": "image_lens_cli.py",
       "bytes": 254,
       "sha256": "6c96d0ec6c2351966f9a261fdfdeafeafedc1d9c3c36198153600c4ddab989bc"
@@ -586,6 +591,11 @@
       "path": "tests/test_pose.py",
       "bytes": 8284,
       "sha256": "adb86f02b4e1b52c4578a8756eb4d374825c53716a33b0de4f806ea38f706f4e"
+    },
+    {
+      "path": "tests/test_zoom.py",
+      "bytes": 1810,
+      "sha256": "5276043d0d6fe1ce5d2637eedd74406298d182e1ea8c254021789a9ddf435d4e"
     }
   ]
 }

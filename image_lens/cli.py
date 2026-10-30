@@ -5,7 +5,7 @@ from pathlib import Path
 import sys
 from image_lens import paths
 
-COMMANDS = ('look', 'scan', 'compare', 'brief', 'catalog', 'pose', 'seed', 'bind', 'prepare', 'validate', 'track', 'analyze', 'grid', 'mark', 'focus')
+COMMANDS = ('look', 'scan', 'compare', 'brief', 'catalog', 'pose', 'seed', 'bind', 'prepare', 'validate', 'track', 'analyze', 'grid', 'mark', 'focus', 'zoom')
 
 
 def parser(command, description):
@@ -158,6 +158,14 @@ def dispatch(command, arguments):
         ap.add_argument('--look', required=True, help='look output directory'); ap.add_argument('--shot', required=True)
         a = ap.parse_args(arguments)
         return dict(status='ok', shot=a.shot, text=digest.focus(a.look, a.shot))
+    if command == 'zoom':
+        from image_lens import zoom
+        ap = parser(command, 'Second read: dense whole frames for at most two spans the reader could not tell, at a fixed frame budget.')
+        ap.add_argument('--video', required=True); ap.add_argument('--out', required=True, help='new output directory')
+        ap.add_argument('--at', action='append', default=[], help='start-end seconds, at most 4 s; repeat once more at most')
+        ap.add_argument('--even', action='store_true', help='control: the same frame budget spread evenly over the clip')
+        a = ap.parse_args(arguments)
+        return zoom.run(a.video, a.out, a.at, a.even)
     if command == 'look':
         from image_lens import look
         ap = parser(command, 'One-command look: scan, pose, pose-seeded tracking per shot window, one short look.md.')
