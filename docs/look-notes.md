@@ -1,6 +1,6 @@
 # look: thresholds and evidence
 
-The README says how to run `look` and read its output. This page keeps the exact limits and the checks behind them. Clips named here: AKAGE (hand-drawn dance), Seedance (AI-generated cuts), MikuMiku (cover with a hammer scene), Kaguya (live clip, 40–70 s held out).
+The [guide](guide.md) says how to run `look` and read its output. This page keeps the exact limits and the checks behind them. Clips named here: AKAGE (hand-drawn dance), Seedance (AI-generated cuts), MikuMiku (cover with a hammer scene), Kaguya (live clip, 40–70 s held out).
 
 ## Windows and drawing changes
 
