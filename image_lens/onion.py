@@ -15,9 +15,38 @@ def _box(bbox, w, h):
     return max(0, int(x0-px)), max(0, int(y0-py)), min(w, int(x1+px)), min(h, int(y1+py))
 
 
-def bands(video, start, end, bbox, camera=None, image=None):
+# Each part's lead point (digest.limbs) drawn frame by frame on the onion: the overlay shows only start and end, the
+# trail shows how the part got there and where it bunched up (slow) or spread out (fast).
+TRAILS = dict(parts=6, dot=3, start=9, end=8, line=2,
+              colors=((0, 220, 255), (255, 0, 255), (255, 80, 0), (0, 128, 255), (255, 255, 255), (160, 0, 160)),
+              names=('노랑', '자홍', '파랑', '주황', '흰색', '보라'))  # BGR; not cyan, red or green, which the onion already uses
+
+
+def trails(packets, points, seed, end, camera=None):
+    """[{point, xy: [(frame, x, y)]}] for up to TRAILS['parts'] point ids, visible frames after the seed, in screen
+    coordinates minus the camera shift since the seed (`camera` is camera.path; None = no camera move). With a camera
+    move, frames whose camera shift is unknown are left out rather than drawn in the wrong place."""
+    out = []
+    for pid in points[:TRAILS['parts']]:
+        xy = []
+        for packet in packets:
+            for frame in packet['frames']:
+                n = frame['frame']
+                if not seed < n <= end or (camera is not None and n not in camera):
+                    continue
+                for q in frame['points']:
+                    if q['point_id'] == pid and q['visible']:
+                        dx, dy = camera[n][:2] if camera is not None else (0., 0.)
+                        xy.append((n, q['xy'][0]-dx, q['xy'][1]-dy))
+        if xy:
+            out.append(dict(point=pid, xy=sorted(xy)))
+    return out
+
+
+def bands(video, start, end, bbox, camera=None, image=None, trails=()):
     """[{band, y, dx, dy, features}] of the median feature shift start->end per band, minus the camera shift.
-    A band with too few surviving features gets dx=dy=None. Writes the onion image when `image` is a path."""
+    A band with too few surviving features gets dx=dy=None. Writes the onion image when `image` is a path, with
+    `trails` (see `trails`) drawn on it."""
     import cv2
     import numpy as np
     cap = cv2.VideoCapture(str(video))
@@ -61,11 +90,11 @@ def bands(video, start, end, bbox, camera=None, image=None):
         mx, my = np.median(d, 0)
         result.append(dict(band=name, y=[top, bottom], dx=round(float(mx)-cam[0], 1), dy=round(float(my)-cam[1], 1), features=int(len(d))))
     if image:
-        _image(cv2, np, first, last, (x0, y0, x1, y1), result, image)
+        _image(cv2, np, first, last, (x0, y0, x1, y1), result, image, trails)
     return result
 
 
-def _image(cv2, np, first, last, box, result, path):
+def _image(cv2, np, first, last, box, result, path, trails=()):
     x0, y0, x1, y1 = box
     a = cv2.cvtColor(first, cv2.COLOR_BGR2GRAY)[y0:y1, x0:x1]; b = last[y0:y1, x0:x1]
     picture = np.dstack([b, b, a])  # dark only at the start -> cyan, dark only at the end -> red
@@ -76,6 +105,14 @@ def _image(cv2, np, first, last, box, result, path):
         if band['dx'] is not None:
             mid = (band['y'][0]+band['y'][1])//2-y0; s = ONION['arrow_scale']
             cv2.arrowedLine(picture, (centre, mid), (int(centre+s*band['dx']), int(mid+s*band['dy'])), (0, 140, 0), 4, tipLength=.3)
+    for trail, color in zip(trails, TRAILS['colors']):
+        at = [(int(round(x-x0)), int(round(y-y0))) for _, x, y in trail['xy']]
+        for a, b in zip(at, at[1:]):
+            cv2.line(picture, a, b, color, TRAILS['line'])
+        for p in at:  # white rim: middle dots on a busy drawing were hard to find
+            cv2.circle(picture, p, TRAILS['dot']+1, (255, 255, 255), -1); cv2.circle(picture, p, TRAILS['dot'], color, -1)
+        cv2.circle(picture, at[0], TRAILS['start'], color, 2)
+        e = TRAILS['end']; cv2.rectangle(picture, (at[-1][0]-e, at[-1][1]-e), (at[-1][0]+e, at[-1][1]+e), color, 2)
     cv2.imwrite(str(path), picture)
 
 
@@ -282,7 +319,8 @@ def lines(result, image_name=None):
         return []
     out = ['- 높이별 흐름 (사람 상자 5등분, 카메라 뺌): ' + ' · '.join(parts)]
     if image_name:
-        out.append(f"  - 어니언 그림: {image_name} (청록=시작, 빨강=끝, 초록 화살표=띠별 이동 ×{ONION['arrow_scale']}; 오른쪽 회색=시작과 가장 다른 가운데 프레임)")
+        out.append(f"  - 어니언 그림: {image_name} (청록=시작, 빨강=끝, 초록 화살표=띠별 이동 ×{ONION['arrow_scale']}; 오른쪽 회색=시작과 가장 다른 가운데 프레임; "
+                   f"색 점선=부위별 대표 점의 프레임마다 위치({'·'.join(TRAILS['names'])} 순, 카메라 뺌), 큰 원=시작, 큰 네모=끝, 점 간격이 좁으면 느림·넓으면 빠름)")
     return out
 
 

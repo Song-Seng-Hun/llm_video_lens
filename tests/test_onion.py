@@ -55,6 +55,39 @@ class Parts(unittest.TestCase):
         self.assertEqual(onion.parts(tracks, 9), ['move-a'])
 
 
+class Trails(unittest.TestCase):
+    def packet(self):
+        return dict(frames=[dict(frame=n, points=[dict(point_id='wrist-l', xy=[100.+5*n, 50.], visible=True),
+                                                  dict(point_id='knee-r', xy=[40., 200.+n], visible=n != 7),
+                                                  dict(point_id='nose', xy=[0., 0.], visible=True)]) for n in range(11)])
+
+    def test_one_trail_per_part_and_one_dot_per_frame(self):
+        found = onion.trails([self.packet()], ['wrist-l', 'knee-r'], 0, 10)
+        self.assertEqual([t['point'] for t in found], ['wrist-l', 'knee-r'])
+        self.assertEqual(len(found[0]['xy']), 10)  # f1..f10: the seed frame is the anchor, not a prediction
+        self.assertEqual(len(found[1]['xy']), 9)   # f7 not visible
+
+    def test_camera_shift_is_taken_out(self):
+        camera = {n: (5.*n, 0., 1.) for n in range(11) if n != 4}
+        found = onion.trails([self.packet()], ['wrist-l'], 0, 10, camera)[0]['xy']
+        self.assertEqual({x for _, x, _ in found}, {100.}); self.assertNotIn(4, [n for n, _, _ in found])
+
+    def test_drawn_on_the_onion(self):
+        import tempfile
+        import cv2
+        import numpy as np
+        with tempfile.TemporaryDirectory() as d:
+            video = Path(d)/'v.avi'; out = cv2.VideoWriter(str(video), cv2.VideoWriter_fourcc(*'MJPG'), 10, (320, 240))
+            for k in range(11):
+                out.write(np.full((240, 320, 3), 128, np.uint8))
+            out.release()
+            image = Path(d)/'o.jpg'
+            onion.bands(video, 0, 10, (20, 20, 300, 230), None, image, onion.trails([self.packet()], ['wrist-l'], 0, 10))
+            picture = cv2.imread(str(image)).astype(int)
+            yellow = (abs(picture-np.array(onion.TRAILS['colors'][0])).sum(2) < 90)
+            self.assertGreater(yellow.sum(), 100)
+
+
 class Peak(unittest.TestCase):
     def test_out_and_back_shows_the_far_frame(self):
         import tempfile
