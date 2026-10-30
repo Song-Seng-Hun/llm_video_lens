@@ -167,4 +167,16 @@ class Together(unittest.TestCase):
         groups = motion_report.together(report)
         self.assertTrue(all(not ({'b', 'c'} <= set(g['points'])) for g in groups))
 
+
+class CoremlCache(unittest.TestCase):
+    def test_caches_of_unpinned_models_are_removed(self):
+        import tempfile
+        from unittest import mock
+        from image_lens import paths
+        with tempfile.TemporaryDirectory() as tmp, mock.patch.object(paths, '_ROOT', Path(tmp)):
+            cache = Path(tmp)/'.cache'/'coreml'
+            (cache/'old-model'/'compiled').mkdir(parents=True); (cache/pose.MODELS['detector'][1]).mkdir()
+            self.assertEqual(pose._coreml_cache('pose'), str(cache/pose.MODELS['pose'][1]))
+            self.assertEqual(sorted(p.name for p in cache.iterdir()), sorted(d for _, d in pose.MODELS.values()))
+
 if __name__ == '__main__': unittest.main()

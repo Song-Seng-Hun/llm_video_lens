@@ -47,6 +47,11 @@ def _model(path, role):
 def _coreml_cache(role):
     path = paths.workspace_root()/'.cache'/'coreml'/MODELS[role][1]
     path.mkdir(parents=True, exist_ok=True)
+    # Compiled models are kept per pinned hash; a model switch left the old pose model's 431 MB behind for good.
+    import shutil
+    for old in path.parent.iterdir():
+        if old.name not in {digest for _, digest in MODELS.values()} and old.is_dir() and not old.is_symlink():
+            shutil.rmtree(old)
     return str(path)
 
 

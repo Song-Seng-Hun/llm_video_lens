@@ -20,7 +20,7 @@
   ],
   "manifest_self_excluded": true,
   "file_count": 133,
-  "total_bytes": 1441045,
+  "total_bytes": 1442452,
   "files": [
     {
       "path": ".gitattributes",
@@ -79,8 +79,8 @@
     },
     {
       "path": "docs/look-notes.md",
-      "bytes": 28900,
-      "sha256": "84991e0a7c807df233966a4688e41aa70ac5c3f96e24247b270e2bc31fbda0a4"
+      "bytes": 28997,
+      "sha256": "233955d35c3a988faddd85a40d028d17eb8463cbb5bd7664b6ab781c297cfae3"
     },
     {
       "path": "docs/provenance.md",
@@ -209,8 +209,8 @@
     },
     {
       "path": "image_lens/pose.py",
-      "bytes": 26252,
-      "sha256": "3f052351683803ddd8c240def53eff7b0290d2069297596d00cf0bdf6a261fca"
+      "bytes": 26564,
+      "sha256": "9bdb318cd5f1cd1200878f8ef66c8b2ece8f1d860ae554e3bdf5e9a28eefcdd6"
     },
     {
       "path": "image_lens/run_point_tracker.py",
@@ -584,8 +584,8 @@
     },
     {
       "path": "lan/server.py",
-      "bytes": 36528,
-      "sha256": "1b18a0e49ff0af8e5a731ff722dbb58b1135e011891cc639aa2f0639ec6e89bd"
+      "bytes": 36643,
+      "sha256": "0f4c5f571cff79f39f48ebb4ac9e5ea1c5ee6638088f797312256db981139cd5"
     },
     {
       "path": "lan/sign.py",
@@ -644,8 +644,8 @@
     },
     {
       "path": "tests/test_lan.py",
-      "bytes": 9844,
-      "sha256": "603b218927f67f95e91d76a8b93129216cc7e8f14d112ae80ab0c78b9fae54c2"
+      "bytes": 10076,
+      "sha256": "57388864aea997afdb90ac3bb2c6c229a3dc1b97848d762809792969602b6efe"
     },
     {
       "path": "tests/test_look.py",
@@ -674,8 +674,8 @@
     },
     {
       "path": "tests/test_pose.py",
-      "bytes": 10199,
-      "sha256": "0326108c48aad733ebcf6dda6358cb31de2fad1d87082865fc1dcf2210387c52"
+      "bytes": 10850,
+      "sha256": "39187fe6726e722fd61876d7d18eda66e6d369137a36adbf66783d114788cad7"
     },
     {
       "path": "tests/test_zoom.py",

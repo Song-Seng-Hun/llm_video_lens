@@ -481,6 +481,8 @@ class App:
             old = [j for j in self.jobs.values() if j.get("finished") and j["finished"] < cutoff]
             for j in old:
                 del self.jobs[j["id"]]
+            for key in [k for k in self.at_locks if k[0] not in self.jobs]:
+                del self.at_locks[key]
         for j in old:
             shutil.rmtree(os.path.join(self.looks, j["id"]), ignore_errors=True)
             for path in (j.get("upload"), self.state_path(j["id"])):
