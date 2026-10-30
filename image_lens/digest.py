@@ -180,7 +180,9 @@ def window_line(done, fps, first=None):
                 shown = [f['text'] for f in found[:DIGEST['parts']]]
                 fields.append('몸 기준: ' + '; '.join(shown) + (f" (+{len(found)-DIGEST['parts']})" if len(found) > DIGEST['parts'] else ''))
             elif not body.get('unknown') and not body.get('uncertain'):
-                fields.append(f"몸 기준: 팔다리 {body['limit_px']:.0f}px 미만")
+                fields.append('몸 기준: 원시 추적 큰 이동 미검출(실제 동작은 모름)'
+                              if (done.get('body_geometry') or {}).get('source') == 'raw_tracker_source_switch'
+                              else f"몸 기준: 팔다리 {body['limit_px']:.0f}px 미만")
         else:
             moves = _screen(done.get('groups', []))
             if moves:
@@ -188,6 +190,8 @@ def window_line(done, fps, first=None):
                          + f" {_dir(m['direction'])} {m['distance_px']:.0f}px" + (f"({motion_report.speed_text(m['speeds'])})" if m.get('speeds') else '')
                          for m in moves[:DIGEST['parts']]]
                 fields.append('화면: ' + '; '.join(shown) + (f" (+{len(moves)-DIGEST['parts']})" if len(moves) > DIGEST['parts'] else ''))
+            elif (done.get('body_geometry') or {}).get('source') == 'raw_tracker_source_switch':
+                fields.append('몸 기준: 원시 기준점 부족, 움직임 모름')
             elif done.get('groups'):
                 fields.append('화면: 24px 이상 이동 없음')
             else:  # seed or every track failed: nothing was measured, which is not stillness
@@ -198,6 +202,17 @@ def window_line(done, fps, first=None):
     fields += events(done.get('events'), fps)
     fields += people(done.get('people'), fps)
     notes = []
+    geometry = done.get('body_geometry')
+    note = body_motion.geometry_note(geometry)
+    if note:
+        notes.append(note)
+        # First windows already say this in the motion field; repeat windows need it here too.
+        if first is not None:
+            body = done.get('body')
+            if not body:
+                notes.append('원시 기준점 부족, 몸 동작 모름')
+            elif not body.get('limbs') and not body.get('unknown') and not body.get('uncertain'):
+                notes.append('원시 추적 큰 이동 미검출(실제 동작은 모름)')
     if done.get('chibi'):
         notes.append('SD 체형: 팔다리 이름 안 붙임')
     elif not done.get('skeleton', True):
@@ -307,6 +322,8 @@ def markdown(record, scan, full_name):
            '어깨는 엉덩이(없으면 눈) 기준 높이 변화, 숫자는 어깨 폭 단위. 어깨 폭은 눈 사이 거리 기준: 넓어짐=가슴 폄·카메라 쪽으로 돎, 좁아짐=웅크림·옆으로 돎. 시간 다음 칸은 구도(전신/무릎 위/상반신/얼굴 클로즈업, 포즈 관절이 화면 안에 있는지로 판단): 상반신·클로즈업이면 사람 상자가 화면 아래에서 잘려서 '
            '높이별 아래 칸은 다리가 아니라 가슴·손이나 얼굴 아래쪽이고, "(팔만)"은 엉덩이 없이 어깨로 팔만 이름 붙였다는 뜻.',
            f"자세히: `image_lens focus --look <이 폴더> --shot <shot-id>` (또는 {full_name}). 점 이름·부위는 미검증, 수치는 원본 비교 전 후보.", '']
+    if record.get('joint_tracking'):
+        out.insert(3, '몸 관절 좌표는 pose·추적 혼합 추정(보임·관절 정답 미검증). 속도·완급은 연속된 원시 점 추적에서만 계산. *.raw-tracks.json은 원시 결과, *.tracks.json은 선택된 좌표. SD·골격 불명은 이름 없는 표면점 경로.')
     if record.get('scaled'):
         out.insert(3, f"원본 {record['scaled']['from'][0]}×{record['scaled']['from'][1]}을 {record['scaled']['to'][0]}×{record['scaled']['to'][1]}로 줄여서 봄: px는 줄인 영상 기준.")
     if record.get('onion_sheets'):
