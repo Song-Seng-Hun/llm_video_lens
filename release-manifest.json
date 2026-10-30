@@ -20,7 +20,8 @@
   ],
   "manifest_self_excluded": true,
   "file_count": 133,
-  "total_bytes": 1390423,
+
+  "total_bytes": 1391390,
   "files": [
     {
       "path": ".gitattributes",
@@ -79,8 +80,8 @@
     },
     {
       "path": "docs/look-notes.md",
-      "bytes": 18921,
-      "sha256": "63ba73ca939f921ce2b1b3941fda3bf09b3c9ff3ebfe2905e88b7670909493b0"
+      "bytes": 19334,
+      "sha256": "8a33ffd0fe051b8faf7cfb189d02c980c955142419846fa988b68be71456376c"
     },
     {
       "path": "docs/provenance.md",
@@ -209,8 +210,8 @@
     },
     {
       "path": "image_lens/pose.py",
-      "bytes": 24247,
-      "sha256": "4404ccbe57fa2a4c9be66fed9f8d23dc24db62160258950e11be81815cde97c6"
+      "bytes": 24828,
+      "sha256": "bec79eecc47cc61868af55b0f18848e51a6f854af96dc20ca8c3b6df6c1f7628"
     },
     {
       "path": "image_lens/run_point_tracker.py",
