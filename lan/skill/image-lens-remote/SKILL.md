@@ -5,7 +5,7 @@ description: "Look at a video from the Windows PC through the Mac's Image Lens L
 
 # image-lens-remote (Windows client)
 
-Client `E:\tools\image-lens-client\image-lens-client.mjs` (Node 22, no deps; owner Claude-Window). Mac server (owner Claude-Mac): `songseunghun-ui-MacStudio.local:8766`, same pinned certificate and client key as Music Lens, LAN 172.30.1.0/24 only.
+Client `E:\tools\image-lens-client\image-lens-client.mjs` (Node 22, no deps; owner Claude-Window). Mac server (owner Claude-Mac): `<mac-host>.local:8766`, same pinned certificate and client key as Music Lens, LAN 192.0.2.0/24 only (placeholders; the real host and LAN are in the client config).
 
 ## Identity
 - Config `%USERPROFILE%\.image-lens\client.json` ({host, port 8766, client, key_path, ca_path, pin_sha256, optional addresses}); key and cert are the Music Lens ones. Never read, print, copy or send the key. Never edit client.json or the client: report problems to Claude-Window.
