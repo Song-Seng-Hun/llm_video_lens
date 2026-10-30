@@ -2,24 +2,33 @@ import unittest
 from image_lens import digest
 
 
-def limb(pid, part, side, direction, distance, axis=0.):
-    return dict(point_id=pid, part=part, side=side, axis_px=axis,
-                strokes=[dict(direction=direction, distance_px=distance, frames=[1, 9])])
+def limb(pid, part, side, direction, distance, axis=0., travel=None, speeds=None):
+    return dict(point_id=pid, part=part, side=side, axis_px=axis, travel_px=distance if travel is None else travel,
+                strokes=[dict(direction=direction, distance_px=distance, frames=[1, 9], speeds=speeds or [])])
 
 
 class Limbs(unittest.TestCase):
-    def test_one_arm_moving_together_is_one_statement(self):
+    def test_one_arm_is_one_statement_led_by_the_farthest_travel(self):
         body = dict(limbs=[limb('wrist-l', '손목', '화면 왼쪽', 'up_left', 48., 32.), limb('elbow-l', '팔꿈치', '화면 왼쪽', 'up_left', 35.),
-                           limb('thumb-l', '엄지 끝', '화면 왼쪽', 'up_left', 57.), limb('move-c', '많이 움직인 곳 c', '화면 오른쪽', 'down_left', 54.)])
-        found = digest.limbs(body, {'thumb-l': 'ease_out'})
+                           limb('thumb-l', '엄지 끝', '화면 왼쪽', 'up_left', 57., speeds=[12., 6., 2.]),
+                           limb('move-c', '많이 움직인 곳 c', '화면 오른쪽', 'down_left', 54.)])
+        found = digest.limbs(body)
         self.assertEqual(len(found), 2)
-        self.assertEqual(found[0]['text'], '왼팔(손목·팔꿈치·엄지) 왼쪽 위 57px, 느려짐')
+        self.assertEqual(found[0]['text'], '왼팔(엄지·손목·팔꿈치) 왼쪽 위 57px(속도 12→6→2 px/f)')
         self.assertTrue(found[1]['text'].startswith('움직인 점 c 왼쪽 아래 54px'))
 
-    def test_different_directions_or_sizes_stay_apart(self):
-        body = dict(limbs=[limb('wrist-r', '손목', '화면 오른쪽', 'left', 26.), limb('thumb-r', '엄지 끝', '화면 오른쪽', 'down_left', 28.),
-                           limb('index-r', '검지 끝', '화면 오른쪽', 'left', 80.)])
-        self.assertEqual(len(digest.limbs(body)), 3)
+    def test_back_and_forth_beats_a_longer_net_move(self):
+        # The wrist swings 30 px out and back three times (travel 180); the elbow drifts 40 px once.
+        body = dict(limbs=[limb('wrist-r', '손목', '화면 오른쪽', 'left', 30., travel=180., speeds=[2., 9., 2.]),
+                           limb('elbow-r', '팔꿈치', '화면 오른쪽', 'down', 40., speeds=[1., 4., 8.])])
+        found = digest.limbs(body)
+        self.assertEqual(len(found), 1); self.assertEqual(found[0]['point'], 'wrist-r')
+        self.assertIn('속도 2→9→2', found[0]['text']); self.assertNotIn('1→4→8', found[0]['text'])
+
+    def test_stroke_from_the_window_start_says_its_start_is_unseen(self):
+        body = dict(limbs=[limb('wrist-r', '손목', '화면 오른쪽', 'up', 40., speeds=[20., 3.])])
+        body['limbs'][0]['strokes'][0]['from_start'] = True
+        self.assertIn('위 40px(속도 20→3 px/f, 그 전은 구간 밖이라 모름)', digest.limbs(body)[0]['text'])
 
 
 class Lines(unittest.TestCase):
@@ -29,6 +38,15 @@ class Lines(unittest.TestCase):
                     groups=[dict(group='arms', moves=[dict(point='wrist-l', direction='left', distance_px=242., ease='ease_out')], warnings=1)])
         line = digest.window_line(done, 50)
         self.assertIn('전체: 몸 왼쪽 244px', line); self.assertNotIn('242', line); self.assertIn('팔다리 12px 미만', line)
+
+    def test_points_moving_together_are_one_screen_move(self):
+        moves = [dict(point='move-a', direction='right', distance_px=60., frames=[3, 12], speeds=[9., 4.]),
+                 dict(point='move-b', direction='right', distance_px=55., frames=[4, 12], speeds=[2., 8.]),
+                 dict(point='move-c', direction='down', distance_px=40., frames=[3, 9], ease=None)]
+        done = dict(window=dict(seed=0, end=20), groups=[dict(group='a', moves=moves,
+                    together=[dict(points=['move-a', 'move-b'], direction='right', frames=[4, 12])])])
+        line = digest.window_line(done, 24)
+        self.assertIn('화면: move-a 외 1점 함께 오른쪽 60px(속도 9→4 px/f); move-c 아래 40px', line); self.assertNotIn('2→8', line)
 
     def test_bridge_says_the_path_is_unknown(self):
         line = digest.bridge_line(dict(frames=[61, 62], limbs=[dict(side='화면 오른쪽', part='손목', direction='up_left', distance_px=656.)]))

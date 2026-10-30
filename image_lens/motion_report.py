@@ -53,6 +53,20 @@ def ease(ts,path):
     if a>r*c and a>=b:return 'ease_out'
     return 'even'
 
+SPEEDS=dict(bins=5)
+
+def speeds(fs,path):
+    """Speed along one stroke in px per frame, as the mean of each of up to SPEEDS['bins'] equal parts in time order.
+    Numbers, not an ease word: in two eye checks the four words matched the viewer on 6 of 11, then 1 of 11."""
+    steps=[math.dist(a,b)/(g-f) for f,g,a,b in zip(fs,fs[1:],path,path[1:]) if g>f]
+    if not steps:return []
+    # At least two steps per part: drawings held for two frames (Kaguya) otherwise read as 0, 31, 0, 28 px/f.
+    k=max(1,min(SPEEDS['bins'],len(steps)//2))
+    return [round(statistics.mean(steps[i*len(steps)//k:(i+1)*len(steps)//k]),1) for i in range(k)]
+
+def speed_text(values):
+    return '속도 '+'→'.join(f'{v:.0f}' for v in values)+' px/f' if values else ''
+
 def strokes(fs,ts,xy):
     """Coarse readable movement units over one continuous run; summary only, raw coordinates are untouched."""
     half=STROKE['median_samples']//2
@@ -76,7 +90,9 @@ def strokes(fs,ts,xy):
     largest=max((u['distance_px'] for u in units if u['direction']!='hold'),default=0.)
     index={f:i for i,f in enumerate(fs)}
     for u in units:
-        u['ease']=ease(ts[index[u['start_frame']]:index[u['end_frame']]+1],smooth[index[u['start_frame']]:index[u['end_frame']]+1]) if u['direction']!='hold' else None
+        a,b=index[u['start_frame']],index[u['end_frame']]+1
+        u['ease']=ease(ts[a:b],smooth[a:b]) if u['direction']!='hold' else None
+        u['speeds']=speeds(fs[a:b],smooth[a:b]) if u['direction']!='hold' else []
         elapsed=u['end_seconds']-u['start_seconds'];u['mean_speed_px_per_s']=u['distance_px']/elapsed if elapsed>0 else 0.
         u['major']=u['direction']!='hold' and u['distance_px']>=max(largest/2,STROKE['major_min_px'])
     return dict(units=units[:STROKE['max_strokes']],omitted_unit_count=max(0,len(units)-STROKE['max_strokes']),params=STROKE,

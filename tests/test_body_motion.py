@@ -40,6 +40,21 @@ class BodyMotion(unittest.TestCase):
         paths = self.body(lambda n: 0); paths['wrist-l'] = {n: (320., 400. if n else 340.) for n in range(21)}
         self.assertEqual(body_motion.describe([packet(paths)], dict(seed=0, end=20))['limbs'], [])
 
+    def test_ease_is_timed_on_the_body_relative_path(self):
+        # The body slides up evenly while the hand speeds up against it: the screen path is even-ish, the limb is ease-in.
+        paths = self.body(lambda n: -6*n); paths['wrist-l'] = {n: (320.+.4*n*n, 400.-6*n) for n in range(21)}
+        r = body_motion.describe([packet(paths)], dict(seed=0, end=20))
+        stroke = r['limbs'][0]['strokes'][0]
+        self.assertEqual((stroke['direction'], stroke['ease']), ('right', 'ease_in'))
+        self.assertEqual(r['centre_shift']['ease'], 'even')
+        self.assertTrue(stroke['from_start'])
+        self.assertLess(stroke['speeds'][0], stroke['speeds'][-1])
+
+    def test_travel_counts_back_and_forth(self):
+        paths = self.body(lambda n: 0); paths['wrist-r'] = {n: (150., 400.+(4*n if n <= 10 else 40-4*(n-10))) for n in range(21)}
+        limb = body_motion.describe([packet(paths)], dict(seed=0, end=20))['limbs'][0]
+        self.assertGreaterEqual(limb['travel_px'], 60.)  # out 36 px and back from f1 (seed left out); net is about 4
+
     def test_hand_crossing_the_centre_keeps_its_arm_side(self):
         paths = self.body(lambda n: 0); paths['wrist-r'] = {n: (210.+n, 400.) for n in range(21)}
         paths['wrist-r'].update({n: (210.+n, 400.-3*n) for n in range(21)})

@@ -103,10 +103,10 @@ def _summary(report, window, group, md_path, traj, frame_motion=None):
                         and math.hypot(u['dx_px']-cam[0], u['dy_px']-cam[1]) < motion_report.STROKE['major_min_px']:
                     with_camera += 1
                     continue
-                timing = f", {motion_report.EASE_KO[u['ease']]}" if u.get('ease') else ''
+                timing = f", {motion_report.speed_text(u['speeds'])}" if u.get('speeds') else ''
                 moves.append(f"{f['point_id']} {motion_report.KO[u['direction']]} {u['distance_px']:.0f}px(f{u['start_frame']}..{u['end_frame']}{timing})")
                 facts.append(dict(point=f['point_id'], direction=u['direction'], distance_px=u['distance_px'],
-                                  frames=[u['start_frame'], u['end_frame']], ease=u.get('ease')))
+                                  frames=[u['start_frame'], u['end_frame']], ease=u.get('ease'), speeds=u.get('speeds')))
                 kept.add(f['point_id'])
     together = [g for g in motion_report.together(report) if 2*len(kept & set(g['points'])) >= len(g['points'])]
     lines = [f"- {NAMES[group]}: " + ('; '.join(moves) if moves else '큰 이동 없음')]
@@ -298,7 +298,10 @@ def run(video, detector, pose_model, checkpoint, out, max_shots=LOOK['max_shots'
                 picture = base.with_name(base.name+'-onion.jpg')
                 try:
                     moving = cam if cam and math.hypot(*cam) >= motion_report.STROKE['major_min_px'] else None
-                    done['bands'] = onion.bands(source, w['seed'], end, person['bbox'], moving, picture)
+                    from image_lens import digest
+                    leads = [f['point'] for f in digest.limbs(done['body'])] if done.get('body') else []
+                    done['trails'] = onion.trails([t[3] for t in tracked], leads, w['seed'], end, frame_motion if moving else None)
+                    done['bands'] = onion.bands(source, w['seed'], end, person['bbox'], moving, picture, done['trails'])
                     done['onion'] = picture.name
                     done['peak'] = onion.peak(source, w['seed'], end, person['bbox'], picture)
                     turns = [e['share'] for e in (done.get('events') or {}).get('width', []) if e['share'] >= body_motion.EVENTS['turn']]

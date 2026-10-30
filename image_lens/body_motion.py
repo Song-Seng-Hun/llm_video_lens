@@ -79,6 +79,7 @@ def describe(packets, window):
     limit = max(BODY_MOTION['min_px'], BODY_MOTION['min_ratio']*size)
     frames = sorted(centre)
     shift = (centre[frames[-1]][0]-centre[frames[0]][0], centre[frames[-1]][1]-centre[frames[0]][1])
+    centre_path = _median3([centre[n] for n in frames])
     limbs = []
     for pid, track in sorted(points.items()):
         part = PARTS.get(pid.split('-')[0])
@@ -90,8 +91,13 @@ def describe(packets, window):
         for lo, hi in segments(rel, limit):
             dx, dy = rel[hi][0]-rel[lo][0], rel[hi][1]-rel[lo][1]
             if math.hypot(dx, dy) >= limit:
+                # Timing on the body-relative path, so a body bounce or camera pan does not set the limb's ease.
                 strokes.append(dict(direction=motion_report.direction(dx, dy), distance_px=round(math.hypot(dx, dy), 1),
-                                    frames=[common[lo], common[hi]]))
+                                    frames=[common[lo], common[hi]], ease=motion_report.ease(common[lo:hi+1], rel[lo:hi+1]),
+                                    speeds=motion_report.speeds(common[lo:hi+1], rel[lo:hi+1]),
+                                    # Windows start where the drawing changes: a stroke from the first frame was already
+                                    # moving, its speed-up is before the cut (AKAGE f47: 40 px in two frames, then settles).
+                                    from_start=lo == 0))
         if not strokes:
             continue
         spread = abs(rel[-1][0])-abs(rel[0][0])
@@ -102,11 +108,13 @@ def describe(packets, window):
         if part == PARTS['move']:
             part = f"{part} {pid.rsplit('-', 1)[-1]}"  # unnamed: keep the letter so it matches the onion image and tracks
         limbs.append(dict(point_id=pid, part=part, side='화면 왼쪽' if x < 0 else '화면 오른쪽',
+                          travel_px=round(sum(math.dist(a, b) for a, b in zip(rel, rel[1:])), 1),
                           strokes=strokes[:BODY_MOTION['max_segments']], omitted=max(0, len(strokes)-BODY_MOTION['max_segments']),
                           axis_px=round(spread, 1) if abs(spread) >= limit else 0.))
     return dict(reference=kind, size_px=round(size, 1), limit_px=round(limit, 1),
                 centre_shift=dict(direction=motion_report.direction(*shift), distance_px=round(math.hypot(*shift), 1),
-                                  frames=[frames[0], frames[-1]]), limbs=limbs)
+                                  frames=[frames[0], frames[-1]], ease=motion_report.ease(frames, centre_path),
+                                  speeds=motion_report.speeds(frames, centre_path)), limbs=limbs)
 
 
 def lines(result):

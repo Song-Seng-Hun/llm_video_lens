@@ -4,7 +4,7 @@ limbs did on top of them, so one slide is not repeated for every tracked point. 
 pose differences between two frames: the path between them is not observed."""
 import math
 import re
-from image_lens import body_motion, motion_report, zoom
+from image_lens import body_motion, motion_report, onion, zoom
 
 DIGEST = dict(parts=3, same_share=.5, repeat_px=8., repeat_share=.25)
 ARM = ('손목', '팔꿈치', '엄지 끝', '검지 끝')
@@ -19,38 +19,53 @@ def _side(side):
     return '왼' if side == '화면 왼쪽' else '오른'
 
 
-def limbs(body, ease=None):
-    """Body-relative limb points merged into statements: points of one screen-side arm or leg whose first stroke has
-    the same direction and a distance within half of each other are one statement. Largest first."""
-    ease = ease or {}
-    groups = []
+def _speed(stroke):
+    """Per-frame speed of a stroke; from the window's first frame its start is cut off (the window begins where the
+    drawing changes, AKAGE f47: 40 px in two frames), so that is said too."""
+    text = motion_report.speed_text(stroke.get('speeds'))
+    if not text:
+        return ''
+    return f"({text}" + (', 그 전은 구간 밖이라 모름)' if stroke.get('from_start') else ')')
+
+
+def limbs(body):
+    """Body-relative limb points merged into one statement per part: one screen-side arm or leg, or one unnamed move
+    point. The lead is the point that travelled farthest (back-and-forth included), and only its strokes and timing are
+    written: in the ease check a small-motion point set the label. Largest first."""
+    groups = {}
     for limb in body.get('limbs', []):
-        part = limb['part']; first = limb['strokes'][0]
+        part = limb['part']
         kind = '팔' if part in ARM else '다리' if part in LEG else None
         key = (_side(limb['side']) + kind) if kind else part.replace('많이 움직인 곳', '움직인 점')
-        for g in groups:
-            if g['key'] == key and g['direction'] == first['direction'] \
-                    and min(g['distance'], first['distance_px']) >= DIGEST['same_share']*max(g['distance'], first['distance_px']):
-                g['parts'].append(part); g['distance'] = max(g['distance'], first['distance_px']); g['limbs'].append(limb)
-                break
-        else:
-            groups.append(dict(key=key, kind=kind, direction=first['direction'], distance=first['distance_px'], parts=[part], limbs=[limb]))
+        groups.setdefault(key, dict(key=key, kind=kind, parts=[], limbs=[]))
+        groups[key]['parts'].append(part); groups[key]['limbs'].append(limb)
     out = []
-    for g in sorted(groups, key=lambda g: -g['distance']):
-        lead = max(g['limbs'], key=lambda l: l['strokes'][0]['distance_px'])
-        path = ' → '.join(f"{_dir(s['direction'])} {s['distance_px']:.0f}px" for s in lead['strokes'])
-        names = '·'.join(dict.fromkeys(p.replace(' 끝', '') for p in g['parts']))
+    for g in groups.values():
+        lead = max(g['limbs'], key=lambda l: (l.get('travel_px', 0.), l['strokes'][0]['distance_px']))
+        first = lead['strokes'][0]
+        path = ' → '.join(f"{_dir(s['direction'])} {s['distance_px']:.0f}px{_speed(s)}" for s in lead['strokes'])
+        names = '·'.join(dict.fromkeys(p.replace(' 끝', '') for p in [lead['part']]+g['parts']))
         label = f"{g['key']}({names})" if g['kind'] else g['key']
         axis = '' if not lead['axis_px'] else f", 몸 {'바깥' if lead['axis_px'] > 0 else '쪽'}으로"
-        timing = f", {motion_report.EASE_KO[ease[lead['point_id']]]}" if ease.get(lead['point_id']) else ''
-        out.append(dict(key=g['key'], direction=g['direction'], distance=g['distance'], label=label, text=f"{label} {path}{axis}{timing}"))
-    return out
+        out.append(dict(key=g['key'], direction=first['direction'], distance=first['distance_px'], label=label,
+                        point=lead['point_id'], text=f"{label} {path}{axis}"))
+    return sorted(out, key=lambda g: -g['distance'])
 
 
 def _screen(groups):
-    """Screen moves from the group summaries (camera-following ones already removed), largest first."""
-    moves = [m for g in groups for m in g.get('moves', [])]
-    return sorted(moves, key=lambda m: -m['distance_px'])
+    """Screen moves from the group summaries (camera-following ones already removed), largest first. Points that moved
+    together (same direction, time and size) are one move: the largest one speaks for them, with its own timing."""
+    out = []
+    for g in groups:
+        moves = sorted(g.get('moves', []), key=lambda m: -m['distance_px']); taken = set()
+        for t in g.get('together', []):
+            members = [i for i, m in enumerate(moves) if i not in taken and m['point'] in t['points'] and m['direction'] == t['direction']
+                       and m['frames'][0] <= t['frames'][1] and t['frames'][0] <= m['frames'][1]]
+            if len(members) > 1:
+                taken.update(members)
+                out.append(dict(moves[members[0]], together=len(members)-1))
+        out += [m for i, m in enumerate(moves) if i not in taken]
+    return sorted(out, key=lambda m: -m['distance_px'])
 
 
 def _bands(bands):
@@ -131,12 +146,11 @@ def window_line(done, fps, first=None):
         body = done.get('body')
         if body:
             c = body['centre_shift']
-            whole.append(f"몸 {_dir(c['direction'])} {c['distance_px']:.0f}px" if c['distance_px'] >= body['limit_px'] else '몸 그대로')
+            whole.append(f"몸 {_dir(c['direction'])} {c['distance_px']:.0f}px{_speed(c)}" if c['distance_px'] >= body['limit_px'] else '몸 그대로')
         if whole:
             fields.append('전체: ' + ', '.join(whole))
-        ease = {m['point']: m['ease'] for m in sorted(_screen(done.get('groups', [])), key=lambda m: m['distance_px']) if m.get('ease')}
         if body:
-            found = limbs(body, ease)
+            found = limbs(body)
             if found:
                 shown = [f['text'] for f in found[:DIGEST['parts']]]
                 fields.append('몸 기준: ' + '; '.join(shown) + (f" (+{len(found)-DIGEST['parts']})" if len(found) > DIGEST['parts'] else ''))
@@ -145,7 +159,8 @@ def window_line(done, fps, first=None):
         else:
             moves = _screen(done.get('groups', []))
             if moves:
-                shown = [f"{m['point']} {_dir(m['direction'])} {m['distance_px']:.0f}px" + (f", {motion_report.EASE_KO[m['ease']]}" if m.get('ease') else '')
+                shown = [f"{m['point']}" + (f" 외 {m['together']}점 함께" if m.get('together') else '')
+                         + f" {_dir(m['direction'])} {m['distance_px']:.0f}px" + (f"({motion_report.speed_text(m['speeds'])})" if m.get('speeds') else '')
                          for m in moves[:DIGEST['parts']]]
                 fields.append('화면: ' + '; '.join(shown) + (f" (+{len(moves)-DIGEST['parts']})" if len(moves) > DIGEST['parts'] else ''))
             elif done.get('groups'):
@@ -252,6 +267,7 @@ def markdown(record, scan, full_name):
            f"추적된 구간 {covered}/{total}프레임, 건너뜀 {len(skipped)}곳.",
            '읽는 법: 한 줄 = 추적 구간 하나. 방향·좌우는 화면 기준. "전체"는 카메라와 몸 중심(어깨 가운데, 없으면 얼굴)의 이동이고, '
            '"몸 기준"은 그 위에 팔다리가 더 한 움직임(몸 중심 기준, 같은 쪽 팔·다리에서 같이 움직인 점은 한 줄). '
+           '"(속도 9→5→1 px/f)"는 그 이동을 시간 순서로 나눈 프레임당 속도(앞이 크면 느려짐, 뒤가 크면 빨라짐; 몸 기준은 몸 중심을 뺀 속도). '
            '"높이별"은 사람 상자를 위→아래 5칸으로 나눈 이동(px, 0=8px 미만). 골격 신뢰가 낮으면 팔다리 이름 없이 "화면" 이동만. '
            '"자세 A"는 처음과 끝 그림이 같은 구간이 다시 나온 것: 반복은 처음과 다른 점만 쓴다. '
            '어깨는 엉덩이(없으면 눈) 기준 높이 변화, 숫자는 어깨 폭 단위. 어깨 폭은 눈 사이 거리 기준: 넓어짐=가슴 폄·카메라 쪽으로 돎, 좁아짐=웅크림·옆으로 돎. 시간 다음 칸은 구도(전신/무릎 위/상반신/얼굴 클로즈업, 포즈 관절이 화면 안에 있는지로 판단): 상반신·클로즈업이면 사람 상자가 화면 아래에서 잘려서 '
@@ -261,6 +277,7 @@ def markdown(record, scan, full_name):
         out.insert(3, f"원본 {record['scaled']['from'][0]}×{record['scaled']['from'][1]}을 {record['scaled']['to'][0]}×{record['scaled']['to'][1]}로 줄여서 봄: px는 줄인 영상 기준.")
     if record.get('onion_sheets'):
         out.insert(-1, f"어니언 모음 그림: {', '.join(record['onion_sheets'])} (구간마다 청록=시작, 빨강=끝, 초록 화살표=높이별 이동, 오른쪽 회색=시작과 가장 다른 가운데 프레임: 돌거나 갔다 돌아오는 동작은 여기서 보임; "
+                       f"색 점선=각 줄 \"몸 기준\"의 부위 대표 점 궤적({'·'.join(onion.TRAILS['names'])} = 몸 기준에 적힌 순서, 점 하나가 한 프레임, 카메라 뺌, 큰 원=시작·큰 네모=끝, 점 간격이 좁으면 느림); "
                        '"who"=사람이 여럿인 구간의 P1·P2 상자; "still"=추적하기엔 짧은 컷의 한 장면, 붙어 있는 컷은 한 줄에 시간 순서; "strip"=몸 돌림 후보 구간의 프레임 5장을 시간 순서로). '
                        '손 모양(하트·브이)처럼 글에 안 나오는 동작은 그림에서 본다.')
     if record.get('frame_sheets'):
