@@ -19,8 +19,8 @@
     "historical experiment outputs"
   ],
   "manifest_self_excluded": true,
-  "file_count": 120,
-  "total_bytes": 1311075,
+  "file_count": 121,
+  "total_bytes": 1289822,
   "files": [
     {
       "path": ".gitattributes",
@@ -34,18 +34,18 @@
     },
     {
       "path": "README.en.md",
-      "bytes": 24987,
-      "sha256": "9d1881119d91825fa6704fb8f2cf983b8675f3a85927e2d814f3c341d7b2e94f"
+      "bytes": 16110,
+      "sha256": "0807e2141cffac1ac92c7730cf26ac44f9251d9f105c055e4962c36affc033fb"
     },
     {
       "path": "README.ja.md",
-      "bytes": 33718,
-      "sha256": "c50d5e053831e15c1e7639d17bbe45700eebd37f3c8244b9baed13ec5a62af9f"
+      "bytes": 22249,
+      "sha256": "246860bfb3f974c4d43b450b6b5f122dd53ab1afefeaf0a3e5387632753d432f"
     },
     {
       "path": "README.md",
-      "bytes": 30392,
-      "sha256": "1c4252817679008c36b10db5ee76824a21f7676dfa45c6767f4c3a098aa2c32a"
+      "bytes": 19915,
+      "sha256": "ceb03fcf6782e6ec1451aace6f381d46589c57fc10e280d337fc7d44d8077cd0"
     },
     {
       "path": "assets/banner-dark.svg",
@@ -71,6 +71,11 @@
       "path": "docs/limitations.md",
       "bytes": 3766,
       "sha256": "21abe396cfa212f4550a589c90f31c8dc3f3065d7cbef447975f8f2b04a25650"
+    },
+    {
+      "path": "docs/look-notes.md",
+      "bytes": 9570,
+      "sha256": "593df6d918ed20ce1dddc30438322c73f785c5cede54ce5b5398a68547bd8ec9"
     },
     {
       "path": "docs/provenance.md",
