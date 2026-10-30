@@ -90,3 +90,9 @@ The [guide](guide.md) says how to run `look` and read its output. This page keep
 ## mark
 
 - On the clip C hammer shot, two points on the hammer head followed the whole swing (wind-up left 74 px, then right and down ~800 px speeding up, settling while slowing) and the eye stayed on the face. A point on the hammer's corner slid onto the hat, and one on the hand stayed behind when the drawing swapped hands.
+
+## Run time
+
+- CoTracker runs on MPS and the RTMW pose model on CoreML; the YOLOX detector stays on CPU (CoreML fails on a frame with no box). Whole look before → after (2026-10-30, M4 Max): clip A 657 → 280 s, B 1753 → 794 s, C 1063 → 593 s, D 661 → 268 s. Tracking alone took 3.5-4x less; pose 15-35% less.
+- Results moved little. Tracks: median 0 px, p95 2-5 px. Pose keypoints scoring 0.5 or more: p99 4 px; only low-score points jump. look.md lines changed in small numbers (a few px, a turn-candidate count by one). Clip A 4.30 s named the right arm instead of the left once; clip D's 18-22 s fall-and-pull line is unchanged.
+- A tracker job now takes about 1.6 s (clip A: 95 jobs, 148 s), of which a warm model call is under 1 s; the rest is the process start, model load and MPS warm-up. The CPU detector takes about 0.1 s a frame.

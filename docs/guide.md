@@ -47,7 +47,7 @@ python -m image_lens --workspace /path/to/workspace prepare --queries queries.js
 python -m image_lens --workspace /path/to/workspace validate --queries queries.json --frozen job.freeze.json --job shot0 --out unused-tracks.json
 ```
 
-Experimental inference requires a separately prepared freeze with `--allow-tracking`, an explicit local checkpoint and a frozen wall budget. Its single attempt is consumed immediately before the model import; failures never trigger automatic retries. The CLI parent kills/reaps its own child process group if the budget expires. No download occurs. CoTracker source and checkpoint have noncommercial upstream terms. No neural inference was run to validate this extraction.
+Experimental inference requires a separately prepared freeze with `--allow-tracking`, an explicit local checkpoint and a frozen wall budget. Its single attempt is consumed immediately before the model import; failures never trigger automatic retries. The CLI parent kills/reaps its own child process group if the budget expires. Tracking runs on the Apple GPU (MPS) and fails without it. No download occurs. CoTracker source and checkpoint have noncommercial upstream terms. No neural inference was run to validate this extraction.
 
 ```sh
 python -m image_lens --workspace /path/to/workspace prepare --queries queries.json --shots shots.json --job shot0 --allow-tracking --max-seconds 120 --out tracking.freeze.json
@@ -156,7 +156,7 @@ A flag on the command line wins. The workspace is Git-ignored, so each machine k
 
 ## Whole-body seeds from pose (optional)
 
-`pose` runs a local whole-body pose model over the canonical scan: YOLOX HumanArt person boxes, RTMW 133 keypoints (rtmlib, ONNX Runtime CPU) and ByteTrack IDs reset at every detected cut. The two ONNX files are user-supplied and pinned by size and SHA256; nothing is downloaded or bundled, and the weight license is not established. Install `requirements-pose.txt` into the same environment. The packet also flags frames where the pose layer itself is unreliable: overlapping person boxes (echo copies, afterimages) and body-skeleton jumps within one track.
+`pose` runs a local whole-body pose model over the canonical scan: YOLOX HumanArt person boxes, RTMW 133 keypoints (rtmlib, ONNX Runtime; boxes on CPU, keypoints on CoreML) and ByteTrack IDs reset at every detected cut. The two ONNX files are user-supplied and pinned by size and SHA256; nothing is downloaded or bundled, and the weight license is not established. Install `requirements-pose.txt` into the same environment. The packet also flags frames where the pose layer itself is unreliable: overlapping person boxes (echo copies, afterimages) and body-skeleton jumps within one track.
 
 `seed` turns one frame of that packet into fresh observation jobs, one per group so each fits the 12-point surface contract: `<job>-head` (nose, eyes, front/top/side hair), `<job>-arms` and `<job>-legs`. Hair points are geometry on a head frame built from the eyes (distance and the up direction away from the nose), so they are candidate surface points, not detected hair. Joints near the frame edge are dropped because off-screen joints come back clamped there. Each seed gets a marked source crop as its pinned visual reference; look at them before tracking. `bind` writes the report bindings for one tracked job.
 
