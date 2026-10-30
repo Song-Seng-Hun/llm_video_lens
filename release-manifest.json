@@ -1,6 +1,6 @@
 {
   "schema": "image-lens.source-release/1",
-  "date_kst": "2026-10-29",
+  "date_kst": "2026-10-31",
   "source_only": true,
   "authored_code_license": "not granted by this extraction; preserve owner decision",
   "vendor_licenses": {
@@ -19,8 +19,8 @@
     "historical experiment outputs"
   ],
   "manifest_self_excluded": true,
-  "file_count": 133,
-  "total_bytes": 1442452,
+  "file_count": 135,
+  "total_bytes": 1460164,
   "files": [
     {
       "path": ".gitattributes",
@@ -44,8 +44,8 @@
     },
     {
       "path": "README.md",
-      "bytes": 6640,
-      "sha256": "8bff21bc7f1512788cc18dbf43dc1539f4fdba700001c291c6ba251ac0c78838"
+      "bytes": 7240,
+      "sha256": "cdda2b4c9ef6b3adc83c93ff16cdf93c58ae680da4ad274919556341ec1c246c"
     },
     {
       "path": "assets/banner-dark.svg",
@@ -79,8 +79,8 @@
     },
     {
       "path": "docs/look-notes.md",
-      "bytes": 28997,
-      "sha256": "233955d35c3a988faddd85a40d028d17eb8463cbb5bd7664b6ab781c297cfae3"
+      "bytes": 32834,
+      "sha256": "807e825535f4b8251406d1cb7ad4258dd7125e789ff26e0b35220e010032a4f9"
     },
     {
       "path": "docs/provenance.md",
@@ -114,8 +114,8 @@
     },
     {
       "path": "image_lens/body_motion.py",
-      "bytes": 34058,
-      "sha256": "9ea38ba4e7810de2c22145faef5f5a58ed108f8cb0d35a2b84bb92e3c841c249"
+      "bytes": 35029,
+      "sha256": "0137166f00e986b4964779f220c29b11cd8818caf52d1ac307076b9f4acd6d1b"
     },
     {
       "path": "image_lens/brief.py",
@@ -144,8 +144,8 @@
     },
     {
       "path": "image_lens/digest.py",
-      "bytes": 23195,
-      "sha256": "f187a74869f9c399c5c503e67661d02de142b4ce065e5fff90080c7cd300e20e"
+      "bytes": 23526,
+      "sha256": "a15dec508b2aa1036c613086cd83ed47b479cbea348cacb79bc0fdc13e1adbb7"
     },
     {
       "path": "image_lens/foreground_regions.py",
@@ -163,9 +163,14 @@
       "sha256": "b3ec971ca2fb53ebb2a7cb5c73a8f2f54733770ef6c6ee445599fcca2ebc5b39"
     },
     {
+      "path": "image_lens/joint_tracking.py",
+      "bytes": 4133,
+      "sha256": "5ad9a6bd88cabb1680696ceeddeeda18086282bef90d2edf230b3e76f533c688"
+    },
+    {
       "path": "image_lens/look.py",
-      "bytes": 35913,
-      "sha256": "2049743294a5155a4eb89b05c1ca8b79a7b6200078188a5cf276927e50a76e3e"
+      "bytes": 37103,
+      "sha256": "d35338fbe6f5adb16ce34c37ca9eef32a1342666d18d4b5a4f900cf70ebca763"
     },
     {
       "path": "image_lens/mark.py",
@@ -641,6 +646,11 @@
       "path": "tests/test_digest.py",
       "bytes": 8220,
       "sha256": "adca740e0a859488d741644f6ce629a942b07361940bfebe5b79a5bfef3bc21a"
+    },
+    {
+      "path": "tests/test_joint_tracking.py",
+      "bytes": 6650,
+      "sha256": "afa1c5f6943694c9794f9f5007a3e511fb023652e756c499576b01f1c20a5dce"
     },
     {
       "path": "tests/test_lan.py",

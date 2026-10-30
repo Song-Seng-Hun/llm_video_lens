@@ -124,14 +124,26 @@ def disagreement(points, kind, centre, size, pose_frames):
     return result
 
 
-def describe(packets, window, pose_frames=None):
+def describe(packets, window, pose_frames=None, timing_packets=None):
     """Body centre shift plus per-limb relative strokes (direction, size, frames) and toward/away from the body axis.
     With pose_frames, a limb point the pose disagrees with is listed as uncertain instead of described."""
     points = series(packets, window)
-    kind, centre, size = reference(points, window)
-    if not kind:
+    # Position may be pose-assisted; speeds/ease must still come from a continuous raw tracker path.
+    timing_points = series(timing_packets, window) if timing_packets is not None else None
+    timing_kind, timing_centre, _ = reference(timing_points, window) if timing_points is not None else (None, {}, None)
+    def timing(pid, ns, fallback):
+        if timing_points is None:
+            return motion_report.ease(ns, fallback), motion_report.speeds(ns, fallback)
+        if timing_kind != reference_kind or ns != list(range(ns[0], ns[-1]+1)) or any(n not in timing_centre or (pid is not None and n not in timing_points.get(pid, {})) for n in ns):
+            return None, None
+        path = [timing_centre[n] if pid is None else (timing_points[pid][n][0]-timing_centre[n][0],
+                                                    timing_points[pid][n][1]-timing_centre[n][1]) for n in ns]
+        path = _median3(path)
+        return motion_report.ease(ns, path), motion_report.speeds(ns, path)
+    reference_kind, centre, size = reference(points, window)
+    if not reference_kind:
         return None
-    apart = disagreement(points, kind, centre, size, pose_frames) if pose_frames else {}
+    apart = disagreement(points, reference_kind, centre, size, pose_frames) if pose_frames else {}
     uncertain = []
     limit = max(BODY_MOTION['min_px'], BODY_MOTION['min_ratio']*size)
     frames = sorted(centre)
@@ -156,10 +168,10 @@ def describe(packets, window, pose_frames=None):
         for lo, hi in segments(rel, limit):
             dx, dy = rel[hi][0]-rel[lo][0], rel[hi][1]-rel[lo][1]
             if math.hypot(dx, dy) >= limit:
-                # Timing on the body-relative path, so a body bounce or camera pan does not set the limb's ease.
+                ease, speeds = timing(pid, common[lo:hi+1], rel[lo:hi+1])
+                # Raw body-relative timing; fusion coordinates never imply measured acceleration.
                 strokes.append(dict(direction=motion_report.direction(dx, dy), distance_px=round(math.hypot(dx, dy), 1),
-                                    frames=[common[lo], common[hi]], ease=motion_report.ease(common[lo:hi+1], rel[lo:hi+1]),
-                                    speeds=motion_report.speeds(common[lo:hi+1], rel[lo:hi+1]),
+                                    frames=[common[lo], common[hi]], ease=ease, speeds=speeds,
                                     # Windows start where the drawing changes: a stroke from the first frame was already
                                     # moving, its speed-up is before the cut (clip A f47: 40 px in two frames, then settles).
                                     from_start=lo == 0))
@@ -179,10 +191,10 @@ def describe(packets, window, pose_frames=None):
                           travel_px=round(sum(math.dist(a, b) for a, b in zip(rel, rel[1:])), 1),
                           strokes=strokes[:BODY_MOTION['max_segments']], omitted=max(0, len(strokes)-BODY_MOTION['max_segments']),
                           axis_px=round(spread, 1) if abs(spread) >= limit else 0.))
-    return dict(reference=kind, size_px=round(size, 1), limit_px=round(limit, 1),
+    centre_ease, centre_speeds = timing(None, frames, centre_path)
+    return dict(reference=reference_kind, size_px=round(size, 1), limit_px=round(limit, 1),
                 centre_shift=dict(direction=motion_report.direction(*shift), distance_px=round(math.hypot(*shift), 1),
-                                  frames=[frames[0], frames[-1]], ease=motion_report.ease(frames, centre_path),
-                                  speeds=motion_report.speeds(frames, centre_path)), limbs=limbs, unknown=unknown, uncertain=uncertain)
+                                  frames=[frames[0], frames[-1]], ease=centre_ease, speeds=centre_speeds), limbs=limbs, unknown=unknown, uncertain=uncertain)
 
 
 def lines(result):

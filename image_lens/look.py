@@ -6,7 +6,7 @@ import os
 import signal
 import time
 from pathlib import Path
-from image_lens import paths
+from image_lens import paths, joint_tracking
 
 LOOK = dict(max_shots=16, window_frames=160, min_frames=12, seed_shift=3, track_seconds=300, strips=6, groups=('head', 'arms', 'hands', 'legs', 'move'))
 NAMES = dict(head='머리', arms='팔', hands='손끝', legs='다리', move='많이 움직인 곳', marked='찍은 점')
@@ -300,6 +300,7 @@ def _run(video, detector, pose_model, checkpoint, out, max_shots=LOOK['max_shots
         nonlocal last_end
         entry, sid, w, end, base, people, receipt, tracked, done, slot, at = window
         errors = []; quiet = []; fps = scan['fps']
+        raw_packets = [paths.load(joint_tracking.track_path(t[2], t[1]))[0] if t[1] in joint_tracking.GROUPS else t[3] for t in tracked]
         from image_lens import body_motion
         if last_end is not None:
             done['bridge'] = body_motion.bridge(body_motion.largest(pose_frames.get(last_end)), body_motion.largest(pose_frames.get(w['seed'])),
@@ -334,10 +335,11 @@ def _run(video, detector, pose_model, checkpoint, out, max_shots=LOOK['max_shots
                 tracked[k] = (name, group, stem, dict(tracks, frames=[dict(f, points=[p for p in f['points'] if p['point_id'] in keep])
                                                                       for f in tracks['frames']]))
         for name, group, stem, tracks in tracked:
+            raw_tracks = joint_tracking.track_path(stem, group)
             if group == 'move' and not (tracks['frames'] and tracks['frames'][0]['points']):
                 quiet.append(NAMES[group]); continue
             try:
-                _step('bind', ['--queries', base.with_suffix('.obs.json'), '--tracks', stem.with_suffix('.tracks.json'),
+                _step('bind', ['--queries', base.with_suffix('.obs.json'), '--tracks', raw_tracks,
                                '--job', name, '--out', stem.with_suffix('.bindings.json')])
                 binding = stem.with_suffix('.bindings.json')
                 if group == 'move':
@@ -346,7 +348,7 @@ def _run(video, detector, pose_model, checkpoint, out, max_shots=LOOK['max_shots
                     for actor in bindings['actors']:
                         actor['features'] = [f for f in actor['features'] if f['point_id'] in keep]
                     binding = paths.write_json(stem.with_name(stem.name+'-parts.bindings.json'), bindings)
-                _step('analyze', ['--tracks', stem.with_suffix('.tracks.json'), '--shots', root/'shots.json',
+                _step('analyze', ['--tracks', raw_tracks, '--shots', root/'shots.json',
                                   '--report-bindings', binding, '--start', w['seed'], '--end', end,
                                   '--format', 'json', '--out', stem.with_suffix('.report.json'),
                                   '--trajectory-dir', stem.with_name(stem.name+'-traj'), '--pose', pose_for(w['seed'])])
@@ -361,7 +363,8 @@ def _run(video, detector, pose_model, checkpoint, out, max_shots=LOOK['max_shots
                 slot.append(f'  - {group} 실패: {str(error)[:120]}')
         if quiet:slot.append(f"  - {'·'.join(quiet)}: 화면 기준 큰 이동({motion_report.STROKE['major_min_px']:.0f}px 이상) 없음")
         if tracked and skeleton['plausible']:
-            done['body'] = body_motion.describe([t[3] for t in tracked], dict(w, end=end), pose_frames)
+            done['body'] = body_motion.describe([t[3] for t in tracked], dict(w, end=end), pose_frames,
+                                               timing_packets=raw_packets)
             slot += ['  '+l for l in body_motion.lines(done['body'])]
         done['events'] = body_motion.pose_events(pose_frames, dict(w, end=end), fps)
         done['people'] = body_motion.people(pose_frames, dict(w, end=end), fps, cam)
@@ -381,7 +384,7 @@ def _run(video, detector, pose_model, checkpoint, out, max_shots=LOOK['max_shots
                 moving = cam if cam and math.hypot(*cam) >= motion_report.STROKE['major_min_px'] else None
                 from image_lens import digest
                 leads = [f['point'] for f in digest.limbs(done['body'])] if done.get('body') else []
-                done['trails'] = onion.trails([t[3] for t in tracked], leads, w['seed'], end, frame_motion if moving else None)
+                done['trails'] = onion.trails(raw_packets, leads, w['seed'], end, frame_motion if moving else None)
                 done['bands'] = onion.bands(source, w['seed'], end, person['bbox'], moving, picture, done['trails'])
                 done['onion'] = picture.name
                 done['peak'] = onion.peak(source, w['seed'], end, person['bbox'], picture)
@@ -421,7 +424,7 @@ def _run(video, detector, pose_model, checkpoint, out, max_shots=LOOK['max_shots
                 _step('prepare', ['--queries', base.with_suffix('.obs.json'), '--shots', root/'shots.json', '--job', name,
                                   '--out', stem.with_suffix('.freeze.json'), '--allow-tracking', '--max-seconds', LOOK['track_seconds']])
                 queued.append((name, group, stem, _submit(['--job', name, '--queries', base.with_suffix('.obs.json'), '--frozen', stem.with_suffix('.freeze.json'),
-                                                           '--out', stem.with_suffix('.tracks.json'), '--checkpoint', checkpoint,
+                                                           '--out', joint_tracking.track_path(stem, group), '--checkpoint', checkpoint,
                                                            '--max-seconds', max(1, min(LOOK['track_seconds'], int(remaining())))]), None))
             except STEP_ERRORS as error:
                 queued.append((name, group, stem, None, error))
@@ -500,7 +503,7 @@ def _run(video, detector, pose_model, checkpoint, out, max_shots=LOOK['max_shots
                     if error:
                         raise error
                     _finish(handle)
-                    tracked.append((name, group, stem, paths.load(stem.with_suffix('.tracks.json'))[0]))
+                    tracked.append((name, group, stem, paths.load(joint_tracking.track_path(stem, group))[0]))
                 except STEP_ERRORS as error:
                     entry['errors'].append(dict(window=w, job=name, error=str(error)[:300]))
                     lines.append(f'  - {group} 실패: {str(error)[:120]}')
@@ -510,6 +513,17 @@ def _run(video, detector, pose_model, checkpoint, out, max_shots=LOOK['max_shots
             end = w['end'] if cut is None else min(w['end'], max(cut, w['seed']+LOOK['min_frames']-1))
             if end < w['end']:
                 done['cut_after'] = end; start = end+1
+            # Cuts/reseeding remain based on raw model visibility. The selected joint stream is separate;
+            # bind/analyze use the raw files so fusion never manufactures a surface ease measurement.
+            observations = None
+            for k, (name, group, stem, packet) in enumerate(tracked):
+                if group in joint_tracking.GROUPS:
+                    if observations is None:
+                        observations, _ = paths.load(base.with_suffix('.obs.json'))
+                    selected = joint_tracking.reconcile(packet, pose_frames, observations['seed_source']['track_id'],
+                                                       dict(w, end=end), joint_tracking.track_path(stem, group), pose_for(w['seed']))
+                    paths.write_json(stem.with_suffix('.tracks.json'), selected)
+                    tracked[k] = (name, group, stem, selected)
             slot = []; lines.append(slot); entry['windows'].append(done)
             pending = (entry, sid, w, end, base, people, receipt, tracked, done, slot, len(entry['errors']))
         lines.append('')
@@ -557,7 +571,8 @@ def _run(video, detector, pose_model, checkpoint, out, max_shots=LOOK['max_shots
         if label:
             done['motif'] = label
     record = dict(schema='image-lens.look/1', source_video=str(source), source_sha256=scan['source_sha256'], params=LOOK,
-                  max_shots=max_shots, scaled=scaled, onion_sheets=sheets, frame_sheets=frame_sheets, errors=errors, shots=shots)
+                  max_shots=max_shots, scaled=scaled, onion_sheets=sheets, frame_sheets=frame_sheets, errors=errors, shots=shots,
+                  joint_tracking=joint_tracking.PARAMS)
     from image_lens import check
     record['check'] = check.spans(record, fps)
     try:
