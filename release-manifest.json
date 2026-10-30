@@ -20,7 +20,7 @@
   ],
   "manifest_self_excluded": true,
   "file_count": 133,
-  "total_bytes": 1389134,
+  "total_bytes": 1390396,
   "files": [
     {
       "path": ".gitattributes",
@@ -79,8 +79,8 @@
     },
     {
       "path": "docs/look-notes.md",
-      "bytes": 18323,
-      "sha256": "e6051eb8e79256c0e51283aa87ac3f4486bb10c7da613610128735e10c6516ab"
+      "bytes": 18921,
+      "sha256": "63ba73ca939f921ce2b1b3941fda3bf09b3c9ff3ebfe2905e88b7670909493b0"
     },
     {
       "path": "docs/provenance.md",
@@ -214,8 +214,8 @@
     },
     {
       "path": "image_lens/run_point_tracker.py",
-      "bytes": 19798,
-      "sha256": "df16ec087574168a9fdb154187b46ea76260ede1a8b4becfc204dcbfe94de64a"
+      "bytes": 20462,
+      "sha256": "42ee90c3e3e241301374cb584f9f09033fd3c196ab8e55b3574155649d551c22"
     },
     {
       "path": "image_lens/shot-detector-pins.json",
