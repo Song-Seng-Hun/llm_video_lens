@@ -25,11 +25,23 @@ PARAMS = {'device': 'mps', 'torch_threads': 8, 'interop_threads': 1, 'offline': 
           'mixed_initialization_queries': False, 'seed': 0}
 
 
+def _state(path):
+    st = os.stat(path)
+    return st.st_dev, st.st_ino, st.st_size, st.st_mtime_ns, st.st_ctime_ns
+
+
 def sha(path):
+    """A file of 1 MiB or more keeps its digest while its state is unchanged (any write moves ctime); the serving child
+    checks the source video for every job."""
+    key = _state(path)
+    if key in _SHA:
+        return _SHA[key]
     h = hashlib.sha256()
     with open(path, 'rb') as f:
         for b in iter(lambda: f.read(1048576), b''):
             h.update(b)
+    if key[2] >= 1048576 and _state(path) == key:
+        _SHA[key] = h.hexdigest()
     return h.hexdigest()
 
 
@@ -51,7 +63,7 @@ def configure_spatial_shape(predictor, shape):
 
 
 # A serving child (tracking_child.py --serve) keeps these between jobs: the checkpoint hash per file state and the loaded model.
-_CHECKED, _MODELS = {}, {}
+_CHECKED, _MODELS, _SHA = {}, {}, {}
 
 
 def checkpoint_sha(path):

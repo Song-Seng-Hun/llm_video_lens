@@ -143,6 +143,18 @@ class Contracts(unittest.TestCase):
             jobs.prepare('queries.json', 'shots.json', 'job.freeze.json', 'shot0')
         self.assertFalse((self.root/'job.freeze.json').exists())
 
+    def test_kept_digest_follows_a_rewrite(self):
+        import hashlib, runpy
+        from image_lens import run_point_tracker
+        big = self.root/'big.bin'; big.write_bytes(b'a'*2097152)
+        helpers = (paths.sha, run_point_tracker.sha, shot_boundaries.sha,
+                   runpy.run_path(str(REPO/'image_lens'/'shot_boundaries.py'))['sha'])
+        for sha in helpers:
+            self.assertEqual(sha(big), sha(big))
+        big.write_bytes(b'b'*2097152)  # same size; ctime moves
+        for sha in helpers:
+            self.assertEqual(sha(big), hashlib.sha256(b'b'*2097152).hexdigest())
+
     def test_prepare_imports_no_torch(self):
         paths.write_json('queries.json', self.query())
         script = '''import sys
