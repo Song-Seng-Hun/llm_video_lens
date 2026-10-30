@@ -96,7 +96,7 @@ def describe(packets, window):
                                     frames=[common[lo], common[hi]], ease=motion_report.ease(common[lo:hi+1], rel[lo:hi+1]),
                                     speeds=motion_report.speeds(common[lo:hi+1], rel[lo:hi+1]),
                                     # Windows start where the drawing changes: a stroke from the first frame was already
-                                    # moving, its speed-up is before the cut (AKAGE f47: 40 px in two frames, then settles).
+                                    # moving, its speed-up is before the cut (clip A f47: 40 px in two frames, then settles).
                                     from_start=lo == 0))
         if not strokes:
             continue
@@ -194,7 +194,7 @@ def bridge_lines(result):
     return out
 
 
-# Calibrated by eye on AKAGE (all plain frames pass; echo-copy ranges fail) and on a 39-cover MikuMiku playlist
+# Calibrated by eye on clip A (all plain frames pass; echo-copy ranges fail) and on a 39-cover playlist (clip C)
 # (6/6 good skeletons pass, 2/26 wrong ones pass). Ratios are in shoulder widths.
 SKELETON = dict(min_score=.30, mean_min=.45, torso=(1., 2.6), hip_width=(.45, 1.6), max_arm=2.5)
 
@@ -222,11 +222,11 @@ def skeleton_check(track):
     return True, 'ok'
 
 
-# Shot framing from which joints are on screen (Seedance: hips missing or guessed onto the chest dropped 37 of 43
-# windows to face-only). Eyes farther apart than this share of the frame width is a face close-up: Seedance face
+# Shot framing from which joints are on screen (clip B: hips missing or guessed onto the chest dropped 37 of 43
+# windows to face-only). Eyes farther apart than this share of the frame width is a face close-up: clip B face
 # close-ups had .37-.38, bust shots .14-.22.
 # On upper-body shots the pose model still guesses ankles at the frame bottom (scores .3-.5, shoulder to ankle
-# <=1.2 shoulder widths); real full-body Seedance frames had scores >=.8 and 2.8-4.6 widths.
+# <=1.2 shoulder widths); real full-body clip B frames had scores >=.8 and 2.8-4.6 widths.
 FRAMING = dict(face_eyes=.3, min_score=.30, border=.02, ankle_score=.6, legs=2.)
 FRAMING_KO = dict(full='전신', thigh='무릎 위', upper='상반신', face='얼굴 클로즈업')
 
@@ -243,7 +243,7 @@ def framing(track, width, height):
             and (k[15][1]+k[16][1]-k[5][1]-k[6][1])/2 >= FRAMING['legs']*shoulders:
         return 'full'
     if skeleton_check(track)[0]:
-        return 'thigh'  # hips and thighs pass the full check, feet out of the shot (AKAGE)
+        return 'thigh'  # hips and thighs pass the full check, feet out of the shot (clip A)
     return 'upper' if seen(5) or seen(6) else 'face'
 
 
@@ -267,7 +267,7 @@ def upper_check(track):
 
 
 
-# Relations and shoulder moves straight from the per-frame pose (every frame is posed). Seedance blind test: hand to
+# Relations and shoulder moves straight from the per-frame pose (every frame is posed). Clip B blind test: hand to
 # cheek, hand to face, shoulder rolls and shrugs were missed; the tracked-point path measures limbs against the
 # shoulder midpoint, which cancels a shared shrug. Distances are in face or shoulder widths, durations in seconds.
 # COCO-WholeBody: 23-90 face contour and features, 91-111 left hand, 112-132 right hand.
@@ -344,7 +344,7 @@ def pose_events(pose_frames, window, fps):
         for s, (wrist, hand) in HANDS.items():
             seen[s] += ok(p, wrist)
             points = [k[i] for i in (wrist, *hand) if ok(p, i)]
-            # Hand points without their wrist are often something else near the face (Seedance: a cat's paws).
+            # Hand points without their wrist are often something else near the face (clip B: a cat's paws).
             if len(face) < EVENTS['face_points'] or not ok(p, wrist):
                 continue
             x0, x1 = min(q[0] for q in face), max(q[0] for q in face); y0, y1 = min(q[1] for q in face), max(q[1] for q in face)
@@ -393,10 +393,10 @@ def pose_events(pose_frames, window, fps):
                 width=width, hands_seen={sides[s]: round(seen[s]/max(1, len(people)), 2) for s in HANDS})
 
 
-# Several people (Kaguya live scene: two or three girls lean on, pull and point at each other; only the largest was
+# Several people (clip D live scene: two or three girls lean on, pull and point at each other; only the largest was
 # followed, and a girl falling backward read as a camera pan). Each person is followed by the pose tracker id alone;
 # relations are pose geometry in shoulder widths and are candidates. Overlapping figures often merge into one
-# detection box with a mixed skeleton (Kaguya f450-f530), so heavy box overlap is said, not hidden.
+# detection box with a mixed skeleton (clip D f450-f530), so heavy box overlap is said, not hidden.
 PEOPLE = dict(max_people=3, presence=.5, min_area=.25, move=.5, distance=.5, touch_pad=.25, touch_seconds=.1,
               upright_deg=30., fallen_deg=60., overlap_iou=.5, overlap_share=.5)
 

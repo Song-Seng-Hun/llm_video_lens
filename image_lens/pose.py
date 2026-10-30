@@ -24,7 +24,7 @@ GROUPS = dict(head=('nose', 'eye_l', 'eye_r', 'hair_front', 'head_top', 'hair_si
 # When the skeleton is implausible (props, folded or cut-off bodies), arm/leg names would be confident and wrong:
 # keep the face, drop named limbs, and track unnamed high-contrast corners inside the person box instead.
 # Hair seeds sit on a head frame built from the two eyes: d = eye distance, up = away from the nose.
-# Offsets in d units; checked by eye on AKAGE only, so every seed stays a candidate surface point.
+# Offsets in d units; checked by eye on clip A only, so every seed stays a candidate surface point.
 HAIR = dict(front=(0., .8), top=(0., 1.7), side=(1.3, -.2))
 
 
@@ -216,7 +216,7 @@ def seed_points(track, width, height):
     kept = {}
     for name, p in points.items():
         x, y = p['xy']
-        # Off-screen joints come back clamped to the frame edge (seen on AKAGE close-ups); drop them.
+        # Off-screen joints come back clamped to the frame edge (seen on clip A close-ups); drop them.
         b = SEED['border_px']
         if math.isfinite(x) and math.isfinite(y) and b <= x < width-b and b <= y < height-b:
             kept[name] = dict(xy=[round(x, 2), round(y, 2)], seed_rule=p['seed_rule'])

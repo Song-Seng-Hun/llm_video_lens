@@ -4,7 +4,7 @@ import math
 import statistics
 
 # A big character sliding over a static layout also yields one dominant transform; count it as the frame moving only
-# when the agreeing matches span most of the frame. AKAGE's sliding figure spans 32-37% of the width; the MikuMiku
+# when the agreeing matches span most of the frame. Clip A's sliding figure spans 32-37% of the width; the clip C
 # playlist pan spans 53-70% of the width but only 27-58% of the height (the cover art is a wide band).
 CAMERA = dict(scale=.5, features=2000, min_inliers=30, ransac_px=3., min_spread=(.5, .25), rekey_px=24., chain_spread=(.75, .5), still_share=.25, known_share=.5, zoom=1.1)
 
@@ -21,7 +21,7 @@ def _step(cv2, np, matcher, base, keys, desc, shape, spread_min=CAMERA['min_spre
     if M is None or inliers.sum() < CAMERA['min_inliers']:
         return None
     # A still layer (an overlay panel, a static background) next to a big moving figure: the agreeing matches are the
-    # figure, not the camera (AKAGE: the title panel stays while the dancer moves 30-50 px).
+    # figure, not the camera (clip A: the title panel stays while the dancer moves 30-50 px).
     shift = math.hypot(M[0, 2]+(M[0, 0]-1)*shape[1]/2+M[0, 1]*shape[0]/2, M[1, 2]+M[1, 0]*shape[1]/2+(M[1, 1]-1)*shape[0]/2)
     still = int((np.hypot(*(b-a).T) <= CAMERA['ransac_px']).sum())
     if shift > CAMERA['ransac_px'] and still >= max(CAMERA['min_inliers'], CAMERA['still_share']*inliers.sum()):
@@ -37,9 +37,9 @@ def path(video, start, end):
     """{frame: (dx, dy, scale)} of the frame centre relative to `start`; frames that could not be matched are left out.
     Frames are matched to the start frame. When one does not match and the last matched frame is CAMERA['rekey_px'] or
     more away, it is matched to that frame instead and the steps are chained, so a pan stays known after the start
-    frame has left the view (Kaguya 70-100 s: a 680 px pan at 23.35 s was unknown). A chained step needs matches over
+    frame has left the view (clip D 70-100 s: a 680 px pan at 23.35 s was unknown). A chained step needs matches over
     CAMERA['chain_spread'] of the frame (ORB leaves a 31 px border, so about .94 is the most at 1920 px): frame to frame, a big figure over a still layout moves as one piece and read
-    as the camera (AKAGE 2.76 s: 50 px, really 0; the figure spans about 70% of the width)."""
+    as the camera (clip A 2.76 s: 50 px, really 0; the figure spans about 70% of the width)."""
     import cv2
     import numpy as np
     cap = cv2.VideoCapture(str(video))
@@ -94,7 +94,7 @@ def describe(camera, start, end, min_px):
     last = frames[-1]
     shift = [(camera[n][0]-camera[frames[0]][0], camera[n][1]-camera[frames[0]][1]) for n in frames]
     net = shift[-1]
-    # A frame or two that matched the figure instead of the background jumps 30-50 px and back (AKAGE): the farthest
+    # A frame or two that matched the figure instead of the background jumps 30-50 px and back (clip A): the farthest
     # point is taken from the running median of five.
     half = 2
     smooth = [(statistics.median(p[0] for p in shift[max(0, i-half):i+half+1]), statistics.median(p[1] for p in shift[max(0, i-half):i+half+1]))

@@ -21,7 +21,7 @@ def _side(side):
 
 def _speed(stroke):
     """Per-frame speed of a stroke; from the window's first frame its start is cut off (the window begins where the
-    drawing changes, AKAGE f47: 40 px in two frames), so that is said too."""
+    drawing changes, clip A f47: 40 px in two frames), so that is said too."""
     text = motion_report.speed_text(stroke.get('speeds'))
     if not text:
         return ''
@@ -69,7 +69,7 @@ def _screen(groups):
 
 
 def _bands(bands):
-    """Per-band shifts, plus one sentence when bands go opposite ways sideways: in the blind test (AKAGE pose 1, head
+    """Per-band shifts, plus one sentence when bands go opposite ways sideways: in the blind test (clip A pose 1, head
     right 22 / waist left 18-29) two readers given only the numbers did not read them as "the waist goes left"."""
     if not bands or all(b['dx'] is None for b in bands):
         return None
@@ -96,7 +96,7 @@ def _close(a, b):
 def _differences(done, first):
     """What a repeat did differently from the pose's first showing: body-centre shift, limb statements and height bands.
     Statements match by direction and size (8 px or a quarter) whatever their label: move-point letters are assigned
-    afresh per window, and on identical AKAGE drawings the pose model sometimes names the other arm."""
+    afresh per window, and on identical clip A drawings the pose model sometimes names the other arm."""
     out = []
     a, b = done.get('body'), first.get('body')
     if a and b:
@@ -215,7 +215,7 @@ def window_line(done, fps, first=None):
 
 def events(found, fps):
     """Fields from the per-frame pose: hand near the face, each shoulder's rises and falls, shoulder-width changes, and
-    hands mostly unseen. A limb below the stroke threshold is not still when its hand was out of view (Seedance 13 s:
+    hands mostly unseen. A limb below the stroke threshold is not still when its hand was out of view (clip B 13 s:
     hands spreading off the bottom edge read as "정지")."""
     if not found:
         return []
@@ -273,7 +273,7 @@ def bridge_line(bridge):
         return None
     a, b = bridge['frames']
     # The largest change on each screen side: by size alone both could be one arm, and the other hand's 294 px drop
-    # (AKAGE f61->f62) was lost in the blind test.
+    # (clip A f61->f62) was lost in the blind test.
     largest = {}
     for l in sorted(bridge['limbs'], key=lambda l: -l['distance_px']):
         largest.setdefault(l['side'], l)
