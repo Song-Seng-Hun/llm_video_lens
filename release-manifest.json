@@ -20,7 +20,7 @@
   ],
   "manifest_self_excluded": true,
   "file_count": 132,
-  "total_bytes": 1377647,
+  "total_bytes": 1378600,
   "files": [
     {
       "path": ".gitattributes",
@@ -59,8 +59,8 @@
     },
     {
       "path": "docs/guide.md",
-      "bytes": 17153,
-      "sha256": "3eb46f913153fde3edde5a0ff5123109a2eb0f2ed7f26ee80391479cb8fc06a5"
+      "bytes": 17149,
+      "sha256": "2766d5410b35e43fd0cd03b44857a612eb08d844397b12614494419245d023fb"
     },
     {
       "path": "docs/import-provenance.json",
@@ -79,8 +79,8 @@
     },
     {
       "path": "docs/look-notes.md",
-      "bytes": 15148,
-      "sha256": "c71acbc8ac60aee73e3d396e179ee64ca4d7f3c326907b7200c405ddc716ffb3"
+      "bytes": 15755,
+      "sha256": "f21bc73bf5386ed080b71139ae29e98ecb2e69c082dbb6002faaae48a5888701"
     },
     {
       "path": "docs/provenance.md",
@@ -204,8 +204,8 @@
     },
     {
       "path": "image_lens/pose.py",
-      "bytes": 23480,
-      "sha256": "5facb935835a42ca2767868108745e1fdf4f4b15529f031b063455fff9a5db01"
+      "bytes": 23830,
+      "sha256": "fb9798236fc8f29a0ef2b9c9306df86f2dd36c37456e0b0e5462b7fda3d50f32"
     },
     {
       "path": "image_lens/run_point_tracker.py",
