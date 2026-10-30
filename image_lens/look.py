@@ -150,7 +150,17 @@ def fit(source, root, max_pixels=1920*1080):
     return copy, {'from': [w, h], 'to': list(size)}
 
 
-def run(video, detector, pose_model, checkpoint, out, max_shots=LOOK['max_shots'], max_seconds=1800):
+def run(*args, **kwargs):
+    from image_lens import watchdog
+    # One tracker child serves every window (clip B: 137 jobs each paid about 0.85 s to start Torch and load the model).
+    watchdog.shared = watchdog.Worker()
+    try:
+        return _run(*args, **kwargs)
+    finally:
+        watchdog.shared.close(); watchdog.shared = None
+
+
+def _run(video, detector, pose_model, checkpoint, out, max_shots=LOOK['max_shots'], max_seconds=1800):
     started = time.monotonic()
     def remaining():
         return max_seconds-(time.monotonic()-started)

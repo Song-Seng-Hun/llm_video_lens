@@ -261,10 +261,12 @@ def dispatch(command, arguments):
         # an independent hard deadline and reaps only this job's process group.
         from image_lens import watchdog
         child = Path(__file__).with_name('tracking_child.py')
+        command = [sys.executable, '-I', '-B', str(child), '--workspace', str(paths.workspace_root())]
         try:
-            returncode, stdout, stderr = watchdog.run(
-                [sys.executable, '-I', '-B', str(child), '--workspace', str(paths.workspace_root()), *args],
-                a.max_seconds)
+            if watchdog.shared is not None:
+                returncode, stdout, stderr = watchdog.shared.run(command, args, a.max_seconds)
+            else:
+                returncode, stdout, stderr = watchdog.run([*command, *args], a.max_seconds)
         except watchdog.ChildTimeout as error:
             if error.stdout: print(error.stdout, end='')
             if error.stderr: print(error.stderr, end='', file=sys.stderr)

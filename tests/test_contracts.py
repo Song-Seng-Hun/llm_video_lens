@@ -237,6 +237,34 @@ raise SystemExit(main(['--workspace', sys.argv[2], 'prepare', '--queries', 'quer
         with self.assertRaises(ChildProcessError): os.waitpid(pid, os.WNOHANG)
         with self.assertRaises(ProcessLookupError): os.kill(pid, 0)
 
+    @unittest.skipUnless(sys.platform != 'win32', 'POSIX process-group watchdog')
+    def test_serving_child_is_reused_and_replaced_after_timeout_or_failure(self):
+        import os
+        from image_lens import watchdog
+        # Stands in for tracking_child.py --serve: 'sleep' hangs, 'fail' answers 1 and exits, anything else answers with the pid.
+        script = ('import json, os, sys, time\n'
+                  'for line in sys.stdin:\n'
+                  '    a = json.loads(line)\n'
+                  '    if a == ["sleep"]: time.sleep(10)\n'
+                  '    code = 1 if a == ["fail"] else 0\n'
+                  '    print(json.dumps(dict(returncode=code, stdout=str(os.getpid()), stderr="")), flush=True)\n'
+                  '    if code: break\n')
+        worker = watchdog.Worker(); command = [sys.executable, '-I', '-B', '-c', script]
+        try:
+            first = worker.run(command, ['a'], 5); second = worker.run(command, ['b'], 5)
+            self.assertEqual(first[0], 0); self.assertEqual(first[1], second[1])
+            with self.assertRaises(watchdog.ChildTimeout) as caught:
+                worker.run(command, ['sleep'], .3)
+            pid = caught.exception.child_pid
+            with self.assertRaises(ChildProcessError): os.waitpid(pid, os.WNOHANG)
+            with self.assertRaises(ProcessLookupError): os.kill(pid, 0)
+            third = worker.run(command, ['c'], 5)
+            self.assertNotEqual(third[1], first[1])
+            self.assertEqual(worker.run(command, ['fail'], 5)[0], 1)
+            self.assertNotEqual(worker.run(command, ['d'], 5)[1], third[1])
+        finally:
+            worker.close()
+
     def test_parent_interruption_kills_and_reaps_child(self):
         import os
         from unittest.mock import patch
