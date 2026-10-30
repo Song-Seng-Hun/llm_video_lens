@@ -20,7 +20,7 @@
   ],
   "manifest_self_excluded": true,
   "file_count": 115,
-  "total_bytes": 1152739,
+  "total_bytes": 1153338,
   "files": [
     {
       "path": ".gitattributes",
@@ -34,8 +34,8 @@
     },
     {
       "path": "README.md",
-      "bytes": 23091,
-      "sha256": "db1048a5adae060d38ed89ae866b72b2b1f3f0b0ae5d5950b28d76cd1f30b8a6"
+      "bytes": 23690,
+      "sha256": "f21cf2b5a95c864859d1c36ab3c0a26775bcfd1025ea28e9809e0da8d42dce3f"
     },
     {
       "path": "docs/import-provenance.json",
