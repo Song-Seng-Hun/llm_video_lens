@@ -149,6 +149,15 @@ class Lan(unittest.TestCase):
                 self.app.jobs.pop('a'*32, None)
             (state/('a'*32+'.json')).unlink()
 
+    def test_status_reports_the_snapshot_commit_file(self):
+        commit = Path(self.cfg_raw['repo'])/'COMMIT'
+        commit.write_text('abc1234\n')
+        again = server.App(server.load_config(self.cfg_path))
+        try:
+            self.assertEqual(again.commit, 'abc1234')
+        finally:
+            again.close(); commit.unlink()
+
     def test_production_config_refuses_loopback_and_overrides(self):
         d = Path(self.tmp.name)
         for change in (dict(test_mode=False), dict(test_mode=False, bind=['en0'], limits={}, allow='127.0.0.0/8', port=8766),

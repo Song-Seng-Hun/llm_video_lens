@@ -50,6 +50,7 @@ Do these only after approving an always-on listener (RunAtLoad + KeepAlive, en0/
    mkdir -p ~/tools/image-lens/api ~/tools/image-lens/app && chmod 700 ~/tools/image-lens
    cp ~/dev/llm_image_lens/lan/{server.py,sign.py} ~/tools/image-lens/api/
    git -C ~/dev/llm_image_lens archive master | tar -x -C ~/tools/image-lens/app
+   git -C ~/dev/llm_image_lens rev-parse --short master > ~/tools/image-lens/app/COMMIT
    ```
 2. Write the config: `mkdir -p ~/.image-lens ~/AI-Look && chmod 700 ~/.image-lens ~/AI-Look` (launchd writes its
    output files into `~/AI-Look`), copy `api.example.json` to
