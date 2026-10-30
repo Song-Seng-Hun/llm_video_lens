@@ -204,7 +204,7 @@ def window_line(done, fps, first=None):
     if lost:
         notes.append('끊김 ' + ', '.join(f"{g['group']} f{g['lost']['after']}~" for g in lost))
     if done.get('cut_after') is not None:
-        notes.append(f"f{done['cut_after']} 뒤 그림 바뀜")
+        notes.append(f"f{done['cut_after']} 뒤 " + ('점 끊김(그림 그대로)' if done.get('cut_redrawn') is False else '그림 바뀜'))
     warnings = sum(g.get('warnings', 0) for g in done.get('groups', []))
     if warnings:
         notes.append(f'경고 {warnings}')

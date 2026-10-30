@@ -5,12 +5,14 @@ import unittest
 
 REPO = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO))
-from image_lens import look
+from image_lens import look, pose
+sys.path.insert(0, str(REPO/'tests'))
+from test_pose import track
 
 
 class Windows(unittest.TestCase):
     def frames(self, n0, n1):
-        return {n: [dict(track_id='t')] for n in range(n0, n1+1)}
+        return {n: [track()] for n in range(n0, n1+1)}
 
     def test_long_shot_splits_into_reseeded_windows(self):
         found, skipped = look.windows(dict(start_frame=0, end_frame=399), self.frames(0, 399), set())
@@ -28,6 +30,20 @@ class Windows(unittest.TestCase):
         self.assertIn('fewer than', skipped[0]['reason'])
         found, skipped = look.windows(dict(start_frame=0, end_frame=50), {}, set())
         self.assertEqual(found, []); self.assertEqual(skipped[0]['reason'], 'no unflagged pose track')
+
+    def sleeve(self):
+        bad = track(); bad['keypoints'][pose.BODY['wrist_l']] = [900., 600.]  # 3D clip f368: a sleeve read as a long arm
+        return [bad]
+
+    def test_a_bad_skeleton_at_the_seed_moves_it_to_the_next_good_frame(self):
+        poses = self.frames(0, 99); poses[0] = self.sleeve()
+        self.assertEqual(look.windows(dict(start_frame=0, end_frame=99), poses, set())[0], [dict(seed=1, end=99)])
+
+    def test_the_seed_stays_when_no_good_frame_is_close(self):
+        poses = self.frames(0, 99)
+        for n in range(4):
+            poses[n] = self.sleeve()
+        self.assertEqual(look.windows(dict(start_frame=0, end_frame=99), poses, set())[0], [dict(seed=0, end=99)])
 
 
 
@@ -64,8 +80,24 @@ class Cut(unittest.TestCase):
     def test_no_cut_when_points_last_to_the_end(self):
         self.assertIsNone(look.cut_frame([self.packet(dict(a=99, b=95, c=30))], dict(seed=0, end=99)))
 
+    def test_a_cut_over_a_still_picture_is_not_a_new_drawing(self):
+        import tempfile
+        import cv2
+        import numpy as np
+        with tempfile.TemporaryDirectory(dir=REPO/'workspace') as d:
+            rng = np.random.default_rng(3)
+            room = cv2.GaussianBlur(rng.integers(0, 255, (120, 160, 3), dtype=np.uint8), (3, 3), 0)
+            video = Path(d)/'cut.avi'; out = cv2.VideoWriter(str(video), cv2.VideoWriter_fourcc(*'MJPG'), 10, (160, 120))
+            for k in range(8):
+                out.write(room if k < 5 else 255-room)  # the drawing changes after frame 4
+            out.release()
+            from image_lens import motion_view
+            self.assertLess(look.changed_after(video, 1), motion_view.CHANGE['min_mean_abs_diff'])
+            self.assertGreaterEqual(look.changed_after(video, 4), motion_view.CHANGE['min_mean_abs_diff'])
+            self.assertGreaterEqual(look.changed_after(video, 3), motion_view.CHANGE['min_mean_abs_diff'])  # one frame early still sees it
+
     def test_reseed_starts_after_the_cut(self):
-        poses = {n: [dict(track_id='t')] for n in range(0, 200)}
+        poses = {n: [track()] for n in range(0, 200)}
         window, _ = look.next_window(dict(start_frame=0, end_frame=199), 42, poses, {42, 43})
         self.assertEqual(window, dict(seed=44, end=199))
 
