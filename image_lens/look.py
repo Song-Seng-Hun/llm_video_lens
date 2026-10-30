@@ -292,7 +292,8 @@ def _run(video, detector, pose_model, checkpoint, out, max_shots=LOOK['max_shots
             slot.append(f"  - 골격 신뢰 낮음({skeleton['reason']}): 팔·다리 이름 없이 얼굴과 많이 움직인 곳(move-a…)만 봄")
         from image_lens import camera, motion_report
         try:
-            frame_motion = camera.path(source, w['seed'], end)
+            main = body_motion.largest(pose_frames.get(w['seed']))
+            frame_motion = camera.path(source, w['seed'], end, main['bbox'] if main else None)
         except Exception as error:  # OpenCV raises its own error type; a missing estimate only disables the filter
             frame_motion = None; errors.append(dict(window=w, step='camera', error=str(error)[:300]))
         cam = camera.between(frame_motion, w['seed'], end)

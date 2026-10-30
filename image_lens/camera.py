@@ -6,7 +6,7 @@ import statistics
 # A big character sliding over a static layout also yields one dominant transform; count it as the frame moving only
 # when the agreeing matches span most of the frame. Clip A's sliding figure spans 32-37% of the width; the clip C
 # playlist pan spans 53-70% of the width but only 27-58% of the height (the cover art is a wide band).
-CAMERA = dict(scale=.5, features=2000, min_inliers=30, ransac_px=3., min_spread=(.5, .25), rekey_px=24., chain_spread=(.75, .5), still_share=.25, known_share=.5, zoom=1.1)
+CAMERA = dict(scale=.5, features=2000, min_inliers=30, ransac_px=3., min_spread=(.5, .25), rekey_px=24., chain_spread=(.75, .5), still_share=.25, person_pad=.1, background_features=200, known_share=.5, zoom=1.1)
 
 
 def _step(cv2, np, matcher, base, keys, desc, shape, spread_min=CAMERA['min_spread']):
@@ -33,8 +33,9 @@ def _step(cv2, np, matcher, base, keys, desc, shape, spread_min=CAMERA['min_spre
     return M
 
 
-def path(video, start, end):
+def path(video, start, end, person=None):
     """{frame: (dx, dy, scale)} of the frame centre relative to `start`; frames that could not be matched are left out.
+    With `person` (the main person's box on the start frame) a frame is matched on the background around it first.
     Frames are matched to the start frame. When one does not match and the last matched frame is CAMERA['rekey_px'] or
     more away, it is matched to that frame instead and the steps are chained, so a pan stays known after the start
     frame has left the view (clip D 70-100 s: a 680 px pan at 23.35 s was unknown). A chained step needs matches over
@@ -44,11 +45,11 @@ def path(video, start, end):
     the same start is cut from it (seed and look both ask for each window: clip B 42 x 0.4 s). Two are kept: look
     reports a window after seeding the next."""
     import os
-    stat = os.stat(video); key = (str(video), stat.st_size, stat.st_mtime_ns, start)
+    stat = os.stat(video); key = (str(video), stat.st_size, stat.st_mtime_ns, start, tuple(person) if person else None)
     for kept_key, kept_end, kept in _LAST:
         if kept_key == key and kept_end >= end:
             return {n: v for n, v in kept.items() if n <= end}
-    result = _path(video, start, end)
+    result = _path(video, start, end, person)
     _LAST[:] = [(key, end, result)]+_LAST[:1]
     return dict(result)
 
@@ -56,7 +57,7 @@ def path(video, start, end):
 _LAST = []
 
 
-def _path(video, start, end):
+def _path(video, start, end, person=None):
     from concurrent.futures import ThreadPoolExecutor
     import cv2
     import numpy as np
@@ -64,27 +65,47 @@ def _path(video, start, end):
     grays = [cv2.cvtColor(cv2.resize(bgr, None, fx=CAMERA['scale'], fy=CAMERA['scale']), cv2.COLOR_BGR2GRAY) for bgr in frames.window(video, start, end)]
     # ORB per frame is independent and gives the same points from a fresh detector, so it runs in threads (clip B
     # window: 0.14 -> 0.02 s); matching and RANSAC stay in frame order.
-    with ThreadPoolExecutor(8) as pool:
-        found = list(pool.map(lambda gray: cv2.ORB_create(CAMERA['features']).detectAndCompute(gray, None), grays))
+    # A big textured figure over a plain room takes most of the 2000 points, and its moves outvote the background
+    # (3D dance clip, fixed camera: 101 of 130 frames unknown); with the person masked out the room alone gives
+    # 300-900 agreeing matches at 0-1 px. A frame the background does not place is matched on the whole frame as before,
+    # and so is every frame when the background has too few points (a close-up).
+    def detect(mask):
+        with ThreadPoolExecutor(8) as pool:
+            return list(pool.map(lambda gray: cv2.ORB_create(CAMERA['features']).detectAndCompute(gray, mask), grays))
+    kinds = [detect(None)]
+    if person is not None and grays:
+        h, w = grays[0].shape; x0, y0, x1, y1 = person; px, py = CAMERA['person_pad']*(x1-x0), CAMERA['person_pad']*(y1-y0)
+        mask = np.full((h, w), 255, np.uint8)
+        mask[max(0, int((y0-py)*CAMERA['scale'])):max(0, int((y1+py)*CAMERA['scale'])),
+             max(0, int((x0-px)*CAMERA['scale'])):max(0, int((x1+px)*CAMERA['scale']))] = 0
+        background = detect(mask)
+        if len(background[0][0]) >= CAMERA['background_features']:
+            kinds.insert(0, background)
     matcher = cv2.BFMatcher(cv2.NORM_HAMMING, crossCheck=True)
     result = {}
     start_ref = last = None
-    for n, gray, (keys, desc) in zip(range(start, end+1), grays, found):
+    for i, (n, gray) in enumerate(zip(range(start, end+1), grays)):
+        here = [kind[i] for kind in kinds]
         if start_ref is None:
-            start_ref = last = (keys, desc, np.eye(3), 0.); centre = (gray.shape[1]/2, gray.shape[0]/2)
+            start_ref = last = (here, np.eye(3), 0.); centre = (gray.shape[1]/2, gray.shape[0]/2)
             result[n] = (0., 0., 1.)
             continue
-        ref = start_ref
-        M = _step(cv2, np, matcher, ref, keys, desc, gray.shape)
-        if M is None and last is not start_ref and last[3] >= CAMERA['rekey_px']:
-            ref = last
-            M = _step(cv2, np, matcher, ref, keys, desc, gray.shape, CAMERA['chain_spread'])
-        if M is None:
+        found = None
+        for (keys, desc), base in zip(here, start_ref[0]):
+            M = _step(cv2, np, matcher, base, keys, desc, gray.shape)
+            if M is not None:
+                found = (M, start_ref); break
+        if found is None and last is not start_ref and last[2] >= CAMERA['rekey_px']:
+            for (keys, desc), base in zip(here, last[0]):
+                M = _step(cv2, np, matcher, base, keys, desc, gray.shape, CAMERA['chain_spread'])
+                if M is not None:
+                    found = (M, last); break
+        if found is None:
             continue
-        total = np.vstack([M, [0, 0, 1]]) @ ref[2]
+        total = np.vstack([found[0], [0, 0, 1]]) @ found[1][1]
         x, y = total[0, 0]*centre[0]+total[0, 1]*centre[1]+total[0, 2], total[1, 0]*centre[0]+total[1, 1]*centre[1]+total[1, 2]
         result[n] = ((x-centre[0])/CAMERA['scale'], (y-centre[1])/CAMERA['scale'], math.hypot(total[0, 0], total[1, 0]))
-        last = (keys, desc, total, math.hypot(*result[n][:2]))
+        last = (here, total, math.hypot(*result[n][:2]))
     return result
 
 

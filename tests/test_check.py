@@ -1,4 +1,5 @@
 import json
+import math
 import tempfile
 import unittest
 from pathlib import Path
@@ -35,6 +36,23 @@ class Path_(unittest.TestCase):
             self.assertEqual(kept, fresh); self.assertEqual(max(kept), 20)
             kept[20] = None  # callers get their own copy
             self.assertEqual(camera.path(video, 0, 20), fresh)
+
+
+    def test_a_big_figure_over_a_still_background_leaves_the_camera_still(self):
+        import cv2
+        import numpy as np
+        with tempfile.TemporaryDirectory(dir=REPO/'workspace') as d:
+            # A still room and a figure covering half the view, sliding 6 px a frame.
+            rng = np.random.default_rng(5)
+            room = cv2.GaussianBlur(rng.integers(0, 255, (360, 640, 3), dtype=np.uint8), (3, 3), 0)
+            figure = rng.integers(0, 255, (260, 300, 3), dtype=np.uint8)
+            video = Path(d)/'figure.avi'; out = cv2.VideoWriter(str(video), cv2.VideoWriter_fourcc(*'MJPG'), 10, (640, 360))
+            for k in range(20):
+                image = room.copy(); image[50:310, 100+6*k:400+6*k] = figure; out.write(image)
+            out.release()
+            found = camera.path(video, 0, 19, [100, 50, 400, 310])
+            self.assertEqual(len(found), 20); self.assertTrue(all(math.hypot(dx, dy) < 1 for dx, dy, _ in found.values()))
+            self.assertLess(len(camera.path(video, 0, 19)), 20)  # on the whole frame the figure's moves leave it unknown
 
 
 class Frames(unittest.TestCase):

@@ -343,7 +343,7 @@ def gap_seeds(video, start, end, bbox, names):
     if end == start:
         return {}
     later = sorted({start+(end-start)//3, start+2*(end-start)//3, end} - {start})
-    moves = camera.path(video, start, end)
+    moves = camera.path(video, start, end, bbox)
     # Gaps are found in the box plus a zero margin, not the whole frame (whole-frame masks per gap were 0.23 of 0.37 s per
     # call on clip B). The margin is wider than the opening and distance-transform steps, so they see the same zeros
     # around the box as on the whole frame; the outline is still traced on the whole frame. Same seeds on 6 clips.
