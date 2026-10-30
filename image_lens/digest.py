@@ -179,7 +179,7 @@ def window_line(done, fps, first=None):
             if found:
                 shown = [f['text'] for f in found[:DIGEST['parts']]]
                 fields.append('몸 기준: ' + '; '.join(shown) + (f" (+{len(found)-DIGEST['parts']})" if len(found) > DIGEST['parts'] else ''))
-            elif not body.get('unknown'):
+            elif not body.get('unknown') and not body.get('uncertain'):
                 fields.append(f"몸 기준: 팔다리 {body['limit_px']:.0f}px 미만")
         else:
             moves = _screen(done.get('groups', []))
@@ -203,6 +203,9 @@ def window_line(done, fps, first=None):
     hidden = [f"{_side(u['side'])}{u['kind']}" for u in (done.get('body') or {}).get('unknown', [])]
     if hidden:
         notes.append('·'.join(hidden) + ' 대부분 가려져 모름')
+    unsure = [f"{_side(u['side'])}{u['part']}" for u in (done.get('body') or {}).get('uncertain', [])]
+    if unsure:
+        notes.append('·'.join(unsure) + ' 불확실(자세·추적 어긋남)')
     lost = [g for g in done.get('groups', []) if g.get('lost')]
     if lost:
         notes.append('끊김 ' + ', '.join(f"{g['group']} f{g['lost']['after']}~" for g in lost))

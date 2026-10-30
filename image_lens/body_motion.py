@@ -6,10 +6,16 @@ from image_lens import motion_report
 
 # min_seen: a limb seen on fewer of the window's frames is said as unknown, not read from its short runs (3D clip: an
 # oversize sleeve hid the arms on most frames; 11 of 31 such limbs on five clips were described from a few frames).
-BODY_MOTION = dict(min_ratio=.06, min_px=8., min_frames=4, max_segments=3, ref_coverage=.8, min_seen=.3)
+# disagree_*: a tracked limb point farther than disagree_px shoulder widths from the same pose joint on at least
+# disagree_share of its frames is said as uncertain, not as a move. Fit on 15 hand-clicked frames (3D clip, clip B): it
+# dropped 5 wrong arm claims (tracker drift, up to 2x the person size off) and no right one; on raised-arm frames the
+# pose followed the sleeve while the tracker was right, and those stayed below (26-46%). Few checks, narrow margin.
+BODY_MOTION = dict(min_ratio=.06, min_px=8., min_frames=4, max_segments=3, ref_coverage=.8, min_seen=.3,
+                   disagree_px=1., disagree_share=.5, pose_score=.3)
 PARTS = dict(wrist='손목', elbow='팔꿈치', thumb='엄지 끝', index='검지 끝', thigh='허벅지', knee='무릎', ankle='발목', move='많이 움직인 곳')
 HEAD = ('nose', 'eye-l', 'eye-r')
 LIMB_POINTS = {'팔': ('wrist', 'elbow', 'thumb', 'index'), '다리': ('thigh', 'knee', 'ankle')}
+JOINTS = dict(elbow=(7, 8), wrist=(9, 10), knee=(13, 14), ankle=(15, 16))  # COCO body indices (left, right)
 
 
 def _limb(pid):
@@ -97,12 +103,36 @@ def segments(path, tolerance):
     return split(0, len(path)-1)
 
 
-def describe(packets, window):
-    """Body centre shift plus per-limb relative strokes (direction, size, frames) and toward/away from the body axis."""
+def disagreement(points, kind, centre, size, pose_frames):
+    """{point_id: share of its frames where the pose joint of the person at the body centre is over disagree_px
+    shoulder widths away}, for tracked elbows, wrists, knees and ankles with a confident pose joint on min_frames."""
+    head = (0, 1, 2) if kind == 'face' else (5, 6)
+    result = {}
+    for pid, track in points.items():
+        name, _, side = pid.rpartition('-')
+        if name not in JOINTS or side not in ('l', 'r'):
+            continue
+        i = JOINTS[name][side == 'r']; far = []
+        for n, xy in track.items():
+            if n not in centre or not pose_frames.get(n):
+                continue
+            person = min(pose_frames[n], key=lambda t: math.dist(_mean([t['keypoints'][k] for k in head]), centre[n]))
+            if person['scores'][i] >= BODY_MOTION['pose_score']:
+                far.append(math.dist(xy, person['keypoints'][i]) > BODY_MOTION['disagree_px']*size)
+        if len(far) >= BODY_MOTION['min_frames']:
+            result[pid] = sum(far)/len(far)
+    return result
+
+
+def describe(packets, window, pose_frames=None):
+    """Body centre shift plus per-limb relative strokes (direction, size, frames) and toward/away from the body axis.
+    With pose_frames, a limb point the pose disagrees with is listed as uncertain instead of described."""
     points = series(packets, window)
     kind, centre, size = reference(points, window)
     if not kind:
         return None
+    apart = disagreement(points, kind, centre, size, pose_frames) if pose_frames else {}
+    uncertain = []
     limit = max(BODY_MOTION['min_px'], BODY_MOTION['min_ratio']*size)
     frames = sorted(centre)
     shift = (centre[frames[-1]][0]-centre[frames[0]][0], centre[frames[-1]][1]-centre[frames[0]][1])
@@ -140,6 +170,9 @@ def describe(packets, window):
         anchor = points.get(('hip-' if part in ('허벅지', '무릎', '발목') else 'shoulder-')+pid.rsplit('-', 1)[-1], {})
         at = [anchor[n][0]-centre[n][0] for n in common if n in anchor]
         x = sorted(at)[len(at)//2] if at else rel[0][0]
+        if apart.get(pid, 0) >= BODY_MOTION['disagree_share']:
+            uncertain.append(dict(point_id=pid, part=part, side='화면 왼쪽' if x < 0 else '화면 오른쪽', share=round(apart[pid], 2)))
+            continue
         if part == PARTS['move']:
             part = f"{part} {pid.rsplit('-', 1)[-1]}"  # unnamed: keep the letter so it matches the onion image and tracks
         limbs.append(dict(point_id=pid, part=part, side='화면 왼쪽' if x < 0 else '화면 오른쪽',
@@ -149,7 +182,7 @@ def describe(packets, window):
     return dict(reference=kind, size_px=round(size, 1), limit_px=round(limit, 1),
                 centre_shift=dict(direction=motion_report.direction(*shift), distance_px=round(math.hypot(*shift), 1),
                                   frames=[frames[0], frames[-1]], ease=motion_report.ease(frames, centre_path),
-                                  speeds=motion_report.speeds(frames, centre_path)), limbs=limbs, unknown=unknown)
+                                  speeds=motion_report.speeds(frames, centre_path)), limbs=limbs, unknown=unknown, uncertain=uncertain)
 
 
 def lines(result):
@@ -169,7 +202,9 @@ def lines(result):
         out.append(f"  - {limb['side']} {limb['part']}: {moves}{axis}")
     for u in result.get('unknown', []):
         out.append(f"  - {u['side']} {u['kind']}: 대부분 가려져 모름(보인 프레임 {u['seen']:.0%})")
-    if not result['limbs'] and not result.get('unknown'):
+    for u in result.get('uncertain', []):
+        out.append(f"  - {u['side']} {u['part']}: 자세 모델과 추적이 어긋나 불확실(어긋난 프레임 {u['share']:.0%})")
+    if not result['limbs'] and not result.get('unknown') and not result.get('uncertain'):
         out.append('  - 팔다리: 몸 기준으로도 기준 미만')
     return out
 
