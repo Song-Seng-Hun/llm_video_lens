@@ -19,8 +19,8 @@
     "historical experiment outputs"
   ],
   "manifest_self_excluded": true,
-  "file_count": 100,
-  "total_bytes": 984294,
+  "file_count": 102,
+  "total_bytes": 998831,
   "files": [
     {
       "path": ".gitattributes",
@@ -34,8 +34,8 @@
     },
     {
       "path": "README.md",
-      "bytes": 9880,
-      "sha256": "0dc5e0a9e352cf6d4c2eb5aeb022f4162e33b52613f4ba821b32340f26de67d9"
+      "bytes": 10878,
+      "sha256": "0b30592d93fb26fe09548d89ef7426b42dcefcd4a39c53260534bf51addd0cc7"
     },
     {
       "path": "docs/import-provenance.json",
@@ -94,8 +94,8 @@
     },
     {
       "path": "image_lens/cli.py",
-      "bytes": 14513,
-      "sha256": "bf1a806d7952b5dbb28d25ff29963d07632ac93a4ed57511bb3a760ad542fe3d"
+      "bytes": 15434,
+      "sha256": "41ad8d94bb9a7bbb2f49da251e4dbd97f2cadfdec182fe1737bdf184a4aeba5b"
     },
     {
       "path": "image_lens/foreground_regions.py",
@@ -108,9 +108,14 @@
       "sha256": "b3ec971ca2fb53ebb2a7cb5c73a8f2f54733770ef6c6ee445599fcca2ebc5b39"
     },
     {
+      "path": "image_lens/look.py",
+      "bytes": 10305,
+      "sha256": "7c3471623906bb9273dde024508bed84d6fa036f5a1b35a8fc88c507b91e429c"
+    },
+    {
       "path": "image_lens/motion_report.py",
-      "bytes": 32585,
-      "sha256": "4839415f63eaf7e2694910044d3f7e36085f4b8e5506672d117a13e090af3379"
+      "bytes": 32807,
+      "sha256": "d048e171845db94a7b9fd302948278d1dfa971efe89843a3a37a581221cc0228"
     },
     {
       "path": "image_lens/motion_view.py",
@@ -513,14 +518,19 @@
       "sha256": "baad7c5ac555f1997c4531c67bd6e52cb9aebba3817506b18708e53d5a8dd2d3"
     },
     {
+      "path": "tests/test_look.py",
+      "bytes": 1722,
+      "sha256": "15d275e6b41d5f17fb312312c7044b48bde08d928610632e170567e9f01a235a"
+    },
+    {
       "path": "tests/test_motion_readability.py",
       "bytes": 3220,
       "sha256": "366e459e154809b46283acee3258366609af7db1e5454c50fca14f63a32e4928"
     },
     {
       "path": "tests/test_pose.py",
-      "bytes": 7631,
-      "sha256": "57c5766aaf083ed3c34359aaf8f7d228105565d99bac289381252e0dbd06e07b"
+      "bytes": 8000,
+      "sha256": "c0668683405fb766746e392c262a2800315d1e39d0a9ef2319b6da107f156b54"
     }
   ]
 }

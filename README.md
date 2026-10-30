@@ -61,6 +61,14 @@ python -m image_lens analyze --help
 
 For an LLM reader, add `--report-bindings bindings.json --format markdown --trajectory-dir traj` to a report. The Markdown then leads with coarse strokes (median-filtered path split at corners and pauses, major = at least half the largest unit), and `traj/trajectory.png` shows the whole-frame path (blue early, red late), a stroke/timeline strip and up to four uncropped frames. The same pass lists appearance-change candidates: consecutive-frame gray-difference jumps to check with `compare --frames a,b`. A major stroke that overlaps a candidate is flagged, because echo/redraw can make the point jump. Strokes are recomputed in `brief`; the picture and candidates are not.
 
+## One command: look
+
+`look` runs the steps below in order and writes everything into one new directory: `scan`, one `pose` pass, then for each shot (first 16 by default) pose-seeded `seed`/`prepare`/`track`/`bind`/`analyze` per group and per window. Shots longer than 160 frames are split into consecutive windows, each reseeded on its first unflagged pose frame. Single-frame shots, shots without a usable pose track and short tails are skipped with a reason. A failed step is recorded and the next job continues; `--max-seconds` is checked between steps (each step keeps its own budget), so a run can overshoot by one step. Read `look.md` first: per shot, the major moves per group, "moved together" lines, warning counts and paths to the full report and trajectory sheet. `look.json` holds the same record, `steps.log` every step receipt.
+
+```sh
+python -m image_lens --workspace W look --video clip.mp4 --detector D.onnx --pose-model P.onnx --checkpoint scaled_offline.pth --out look-clip
+```
+
 ## Whole-body seeds from pose (optional)
 
 `pose` runs a local whole-body pose model over the canonical scan: YOLOX HumanArt person boxes, RTMW 133 keypoints (rtmlib, ONNX Runtime CPU) and ByteTrack IDs reset at every detected cut. The two ONNX files are user-supplied and pinned by size and SHA256; nothing is downloaded or bundled, and the weight license is not established. Install `requirements-pose.txt` into the same environment. The packet also flags frames where the pose layer itself is unreliable: overlapping person boxes (echo copies, afterimages) and body-skeleton jumps within one track.
