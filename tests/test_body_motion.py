@@ -229,3 +229,36 @@ class Hidden(unittest.TestCase):
         from image_lens import digest
         line = digest.window_line(dict(window=dict(seed=0, end=20), body=r, groups=[]), 50.)
         self.assertIn('오른팔 대부분 가려져 모름', line)
+
+
+class Disagree(unittest.TestCase):
+    def pose(self, wrist_r):
+        k = [[0., 0.]]*17; k[5], k[6] = [300., 300.], [100., 300.]; k[10] = list(wrist_r); k[9] = [320., 400.]
+        return [dict(keypoints=k, scores=[.9]*17, bbox=[0, 0, 400, 800])]
+
+    def paths(self):
+        paths = BodyMotion.body(None, lambda n: 0); paths['wrist-r'] = {n: (80.-10*n, 400.) for n in range(21)}
+        return paths
+
+    def test_a_wrist_far_from_the_pose_joint_is_uncertain_not_a_move(self):
+        # 3D clip f96: the tracked wrist drifted 2x the person size off while the pose (and the drawing) kept it near the hip.
+        r = body_motion.describe([packet(self.paths())], dict(seed=0, end=20), {n: self.pose((80., 700.)) for n in range(21)})
+        self.assertEqual(r['limbs'], [])
+        self.assertEqual(r['uncertain'], [dict(point_id='wrist-r', part='손목', side='화면 왼쪽', share=1.)])
+        self.assertIn('화면 왼쪽 손목: 자세 모델과 추적이 어긋나 불확실(어긋난 프레임 100%)', '\n'.join(body_motion.lines(r)))
+        from image_lens import digest
+        line = digest.window_line(dict(window=dict(seed=0, end=20), body=r, groups=[]), 50.)
+        self.assertIn('왼손목 불확실(자세·추적 어긋남)', line); self.assertNotIn('미만', line)
+
+    def test_a_wrist_near_the_pose_joint_or_without_pose_is_described(self):
+        paths = self.paths()
+        near = {n: self.pose(paths['wrist-r'][n]) for n in range(21)}
+        for frames in (near, None):
+            r = body_motion.describe([packet(paths)], dict(seed=0, end=20), frames)
+            self.assertEqual(([l['point_id'] for l in r['limbs']], r['uncertain']), (['wrist-r'], []))
+
+    def test_a_low_score_pose_joint_does_not_count(self):
+        frames = {n: self.pose((80., 700.)) for n in range(21)}
+        for f in frames.values(): f[0]['scores'][10] = .1
+        r = body_motion.describe([packet(self.paths())], dict(seed=0, end=20), frames)
+        self.assertEqual([l['point_id'] for l in r['limbs']], ['wrist-r'])

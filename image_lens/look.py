@@ -356,7 +356,7 @@ def _run(video, detector, pose_model, checkpoint, out, max_shots=LOOK['max_shots
                 slot.append(f'  - {group} 실패: {str(error)[:120]}')
         if quiet:slot.append(f"  - {'·'.join(quiet)}: 화면 기준 큰 이동({motion_report.STROKE['major_min_px']:.0f}px 이상) 없음")
         if tracked and skeleton['plausible']:
-            done['body'] = body_motion.describe([t[3] for t in tracked], dict(w, end=end))
+            done['body'] = body_motion.describe([t[3] for t in tracked], dict(w, end=end), pose_frames)
             slot += ['  '+l for l in body_motion.lines(done['body'])]
         done['events'] = body_motion.pose_events(pose_frames, dict(w, end=end), fps)
         done['people'] = body_motion.people(pose_frames, dict(w, end=end), fps, cam)
