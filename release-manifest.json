@@ -19,8 +19,8 @@
     "historical experiment outputs"
   ],
   "manifest_self_excluded": true,
-  "file_count": 115,
-  "total_bytes": 1164687,
+  "file_count": 120,
+  "total_bytes": 1311075,
   "files": [
     {
       "path": ".gitattributes",
@@ -33,9 +33,29 @@
       "sha256": "0e19822010301a9f3a5880d71ce22f16a6461f6bf086242da94645fb26be8af0"
     },
     {
+      "path": "README.en.md",
+      "bytes": 24987,
+      "sha256": "9d1881119d91825fa6704fb8f2cf983b8675f3a85927e2d814f3c341d7b2e94f"
+    },
+    {
+      "path": "README.ja.md",
+      "bytes": 33718,
+      "sha256": "c50d5e053831e15c1e7639d17bbe45700eebd37f3c8244b9baed13ec5a62af9f"
+    },
+    {
       "path": "README.md",
-      "bytes": 24428,
-      "sha256": "b597e7b26a5afd8fda9f7e0f12dc1fddf98d3d55f999fdbee478a6769257db34"
+      "bytes": 30392,
+      "sha256": "1c4252817679008c36b10db5ee76824a21f7676dfa45c6767f4c3a098aa2c32a"
+    },
+    {
+      "path": "assets/banner-dark.svg",
+      "bytes": 28585,
+      "sha256": "6e21b1c148e7774f4e698df6f15941a7269cfe4918d98ac5165dc4a186bd3d0c"
+    },
+    {
+      "path": "assets/banner-light.svg",
+      "bytes": 28584,
+      "sha256": "4c2abc36a5e23ea59c90866f3c2c7c2a638fd2e9794e9b8cf6f65a9173792796"
     },
     {
       "path": "docs/import-provenance.json",
@@ -596,6 +616,11 @@
       "path": "tests/test_zoom.py",
       "bytes": 3815,
       "sha256": "220c994e1b34812ae6edfcb96d565848f333dd5b76d44ca551b0947b90fe926d"
+    },
+    {
+      "path": "tools/build_banner.py",
+      "bytes": 24550,
+      "sha256": "273a65b56c1778445659cf8d7f7874396326a60f33eeb7eae658d25e273d4938"
     }
   ]
 }
