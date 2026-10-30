@@ -49,36 +49,29 @@ def bands(video, start, end, bbox, camera=None, image=None, trails=()):
     `trails` (see `trails`) drawn on it."""
     import cv2
     import numpy as np
-    cap = cv2.VideoCapture(str(video))
-    try:
-        cap.set(cv2.CAP_PROP_POS_FRAMES, start)
-        ok, first = cap.read()
-        if not ok:
-            return []
-        h, w = first.shape[:2]
-        x0, y0, x1, y1 = _box(bbox, w, h)
-        prev = cv2.cvtColor(first, cv2.COLOR_BGR2GRAY)
-        n = len(ONION['bands']); step = (bbox[3]-bbox[1])/n
-        edges = [(int(bbox[1]+i*step), int(bbox[1]+(i+1)*step)) for i in range(n)]
-        seeds = []
-        for top, bottom in edges:
-            mask = np.zeros_like(prev); mask[max(0, top):min(h, bottom), x0:x1] = 255
-            p = cv2.goodFeaturesToTrack(prev, ONION['features'], ONION['quality'], ONION['spacing'], mask=mask)
-            seeds.append(np.zeros((0, 1, 2), np.float32) if p is None else p)
-        sizes = [len(p) for p in seeds]
-        origin = np.concatenate(seeds); cur = origin.copy(); alive = np.ones(len(origin), bool)
-        last = prev
-        for _ in range(start+1, end+1):
-            ok, frame = cap.read()
-            if not ok:
-                break
-            gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-            if len(cur):
-                cur, status, _ = cv2.calcOpticalFlowPyrLK(last, gray, cur, None, winSize=(31, 31), maxLevel=3)
-                alive &= status.ravel() == 1
-            last = gray
-    finally:
-        cap.release()
+    from image_lens import frames
+    window = frames.window(video, start, end)
+    if not window:
+        return []
+    first = window[0]; h, w = first.shape[:2]
+    x0, y0, x1, y1 = _box(bbox, w, h)
+    prev = cv2.cvtColor(first, cv2.COLOR_BGR2GRAY)
+    n = len(ONION['bands']); step = (bbox[3]-bbox[1])/n
+    edges = [(int(bbox[1]+i*step), int(bbox[1]+(i+1)*step)) for i in range(n)]
+    seeds = []
+    for top, bottom in edges:
+        mask = np.zeros_like(prev); mask[max(0, top):min(h, bottom), x0:x1] = 255
+        p = cv2.goodFeaturesToTrack(prev, ONION['features'], ONION['quality'], ONION['spacing'], mask=mask)
+        seeds.append(np.zeros((0, 1, 2), np.float32) if p is None else p)
+    sizes = [len(p) for p in seeds]
+    origin = np.concatenate(seeds); cur = origin.copy(); alive = np.ones(len(origin), bool)
+    last = prev
+    for frame in window[1:]:
+        gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+        if len(cur):
+            cur, status, _ = cv2.calcOpticalFlowPyrLK(last, gray, cur, None, winSize=(31, 31), maxLevel=3)
+            alive &= status.ravel() == 1
+        last = gray
     cam = camera or (0., 0.)
     shift = (cur-origin).reshape(-1, 2)
     result = []; at = 0
@@ -136,30 +129,22 @@ def peak(video, start, end, bbox, image):
     if end-start+1 < PEAK['min_frames']:
         return None
     lo, hi = start+max(1, int(PEAK['margin']*(end-start))), end-max(1, int(PEAK['margin']*(end-start)))
-    cap = cv2.VideoCapture(str(video))
-    try:
-        cap.set(cv2.CAP_PROP_POS_FRAMES, start)
-        found = {}; first = None
-        for n in range(start, hi+1):
-            ok, frame = cap.read()
-            if not ok:
-                break
-            small = cv2.resize(cv2.cvtColor(_crop(cv2, frame, bbox), cv2.COLOR_BGR2GRAY), None, fx=1/PEAK['scale'], fy=1/PEAK['scale'], interpolation=cv2.INTER_AREA).astype(np.float32)
-            if first is None:
-                first = small
-            elif n >= lo:
-                found[n] = float(np.abs(small-first).mean())
-        if not found:
-            return None
-        # Once a part has left its start outline the difference stops growing; take the middle of that plateau.
-        plateau = [n for n, d in found.items() if d >= PEAK['plateau']*max(found.values())]
-        n = plateau[len(plateau)//2]
-        cap.set(cv2.CAP_PROP_POS_FRAMES, n)
-        ok, frame = cap.read()
-    finally:
-        cap.release()
-    if not ok or image is None:
-        return n if ok else None
+    from image_lens import frames
+    window = frames.window(video, start, end)[:hi-start+1]
+    found = {}; first = None
+    for n, frame in zip(range(start, hi+1), window):
+        small = cv2.resize(cv2.cvtColor(_crop(cv2, frame, bbox), cv2.COLOR_BGR2GRAY), None, fx=1/PEAK['scale'], fy=1/PEAK['scale'], interpolation=cv2.INTER_AREA).astype(np.float32)
+        if first is None:
+            first = small
+        elif n >= lo:
+            found[n] = float(np.abs(small-first).mean())
+    if not found:
+        return None
+    # Once a part has left its start outline the difference stops growing; take the middle of that plateau.
+    plateau = [n for n, d in found.items() if d >= PEAK['plateau']*max(found.values())]
+    n = plateau[len(plateau)//2]; frame = window[n-start]
+    if image is None:
+        return n
     onion = cv2.imread(str(image))
     panel = cv2.cvtColor(cv2.cvtColor(_crop(cv2, frame, bbox), cv2.COLOR_BGR2GRAY), cv2.COLOR_GRAY2BGR)
     if onion is not None and onion.shape[0] == panel.shape[0]:
@@ -341,26 +326,19 @@ def gap_seeds(video, start, end, bbox, names):
     import cv2
     import numpy as np
     from image_lens import camera, motion_report
-    cap = cv2.VideoCapture(str(video))
-    try:
-        cap.set(cv2.CAP_PROP_POS_FRAMES, start)
-        ok, bgr = cap.read()
-        if not ok:
-            return {}
-        first = cv2.cvtColor(bgr, cv2.COLOR_BGR2GRAY); h, w = first.shape
-        x0, y0, x1, y1 = _box(bbox, w, h)
-        # Stop before a drawing swap (costume change, wipe): a gap across it is the new drawing, not motion.
-        kept = {start: first}; prev = first
-        for n in range(start+1, end+1):
-            ok, bgr = cap.read()
-            if not ok:
-                break
-            image = cv2.cvtColor(bgr, cv2.COLOR_BGR2GRAY)
-            if (cv2.absdiff(prev, image)[y0:y1, x0:x1] > GAPS['diff']).mean() > GAPS['switch_share']:
-                break
-            kept[n] = prev = image
-    finally:
-        cap.release()
+    from image_lens import frames
+    window = frames.window(video, start, end)
+    if not window:
+        return {}
+    first = cv2.cvtColor(window[0], cv2.COLOR_BGR2GRAY); h, w = first.shape
+    x0, y0, x1, y1 = _box(bbox, w, h)
+    # Stop before a drawing swap (costume change, wipe): a gap across it is the new drawing, not motion.
+    kept = {start: first}; prev = first
+    for n, bgr in zip(range(start+1, end+1), window[1:]):
+        image = cv2.cvtColor(bgr, cv2.COLOR_BGR2GRAY)
+        if (cv2.absdiff(prev, image)[y0:y1, x0:x1] > GAPS['diff']).mean() > GAPS['switch_share']:
+            break
+        kept[n] = prev = image
     end = max(kept)
     if end == start:
         return {}

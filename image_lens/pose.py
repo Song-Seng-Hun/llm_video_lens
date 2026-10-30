@@ -43,6 +43,12 @@ def _model(path, role):
     return path
 
 
+def _coreml_cache(role):
+    path = paths.workspace_root()/'.cache'/'coreml'/MODELS[role][1]
+    path.mkdir(parents=True, exist_ok=True)
+    return str(path)
+
+
 def _detector_class():
     import numpy as np
     from rtmlib import YOLOX
@@ -95,9 +101,14 @@ def run(shots, detector, pose_model, start=0, end=None):
                             nms_thr=PARAMS['det_nms'], backend='onnxruntime', device='cpu')
     # The detector's CoreML part needs static input shapes; without them every CoreML format fails on the dynamic NMS
     # input. Clip B, 390 frames: 104 -> 11 ms a frame, the same box count on every frame, boxes within 0.01 px of CPU.
+    # The compiled CoreML models are kept per pinned model hash (fresh process: pose 2.0 -> 0.1 s, detector 0.5 -> 0.1 s,
+    # the same outputs). The pose session is rtmlib's 'mps' one (CoreML default options) plus the cache.
     det.session = onnxruntime.InferenceSession(str(models['detector']), providers=[
-        ('CoreMLExecutionProvider', dict(ModelFormat='MLProgram', RequireStaticInputShapes='1')), 'CPUExecutionProvider'])
-    pose = RTMPose(str(models['pose']), model_input_size=tuple(PARAMS['pose_input']), to_openpose=False, backend='onnxruntime', device='mps')
+        ('CoreMLExecutionProvider', dict(ModelFormat='MLProgram', RequireStaticInputShapes='1', ModelCacheDirectory=_coreml_cache('detector'))),
+        'CPUExecutionProvider'])
+    pose = RTMPose(str(models['pose']), model_input_size=tuple(PARAMS['pose_input']), to_openpose=False, backend='onnxruntime', device='cpu')
+    pose.session = onnxruntime.InferenceSession(str(models['pose']), providers=[
+        ('CoreMLExecutionProvider', dict(ModelCacheDirectory=_coreml_cache('pose'))), 'CPUExecutionProvider'])
     # Pose on CoreML (29 -> 8 ms a crop, keypoints within 0.01).
     if any(m.session.get_providers() != ['CoreMLExecutionProvider', 'CPUExecutionProvider'] for m in (det, pose)):
         raise ValueError('unexpected execution provider')
@@ -266,16 +277,9 @@ LABELS = dict(head='머리·눈·머리카락 (포즈 기준 자동 배치, 부�
 
 def _marked_crops(video, frame, width, height, seeds, directory):
     """One marked source crop per seed: the pinned visual reference the observation contract requires."""
-    import cv2
     from PIL import Image, ImageDraw
-    cap = cv2.VideoCapture(str(video))
-    try:
-        cap.set(cv2.CAP_PROP_POS_FRAMES, frame)
-        ok, bgr = cap.read()
-        if not ok or round(cap.get(cv2.CAP_PROP_POS_FRAMES)) != frame+1 or bgr.shape[:2] != (height, width):
-            raise ValueError('seed frame decode geometry/index mismatch')
-    finally:
-        cap.release()
+    from image_lens import frames
+    bgr, = frames.checked(video, frame, frame, width, height, 'seed frame decode geometry/index mismatch')
     image = Image.fromarray(bgr[:, :, ::-1].copy()); half = 120; written = {}
     directory.mkdir()
     for name, s in seeds.items():

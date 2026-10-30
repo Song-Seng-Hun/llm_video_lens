@@ -10,14 +10,11 @@ def thumb(video, frame, bbox):
     import cv2
     import numpy as np
     from image_lens import onion
-    cap = cv2.VideoCapture(str(video))
-    try:
-        cap.set(cv2.CAP_PROP_POS_FRAMES, frame)
-        ok, image = cap.read()
-    finally:
-        cap.release()
-    if not ok:
+    from image_lens import frames
+    got = frames.window(video, frame, frame)
+    if not got:
         return None
+    image = got[0]
     h, w = image.shape[:2]
     x0, y0, x1, y1 = onion._box(bbox, w, h)
     if x1 <= x0 or y1 <= y0:
