@@ -39,7 +39,22 @@ def path(video, start, end):
     more away, it is matched to that frame instead and the steps are chained, so a pan stays known after the start
     frame has left the view (clip D 70-100 s: a 680 px pan at 23.35 s was unknown). A chained step needs matches over
     CAMERA['chain_spread'] of the frame (ORB leaves a 31 px border, so about .94 is the most at 1920 px): frame to frame, a big figure over a still layout moves as one piece and read
-    as the camera (clip A 2.76 s: 50 px, really 0; the figure spans about 70% of the width)."""
+    as the camera (clip A 2.76 s: 50 px, really 0; the figure spans about 70% of the width).
+    A frame's value depends only on the frames before it, so the last path is kept and a shorter or equal request from
+    the same start is cut from it (seed and look both ask for each window: clip B 42 x 0.4 s)."""
+    import os
+    stat = os.stat(video); key = (str(video), stat.st_size, stat.st_mtime_ns, start)
+    if _LAST and _LAST[0] == key and _LAST[1] >= end:
+        return {n: v for n, v in _LAST[2].items() if n <= end}
+    result = _path(video, start, end)
+    _LAST[:] = [key, end, result]
+    return dict(result)
+
+
+_LAST = []
+
+
+def _path(video, start, end):
     import cv2
     import numpy as np
     cap = cv2.VideoCapture(str(video))

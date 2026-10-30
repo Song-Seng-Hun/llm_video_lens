@@ -9,11 +9,29 @@ import runpy
 
 from image_lens.paths import workspace_root
 SHOT = runpy.run_path(str(Path(__file__).with_name('shot_boundaries.py')))
+_SHOT_LAST = [None, None]
+_VIEW = []
 PARAMS = dict(min_samples=12, static_extent_px=1.5, min_travel_px=12.,
               max_perpendicular_ratio=.15, max_backward_step_ratio=.08,
               max_fit_rmse=.08, min_fit_margin=.02, background_agreement_px=2.)
 PROFILES = {'approximately_constant_speed': lambda u: u,
             'accelerating': lambda u: u*u, 'decelerating': lambda u: 2*u-u*u}
+
+def _shot_context(packet):
+    """SHOT context of this packet object, validated once: a report asks for every point and pair (clip B: about 200 times
+    per analyze, 0.8 ms each)."""
+    if _SHOT_LAST[0] is not packet:
+        _SHOT_LAST[:] = [packet, SHOT['context'](packet)]
+    return _SHOT_LAST[1]
+
+def _view_module():
+    """motion_view loaded from its file, reused while the file's bytes are unchanged so its per-window cache lives on."""
+    import importlib.util
+    path=Path(__file__).with_name('motion_view.py');digest=hashlib.sha256(path.read_bytes()).hexdigest()
+    if _VIEW[:1]!=[digest]:
+        spec=importlib.util.spec_from_file_location('motion_view',path)
+        module=importlib.util.module_from_spec(spec);spec.loader.exec_module(module);_VIEW[:]=[digest,module]
+    return _VIEW[1]
 
 def finite(value):
     try:
@@ -80,7 +98,7 @@ def collect_observations(packet,point_id,start,end,camera_ids=(),*,min_samples=1
               camera_assumption='Selected features are world-static; common co-motion is not detectable.' if camera_ids else None)
     def unknown(reason,**details):
         return dict(base,label='unknown',reasons=[reason],**details)
-    shot_context=SHOT['context'](packet)
+    shot_context=_shot_context(packet)
     if shot_context and shot_context['status']=='requires_shot_local_retracking':
         return unknown('offline_tracking_context_crosses_detected_shots',shot_context=shot_context)
     frames=packet.get('frames')
@@ -316,7 +334,7 @@ def main():
         if packet.get('shot_check') is not None and packet['shot_check']!=scan:
             raise ValueError('conflicting producer shot evidence; do not overwrite it with another scan; fresh tracking required')
         packet=dict(packet,shot_check=scan)
-    shot_context=SHOT['context'](packet)
+    shot_context=_shot_context(packet)
     if shot_context and shot_context['status']=='requires_shot_local_retracking':
         if not packet['job']['start_frame']<=args.start<args.end<=packet['job']['end_frame'] or args.end-args.start+1>160:
             raise ValueError('requested native interval is outside tracked generation range')
@@ -385,8 +403,7 @@ def main():
         json.dumps(result,ensure_ascii=False,allow_nan=False)
         if args.evidence_dir:result['evidence_contact']=report_module.render_contact(result,packet,args.evidence_dir,workspace_root(),foreground_masks=foreground_masks)
         if args.trajectory_dir:
-            spec=importlib.util.spec_from_file_location('motion_view',Path(__file__).with_name('motion_view.py'))
-            view_module=importlib.util.module_from_spec(spec);spec.loader.exec_module(view_module)
+            view_module=_view_module()
             pose_flags=None
             if args.pose:
                 from image_lens import paths as lens_paths

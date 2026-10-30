@@ -1,11 +1,12 @@
 """Whole-frame trajectory sheet and appearance-change candidates for one motion report.
 Reads the pinned source only; no tracking, interpolation, gap filling or automatic redraw/action decision."""
-import hashlib,math
+import copy,hashlib,math
 from pathlib import Path
 
 CHANGE=dict(thumb=(160,120),min_mean_abs_diff=12.,median_factor=4.,max_candidates=6)
 POSE_NEAR_FRAMES=2
 SIZE=dict(width=1600,main=(1200,900),thumbs=4)
+_CHANGES=[]
 
 def usable(point,width,height):
     xy=point.get('xy')
@@ -60,6 +61,9 @@ def render(report,packet,directory,root,source_video,pose_flags=None):
     units=[(f['point_id'],u) for f in report['features'] for run in f['continuous_runs'] for u in run['strokes']['units']]
     picks=[start]+[u[k] for _,u in units if u['major'] for k in ('start_frame','end_frame')]+[end]
     picks=sorted(set(picks));picks=picks if len(picks)<=SIZE['thumbs'] else [picks[round(i*(len(picks)-1)/(SIZE['thumbs']-1))] for i in range(SIZE['thumbs'])]
+    # Every group of one window asks for the same frames; their change candidates are kept for the next call.
+    stat=Path(source_video).stat();key=(str(source_video),stat.st_size,stat.st_mtime_ns,start,end)
+    kept=_CHANGES[1] if _CHANGES and _CHANGES[0]==key else None
     cap=cv2.VideoCapture(str(source_video));small=[];full={}
     try:
         if not cap.isOpened():raise ValueError('source cannot be decoded')
@@ -67,10 +71,10 @@ def render(report,packet,directory,root,source_video,pose_flags=None):
         for n in range(start,end+1):
             ok,bgr=cap.read()
             if not ok or round(cap.get(cv2.CAP_PROP_POS_FRAMES))!=n+1 or bgr.shape[:2]!=(h,w):raise ValueError('source decode geometry/index mismatch')
-            small.append(cv2.resize(cv2.cvtColor(bgr,cv2.COLOR_BGR2GRAY),CHANGE['thumb'],interpolation=cv2.INTER_AREA))
+            if kept is None:small.append(cv2.resize(cv2.cvtColor(bgr,cv2.COLOR_BGR2GRAY),CHANGE['thumb'],interpolation=cv2.INTER_AREA))
             if n in picks or n==start:full[n]=Image.fromarray(bgr[:,:,::-1].copy())
     finally:cap.release()
-    changes=change_candidates(small,start);pose=pose_overlay(pose_flags,start,end,changes['candidates'])
+    changes=kept or change_candidates(small,start);_CHANGES[:]=[key,changes];changes=copy.deepcopy(changes);pose=pose_overlay(pose_flags,start,end,changes['candidates'])
     many=len(report['features'])>2
     font=ImageFont.load_default(size=18);tiny=ImageFont.load_default(size=14)
     def color(t):
