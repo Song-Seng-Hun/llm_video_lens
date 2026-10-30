@@ -3,7 +3,7 @@ skirt, a prop); splitting the person box into horizontal bands and following cor
 height moved where. The onion image overlays the first frame (cyan) and the last (red) so the motion reads in one picture."""
 import math
 
-# AKAGE pose 1 (black dress, f32..46): head right 20, chest 3, waist left 15, skirt left 8, hem right 4; the three
+# Clip A pose 1 (black dress, f32..46): head right 20, chest 3, waist left 15, skirt left 8, hem right 4; the three
 # repeats agree within 3 px. Below min_px a band counts as still.
 ONION = dict(bands=('맨 위', '위', '가운데', '아래', '맨 아래'), features=40, quality=.02, spacing=10, min_features=5,
              min_px=8., pad=.1, arrow_scale=2)
@@ -117,7 +117,7 @@ def _image(cv2, np, first, last, box, result, path, trails=()):
 
 
 # The onion overlays start and end only: a spin or a hand that goes out and back ends where it began, so the overlay
-# looks still (Seedance blind test, all three spins missed). The frame most unlike the start, away from both ends,
+# looks still (clip B blind test, all three spins missed). The frame most unlike the start, away from both ends,
 # goes next to it.
 PEAK = dict(min_frames=8, margin=.15, scale=4, plateau=.95)
 
@@ -234,9 +234,9 @@ def strip(video, start, end, bbox, image, count=5):
 
 def sheets(root, items):
     """Onion images of a whole look on a few contact sheets (time label above each), so an image reader sees the
-    gestures the text loses (heart hands, V signs on Seedance close-ups). items: [(start_s, end_s, image name, note)],
+    gestures the text loses (heart hands, V signs on clip B close-ups). items: [(start_s, end_s, image name, note)],
     note '' for an onion image, 'still' for a short cut's still, 'strip' for a frame strip. Stills of back-to-back
-    cuts share one full-width row in time order (Seedance: a spin made of seven 3-6 frame cuts); a strip gets its own
+    cuts share one full-width row in time order (clip B: a spin made of seven 3-6 frame cuts); a strip gets its own
     row under its window. Rows, not tiles, are counted per sheet."""
     import cv2
     import numpy as np
@@ -325,13 +325,13 @@ def lines(result, image_name=None):
 
 
 # Seeds where the onion gap is thickest: the band between the start outline and a later outline is widest where that
-# part moved (AKAGE pose 1: sleeves and hair tips; MikuMiku hammer: the hammer head). Gaps also open where a part
+# part moved (clip A pose 1: sleeves and hair tips; clip C hammer: the hammer head). Gaps also open where a part
 # arrives, so a candidate must sit on an outline of the start frame inside the gap. Thirds catch moves that return.
 # Gap width is not travel (the hammer scene's widest gap, 124 px, moved 39 px; the hammer moved 450 px), and joined gaps
 # are not one part, so up to 12 candidates are seeded and tracked; `parts` then keeps one point per group that moved
 # together. LK flow cannot follow the hammer swing (110-170 px of 450, and a face point dragged 500 px by it), so the
 # grouping uses the real tracks. Together = paths never further apart than 16 px or half the larger travel: at 8 px / a
-# quarter, AKAGE kept 6 points in 11 of 19 windows (drawn parts deform as they move) and the hammer got two points.
+# quarter, clip A kept 6 points in 11 of 19 windows (drawn parts deform as they move) and the hammer got two points.
 GAPS = dict(points=6, diff=40, min_area=80, min_half_px=4., spacing_px=40., edge=(50, 150), switch_share=.3,
             keep_share=.4, min_travel_px=8., together_px=16., together_share=.5)
 

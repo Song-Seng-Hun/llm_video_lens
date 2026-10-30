@@ -1,5 +1,5 @@
 """Where the text is most likely wrong, so the reader looks there first. A reader does not pick the spans it got wrong
-(Kaguya 18-22 s, a pull and a fall in one merged pose box, was written confidently as an arm around the shoulder and
+(clip D 18-22 s, a pull and a fall in one merged pose box, was written confidently as an arm around the shoulder and
 not chosen for zoom), so the tool ranks its own warning signs and shows those spans as dense frames. It does not catch
 that case: the merged box reads as one person with ordinary warnings, ranked below the top four on the existing run,
 so frame-sheet-N.jpg stays the guard against it.
@@ -54,7 +54,7 @@ def signs(record, fps):
                 add(CHECK['camera'], '카메라 모름')
             if score:
                 found.append((a, b, score, why, anchors))
-    # Back-to-back short cuts (the Seedance spin at 1.8-2.2 s was seven cuts of 3-6 frames) are only stills in the text.
+    # Back-to-back short cuts (the clip B spin at 1.8-2.2 s was seven cuts of 3-6 frames) are only stills in the text.
     run = []
     for a, b in sorted(shorts)+[(None, None)]:
         if a is not None and run and a-run[-1][1] <= CHECK['merge_gap_s']*fps:

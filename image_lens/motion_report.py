@@ -60,7 +60,7 @@ def speeds(fs,path):
     Numbers, not an ease word: in two eye checks the four words matched the viewer on 6 of 11, then 1 of 11."""
     steps=[math.dist(a,b)/(g-f) for f,g,a,b in zip(fs,fs[1:],path,path[1:]) if g>f]
     if not steps:return []
-    # At least two steps per part: drawings held for two frames (Kaguya) otherwise read as 0, 31, 0, 28 px/f.
+    # At least two steps per part: drawings held for two frames (clip D) otherwise read as 0, 31, 0, 28 px/f.
     k=max(1,min(SPEEDS['bins'],len(steps)//2))
     return [round(statistics.mean(steps[i*len(steps)//k:(i+1)*len(steps)//k]),1) for i in range(k)]
 

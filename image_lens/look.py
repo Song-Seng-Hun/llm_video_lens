@@ -176,7 +176,7 @@ def run(video, detector, pose_model, checkpoint, out, max_shots=LOOK['max_shots'
         shots.append(entry)
         lines.append(f"## {sid} {entry['seconds'][0]:.2f}–{entry['seconds'][1]:.2f}s (f{s0}..{s1})")
         def still(k):
-            # A cut too short to track still shows its pose (Seedance: 83 skipped ranges, many whole cuts under 0.2 s).
+            # A cut too short to track still shows its pose (clip B: 83 skipped ranges, many whole cuts under 0.2 s).
             from image_lens import body_motion, onion
             mid = (k['frames'][0]+k['frames'][1])//2; person = body_motion.largest(pose_frames.get(mid))
             try:
@@ -333,7 +333,7 @@ def run(video, detector, pose_model, checkpoint, out, max_shots=LOOK['max_shots'
             '경고는 "원본부터 비교하라"는 뜻이다. 가짜 움직임이라는 판정이 아니다. 자세한 수치는 장면별 report.json에 있다.', '']
     paths.write(root/'look-full.md', '\n'.join(head+lines).rstrip('\n')+'\n')
     from image_lens import onion
-    # Frame strips for the largest shoulder-width swings only: on Seedance all 18 turn candidates got one, the sheets went
+    # Frame strips for the largest shoulder-width swings only: on clip B all 18 turn candidates got one, the sheets went
     # from 8 to 14 and a fresh reader scored about the same (13 vs 12.5 of 21); hair and a cat on the shoulder swing too.
     for done, end, bbox, base in sorted(stripping, key=lambda s: -s[0]['turn_share'])[:LOOK['strips']]:
         try:

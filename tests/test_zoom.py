@@ -49,7 +49,7 @@ class Run(unittest.TestCase):
 
 class Overview(unittest.TestCase):
     def test_one_frame_per_interval_with_a_cap(self):
-        self.assertEqual(zoom.overview_count(719, 23.98), 24)  # Kaguya 30 s: the budget that gained 3.5 of 20
+        self.assertEqual(zoom.overview_count(719, 23.98), 24)  # clip D 30 s: the budget that gained 3.5 of 20
         self.assertEqual(zoom.overview_count(24*600, 24), zoom.ZOOM['max_overview'])
         self.assertEqual(zoom.overview_count(3, 24), 1)
 

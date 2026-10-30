@@ -1,7 +1,7 @@
 """Second read. After reading a look, the reader names at most two short spans it could not tell; zoom shows each as
-dense whole frames in time order (who pulls whom, a fall: Kaguya 18-22 s was one merged pose box, so pose lines and
+dense whole frames in time order (who pulls whom, a fall: clip D 18-22 s was one merged pose box, so pose lines and
 person crops cannot show it). The frame budget is fixed and counted, so a gain can be checked against the same number
-of frames spread evenly over the clip (--even). There the even frames gained more (Kaguya 8.5 -> 12 of 20 against
+of frames spread evenly over the clip (--even). There the even frames gained more (clip D 8.5 -> 12 of 20 against
 10.5 -> 11.5 for the reader's own spans), so `look` also writes such frames for the whole clip (`overview`)."""
 import json
 

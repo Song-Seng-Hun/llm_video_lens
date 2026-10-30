@@ -20,7 +20,7 @@
   ],
   "manifest_self_excluded": true,
   "file_count": 124,
-  "total_bytes": 1292041,
+  "total_bytes": 1292019,
   "files": [
     {
       "path": ".gitattributes",
@@ -74,13 +74,13 @@
     },
     {
       "path": "docs/limitations.md",
-      "bytes": 3766,
-      "sha256": "21abe396cfa212f4550a589c90f31c8dc3f3065d7cbef447975f8f2b04a25650"
+      "bytes": 3769,
+      "sha256": "c65abcf725977fc23bfb427fe9adadefc17ead9a4120ce9e5b32d9d1b84e2503"
     },
     {
       "path": "docs/look-notes.md",
-      "bytes": 12157,
-      "sha256": "93893d4ee7b2287108f5ce2448751998ee043111caa0f550bbdfffee8c523fbb"
+      "bytes": 12143,
+      "sha256": "30e1a7bf3eff61cf3c491be026763653f59278a0fecab797fea4f9f403186f6b"
     },
     {
       "path": "docs/provenance.md",
@@ -114,8 +114,8 @@
     },
     {
       "path": "image_lens/body_motion.py",
-      "bytes": 28116,
-      "sha256": "6eab27b00e32bdfd5d32247eb1e936edd40297db206da29298a490d70c3b1a61"
+      "bytes": 28109,
+      "sha256": "27a704847b4adefdec0dff467c3a3b39d59a618ca00a49e0bba3a406f440a2d9"
     },
     {
       "path": "image_lens/brief.py",
@@ -124,13 +124,13 @@
     },
     {
       "path": "image_lens/camera.py",
-      "bytes": 6854,
-      "sha256": "f56bca81726967deee6ad531f45fb480662ff17ec9964c167c6939ad93a88bec"
+      "bytes": 6856,
+      "sha256": "acb864402c05dfd1c10bc83a6f447ad0b526a530d9d6c2e885c988ce8c136a27"
     },
     {
       "path": "image_lens/check.py",
-      "bytes": 9197,
-      "sha256": "3c3022f8e266f20b323d6a26df552e321acd8f9ea84b53a2cde2b488f814be01"
+      "bytes": 9195,
+      "sha256": "85de93f69bb609ce455b5ffd21edb5e026a001f067ed358afcb4415b93591a0b"
     },
     {
       "path": "image_lens/checkpoint-manifest.json",
@@ -144,8 +144,8 @@
     },
     {
       "path": "image_lens/digest.py",
-      "bytes": 22543,
-      "sha256": "9680c0220a4c0961dfb5c7da1a3ffc2cdeb020a2046f5a0c51d6f44978adcae9"
+      "bytes": 22545,
+      "sha256": "6609f29e215fe9e74ef1fe7b8ba89ba1efcc2aae0a6e1ca0e61ccc6485eb980c"
     },
     {
       "path": "image_lens/foreground_regions.py",
@@ -159,8 +159,8 @@
     },
     {
       "path": "image_lens/look.py",
-      "bytes": 25705,
-      "sha256": "fed42a4f04077207fe412a1d899700f0b762637967c432387ff99e56dad7f5d9"
+      "bytes": 25701,
+      "sha256": "f8fed123992e2920bd51ae7e45950b78521afd38a536e40b4b969019ba063f3e"
     },
     {
       "path": "image_lens/mark.py",
@@ -169,13 +169,13 @@
     },
     {
       "path": "image_lens/motif.py",
-      "bytes": 2261,
-      "sha256": "dd6d322b824676be11e2eb6a0d9730bccf812cb030925103baf5ce9937bc7d87"
+      "bytes": 2262,
+      "sha256": "2e2b870e600bfe7d453dec5b9353c3302835321c2b73569709802f31fb11c40d"
     },
     {
       "path": "image_lens/motion_report.py",
       "bytes": 34974,
-      "sha256": "2491b000bb8eb9ea8993e3f8c33de2543d7cc0d8b3fa439f5fd12895095f25a1"
+      "sha256": "041c8a17e206b3d0b8bf8fcd8b28d91abbd1962b0f0fafee42276321cb98c2b7"
     },
     {
       "path": "image_lens/motion_view.py",
@@ -189,8 +189,8 @@
     },
     {
       "path": "image_lens/onion.py",
-      "bytes": 21478,
-      "sha256": "c77bd2fd463c7898a441ba81bbf15d97d334b7b7d6ff8a10e921c5858d019c3f"
+      "bytes": 21473,
+      "sha256": "a2c3b5ca7806c390ad292a2ef1c5299e589709db2146ed096693c4c2332ed7cc"
     },
     {
       "path": "image_lens/part_regions.py",
@@ -204,8 +204,8 @@
     },
     {
       "path": "image_lens/pose.py",
-      "bytes": 21109,
-      "sha256": "6aa2d1b8f7dac1b6e8d3c18e1eb2e7e9f94a76f4ef741cc9bf24fe5085f3692a"
+      "bytes": 21111,
+      "sha256": "8c5c632b0af9e32e41a8fcc7c87063ae1b78b0a30ea71906d208b27fb4604bf3"
     },
     {
       "path": "image_lens/run_point_tracker.py",
@@ -550,7 +550,7 @@
     {
       "path": "image_lens/zoom.py",
       "bytes": 6016,
-      "sha256": "a74073aaece632a77db61346ce13837d606d44a1316546c2a7d2fc7a3ebf307c"
+      "sha256": "f75ed773db44ad3c680d2125e02fdbcabf49bc6db6aabdf9ec8e5f9b6b531f74"
     },
     {
       "path": "image_lens_cli.py",
@@ -635,7 +635,7 @@
     {
       "path": "tests/test_zoom.py",
       "bytes": 3815,
-      "sha256": "220c994e1b34812ae6edfcb96d565848f333dd5b76d44ca551b0947b90fe926d"
+      "sha256": "c45710fb2d0b51606ed65b32207909ac91af3c3d1dd20c6cbbef086ebb12787a"
     },
     {
       "path": "tools/build_banner.py",

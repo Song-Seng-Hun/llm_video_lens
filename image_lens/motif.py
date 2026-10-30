@@ -1,4 +1,4 @@
-"""Repeated poses: windows whose start and end drawings match an earlier window's are one pose shown again (AKAGE
+"""Repeated poses: windows whose start and end drawings match an earlier window's are one pose shown again (clip A
 cycles four costumes, each with the same move). look.md then says the pose once and only how a repeat differs."""
 import math
 
