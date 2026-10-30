@@ -20,7 +20,7 @@
   ],
   "manifest_self_excluded": true,
   "file_count": 133,
-  "total_bytes": 1434632,
+  "total_bytes": 1438960,
   "files": [
     {
       "path": ".gitattributes",
@@ -79,8 +79,8 @@
     },
     {
       "path": "docs/look-notes.md",
-      "bytes": 26599,
-      "sha256": "c62b8bcecf97f9ca0f9b7785634d89ebb2130f6ac849c03634c0900177885289"
+      "bytes": 27463,
+      "sha256": "719e481e948b43f8a4afd1b249a30a3bbecd82cca014f7f63449e0c24db01e7c"
     },
     {
       "path": "docs/provenance.md",
@@ -114,8 +114,8 @@
     },
     {
       "path": "image_lens/body_motion.py",
-      "bytes": 32733,
-      "sha256": "42a4baf0fdc046120cc7791e711187cfe2cd06e8fdd2273f3120c8cca02c29ce"
+      "bytes": 34058,
+      "sha256": "9ea38ba4e7810de2c22145faef5f5a58ed108f8cb0d35a2b84bb92e3c841c249"
     },
     {
       "path": "image_lens/brief.py",
@@ -129,8 +129,8 @@
     },
     {
       "path": "image_lens/check.py",
-      "bytes": 9200,
-      "sha256": "01f6f1204df830a805dea11b5d245e7f3778c983ccbdc0e005d333f3f5ad3282"
+      "bytes": 9235,
+      "sha256": "e9b7702785f485e344b62232381f734c84e99cb4e175c6776d480cbf19cd3de8"
     },
     {
       "path": "image_lens/checkpoint-manifest.json",
@@ -144,8 +144,8 @@
     },
     {
       "path": "image_lens/digest.py",
-      "bytes": 23104,
-      "sha256": "8c856a493068141f1255cc1775841dc348da48d2e638234e215d297a3ca366f9"
+      "bytes": 23195,
+      "sha256": "f187a74869f9c399c5c503e67661d02de142b4ce065e5fff90080c7cd300e20e"
     },
     {
       "path": "image_lens/foreground_regions.py",
@@ -164,8 +164,8 @@
     },
     {
       "path": "image_lens/look.py",
-      "bytes": 35439,
-      "sha256": "f7e28ee1b7d7ed0c9f84c65c03de4020e3cd7e565bf45f86497f284d86317b8d"
+      "bytes": 35695,
+      "sha256": "d7e562005fc6cf31d70eb77458136b006e74a81597a5a59fc7f4ebb050298e0d"
     },
     {
       "path": "image_lens/mark.py",
@@ -209,8 +209,8 @@
     },
     {
       "path": "image_lens/pose.py",
-      "bytes": 25478,
-      "sha256": "aeea2a8f531b1b9ad947d9118f04fa9f646c221dfc60d2876bfd7f2d429b7ff5"
+      "bytes": 25883,
+      "sha256": "597c3c257240e6da849907312203f1d568c15adbe3ada585f46f60c938170b4e"
     },
     {
       "path": "image_lens/run_point_tracker.py",
@@ -624,8 +624,8 @@
     },
     {
       "path": "tests/test_body_motion.py",
-      "bytes": 15802,
-      "sha256": "61d383d606d436bfcf3a355b1b19b5af13b261e0216f8e13b8525cbe579491a9"
+      "bytes": 17154,
+      "sha256": "c42fe89eab8a05f5eaaf5fe0f96fe1118c27d0a4f2caa6cd21280f6fb05b2e97"
     },
     {
       "path": "tests/test_check.py",

@@ -47,7 +47,7 @@ def signs(record, fps):
             if events.get('lost_frames', 0) >= max(3, round(.1*fps)):
                 add(CHECK['pose_lost'], f"포즈 추적 {events['lost_frames']}프레임 끊김")
             if d.get('skeleton') is False:
-                add(CHECK['skeleton'], '골격 신뢰 낮음')
+                add(CHECK['skeleton'], 'SD 체형' if d.get('chibi') else '골격 신뢰 낮음')
             if events.get('turns'):
                 add(CHECK['turns'], f"몸 돌림 후보 {len(events['turns'])}곳", [t[0] for t in events['turns']])
             if (d.get('camera') or {}).get('unknown'):

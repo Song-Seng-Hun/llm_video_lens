@@ -306,7 +306,10 @@ def _run(video, detector, pose_model, checkpoint, out, max_shots=LOOK['max_shots
         slot.append(f"- 구간 f{w['seed']}..{end} (점 배치 f{w['seed']}" + (f", {people}명 중 가장 큰 사람" if people > 1 else '') + ')')
         skeleton = receipt.get('skeleton') or dict(plausible=True); done['skeleton'] = skeleton['plausible']
         done['framing'] = skeleton.get('framing'); done['scope'] = skeleton.get('scope')
-        if not skeleton['plausible']:
+        done['chibi'] = skeleton.get('chibi')
+        if done['chibi']:
+            slot.append(f"  - SD 체형(머리가 큼, 눈 간격이 눈~발목의 {done['chibi']:.2f}): 팔·다리 이름 없이 얼굴과 많이 움직인 곳(move-a…)만 봄")
+        elif not skeleton['plausible']:
             slot.append(f"  - 골격 신뢰 낮음({skeleton['reason']}): 팔·다리 이름 없이 얼굴과 많이 움직인 곳(move-a…)만 봄")
         from image_lens import camera, motion_report
         try:
