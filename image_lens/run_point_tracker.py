@@ -50,6 +50,18 @@ def configure_spatial_shape(predictor, shape):
     predictor.model.model_resolution = shape
 
 
+# A serving child (tracking_child.py --serve) keeps these between jobs: the checkpoint hash per file state and the loaded model.
+_CHECKED, _MODELS = {}, {}
+
+
+def checkpoint_sha(path):
+    st = path.stat()
+    key = (str(path), st.st_ino, st.st_size, st.st_mtime_ns)
+    if key not in _CHECKED:
+        _CHECKED[key] = sha(path)
+    return _CHECKED[key]
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument('--checkpoint', help='explicit local pinned checkpoint, required only for inference')
@@ -105,7 +117,7 @@ def main():
             raise ValueError('tracking requires an explicit local --checkpoint; no download is performed')
         checkpoint = Path(args.checkpoint).expanduser().absolute()
         paths._no_symlinks(checkpoint)
-        if not checkpoint.is_file() or checkpoint.stat().st_size != 101890938 or sha(checkpoint) != CHECKPOINT_SHA:
+        if not checkpoint.is_file() or checkpoint.stat().st_size != 101890938 or checkpoint_sha(checkpoint) != CHECKPOINT_SHA:
             raise ValueError('checkpoint pin mismatch')
     packet = json.loads(Path(args.queries).read_text())
     observation_mode = packet.get('schema') == 'team-eye.observations/1'
@@ -219,12 +231,14 @@ def main():
                           max_seconds=args.max_seconds, automatic_retry=False))
     import torch
     if torch.__version__ != '2.9.0':raise ValueError('unexpected Torch version')
-    torch.set_num_threads(PARAMS['torch_threads']);torch.set_num_interop_threads(PARAMS['interop_threads'])
+    if not _MODELS:  # interop threads can be set only once per process
+        torch.set_num_threads(PARAMS['torch_threads']);torch.set_num_interop_threads(PARAMS['interop_threads'])
     torch.manual_seed(PARAMS['seed']);np.random.seed(PARAMS['seed'])
     if 'cotracker' in sys.modules and Path(sys.modules['cotracker'].__file__).resolve()!=source/'cotracker/__init__.py':
         raise ValueError('another cotracker module is already loaded')
     if not torch.backends.mps.is_available():raise ValueError('MPS (Apple GPU) is not available')
-    sys.path.insert(0,str(source))
+    if str(source) not in sys.path:
+        sys.path.insert(0,str(source))
     from cotracker.predictor import CoTrackerPredictor
     print(json.dumps({'stage': 'decoded', 'job': args.job, 'frames': len(images), 'queries': len(queries)}), file=sys.stderr, flush=True)
     region_observations = region_api['track'](images, job) if region_api else None
@@ -233,9 +247,12 @@ def main():
     q = torch.tensor(queries, dtype=torch.float32).unsqueeze(0).to(PARAMS['device'])
     if not torch.isfinite(video).all() or not 0 <= video.min() <= video.max() <= 255:
         raise ValueError('invalid RGB tensor')
-    model = CoTrackerPredictor(checkpoint=str(checkpoint), offline=True, v2=False, window_len=60).to(PARAMS['device']).eval()
+    model = _MODELS.get(str(checkpoint))
+    if model is None:
+        model = CoTrackerPredictor(checkpoint=str(checkpoint), offline=True, v2=False, window_len=60).to(PARAMS['device']).eval()
+        model.model.forward = partial(model.model.forward, fmaps_chunk_size=PARAMS['feature_chunk_size'])
+        _MODELS[str(checkpoint)] = model
     configure_spatial_shape(model, resolution)
-    model.model.forward = partial(model.model.forward, fmaps_chunk_size=PARAMS['feature_chunk_size'])
     print(json.dumps({'stage': 'inference_started', 'job': args.job, 'device': PARAMS['device']}), file=sys.stderr, flush=True)
     inference_started = time.monotonic()
     with torch.inference_mode():
