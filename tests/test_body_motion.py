@@ -211,3 +211,21 @@ class People(unittest.TestCase):
 
 
 if __name__ == '__main__': unittest.main()
+
+
+class Hidden(unittest.TestCase):
+    def test_an_arm_seen_on_few_frames_is_unknown_not_a_move(self):
+        # 3D clip: the sleeve hid the wrist on most frames; its few seen frames looked like a big move.
+        paths = BodyMotion.body(None, lambda n: 0); paths['wrist-l'] = {n: (320.+20*n, 400.) for n in range(21)}
+        paths['wrist-r'] = {n: (80.-20*n, 400.) for n in range(21)}
+        p = packet(paths)
+        for f in p['frames']:
+            for q in f['points']:
+                q['visible'] = q['point_id'] != 'wrist-l' or f['frame'] in (0, 1, 2, 3, 4)
+        r = body_motion.describe([p], dict(seed=0, end=20))
+        self.assertEqual([l['point_id'] for l in r['limbs']], ['wrist-r'])
+        self.assertEqual(r['unknown'], [dict(kind='팔', side='화면 오른쪽', seen=.2)])
+        self.assertIn('화면 오른쪽 팔: 대부분 가려져 모름(보인 프레임 20%)', '\n'.join(body_motion.lines(r)))
+        from image_lens import digest
+        line = digest.window_line(dict(window=dict(seed=0, end=20), body=r, groups=[]), 50.)
+        self.assertIn('오른팔 대부분 가려져 모름', line)

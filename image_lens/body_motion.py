@@ -4,9 +4,36 @@ Sides are screen sides (화면 왼쪽/오른쪽), taken from where the point sta
 import math
 from image_lens import motion_report
 
-BODY_MOTION = dict(min_ratio=.06, min_px=8., min_frames=4, max_segments=3, ref_coverage=.8)
+# min_seen: a limb seen on fewer of the window's frames is said as unknown, not read from its short runs (3D clip: an
+# oversize sleeve hid the arms on most frames; 11 of 31 such limbs on five clips were described from a few frames).
+BODY_MOTION = dict(min_ratio=.06, min_px=8., min_frames=4, max_segments=3, ref_coverage=.8, min_seen=.3)
 PARTS = dict(wrist='손목', elbow='팔꿈치', thumb='엄지 끝', index='검지 끝', thigh='허벅지', knee='무릎', ankle='발목', move='많이 움직인 곳')
 HEAD = ('nose', 'eye-l', 'eye-r')
+LIMB_POINTS = {'팔': ('wrist', 'elbow', 'thumb', 'index'), '다리': ('thigh', 'knee', 'ankle')}
+
+
+def _limb(pid):
+    name, _, side = pid.rpartition('-')
+    kind = next((k for k, names in LIMB_POINTS.items() if name in names), None)
+    return (kind, side) if kind and side in ('l', 'r') else None
+
+
+def coverage(packets, window):
+    """{(kind, side): (share of the window's frames after the seed with any of that limb's points visible, its points'
+    mean seed x)} for each seeded arm and leg."""
+    frames = max(1, window['end']-window['seed']); seen = {}; at = {}
+    for packet in packets:
+        for frame in packet['frames']:
+            for p in frame['points']:
+                key = _limb(p['point_id'])
+                if not key:
+                    continue
+                hits = seen.setdefault(key, set())
+                if frame['frame'] == window['seed'] and p.get('xy'):
+                    at.setdefault(key, []).append(p['xy'][0])
+                if p['visible'] and window['seed'] < frame['frame'] <= window['end']:
+                    hits.add(frame['frame'])
+    return {k: (len(v)/frames, sum(at[k])/len(at[k]) if at.get(k) else None) for k, v in seen.items()}
 
 
 def series(packets, window):
@@ -80,11 +107,19 @@ def describe(packets, window):
     frames = sorted(centre)
     shift = (centre[frames[-1]][0]-centre[frames[0]][0], centre[frames[-1]][1]-centre[frames[0]][1])
     centre_path = _median3([centre[n] for n in frames])
+    seen = coverage(packets, window)
+    hidden = {k for k, (share, _) in seen.items() if share < BODY_MOTION['min_seen']}
+    unknown = []
+    for kind, side in sorted(hidden):
+        x, other = seen[(kind, side)][1], seen.get((kind, 'r' if side == 'l' else 'l'), (0, None))[1]
+        ref = other if other is not None else sorted(c[0] for c in centre.values())[len(centre)//2]
+        if x is not None:
+            unknown.append(dict(kind=kind, side='화면 왼쪽' if x < ref else '화면 오른쪽', seen=round(seen[(kind, side)][0], 2)))
     limbs = []
     for pid, track in sorted(points.items()):
         part = PARTS.get(pid.split('-')[0])
         common = [n for n in sorted(track) if n in centre]
-        if not part or len(common) < BODY_MOTION['min_frames']:
+        if not part or len(common) < BODY_MOTION['min_frames'] or _limb(pid) in hidden:
             continue
         rel = _median3([(track[n][0]-centre[n][0], track[n][1]-centre[n][1]) for n in common])
         strokes = []
@@ -114,7 +149,7 @@ def describe(packets, window):
     return dict(reference=kind, size_px=round(size, 1), limit_px=round(limit, 1),
                 centre_shift=dict(direction=motion_report.direction(*shift), distance_px=round(math.hypot(*shift), 1),
                                   frames=[frames[0], frames[-1]], ease=motion_report.ease(frames, centre_path),
-                                  speeds=motion_report.speeds(frames, centre_path)), limbs=limbs)
+                                  speeds=motion_report.speeds(frames, centre_path)), limbs=limbs, unknown=unknown)
 
 
 def lines(result):
@@ -132,7 +167,9 @@ def lines(result):
                            for s in limb['strokes'])
         axis = '' if not limb['axis_px'] else f", 몸 {'바깥으로' if limb['axis_px'] > 0 else '쪽으로'} {abs(limb['axis_px']):.0f}px"
         out.append(f"  - {limb['side']} {limb['part']}: {moves}{axis}")
-    if not result['limbs']:
+    for u in result.get('unknown', []):
+        out.append(f"  - {u['side']} {u['kind']}: 대부분 가려져 모름(보인 프레임 {u['seen']:.0%})")
+    if not result['limbs'] and not result.get('unknown'):
         out.append('  - 팔다리: 몸 기준으로도 기준 미만')
     return out
 
