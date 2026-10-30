@@ -39,6 +39,10 @@ The README says how to run `look` and read its output. This page keeps the exact
 ## Camera and height bands
 
 - Whole-frame motion (pan, zoom, scrolling UI) comes from ORB matches against the seed frame. It counts only when the agreeing matches span at least half the width and a quarter of the height, so a large figure sliding over a still layout is not taken for the camera. At 24 px or more it gets a "화면 전체" line, and major moves that only follow it are dropped.
+- The line carries speeds in time order, a move that went out and came back (farthest point of a running median of five, at least twice the net shift) and zoom from ×1.1. Under half the frames matched reads "카메라 모름", not still.
+- Frames are matched to the window's first frame. When one does not match and the last matched frame is 24 px or more away, it is matched to that frame and the steps are chained, needing matches over 75% of the width and half the height. Kaguya 70–100 s: a 671 px pan at 23.35 s was unknown before; where the old start-only match was known, the net shift is the same (all of MikuMiku, Seedance).
+- Matching each frame to the one before was tried first: on AKAGE it read the dancer over the still title panel as the camera ("오른쪽 위 50px", really 0).
+- A step whose matches include a still layer (at least 30 matches, a quarter of the inliers, moving 3 px or less while the transform moves more) is left unknown: on AKAGE seed matches locked on the dancer in 11 windows ("위 45px까지 갔다 돌아옴"). Cost: AKAGE now matches 61 of 462 frames (303 before), so its 406 px pan at 9.24 s reads "카메라 모름"; Seedance 391 of 1413 (459 before) with the same camera lines.
 - "높이별 흐름": the person box is split into five horizontal bands; corner features in each band are followed from the first to the last frame and the median shift per band (minus the camera) is reported. AKAGE pose 1: head right ~22 px, waist and skirt left ~20–29 px; the three repeats agree within 5 px.
 
 ## Speeds and timing
@@ -72,6 +76,13 @@ The README says how to run `look` and read its output. This page keeps the exact
 
 - `zoom` takes 12 frames per span, at most two spans of 4 s, and writes the frame and pixel cost to `zoom.json`; `--even` spreads the same 24 frames over the whole clip as a control.
 - In one recheck on Kaguya (key known, one reader each) a reader that chose its own spans went from 10.5 to 11.5 of 20; a reader given the 24 even frames went from 8.5 to 12. Readers do not pick the spans they got wrong: the pull-and-fall at 18–22 s was written confidently as an arm around the shoulder and not chosen. So `look` writes `frame-sheet-N.jpg` for every clip.
+
+## Check list and at
+
+- "먼저 확인할 곳" ranks the tool's own warning signs per window or skipped range. Weights: overlapping person boxes, nothing tracked and 12+ frames with no pose 3 each; lost points, warnings, a lost pose track and three or more back-to-back short cuts 2 each; two or more people, a low skeleton score, turn candidates and an unknown camera 1 each. Up to four spans scoring 2 or more are kept, each cut to 4 s around its turn and lost-point frames, with 6 dense frames each in `check-sheet-N.jpg` (zoom's 24-frame budget).
+- Windows touch each other, so neighbouring signs are not merged: merged, the whole Kaguya clip became one span.
+- It does not catch Kaguya 18–22 s (two people in one merged box). That window scores 4 (warnings, low skeleton, turns), tied with four others, below five that score 5 to 9. A sign for the number of pose boxes changing within a window was tried: it fired on that window, but also on single-dancer AKAGE windows (false extra boxes) and still left the window out of the top four, so it was dropped. The frame sheets stay the guard for this case.
+- `at --look <dir> --span a-b` gathers the window lines, skipped ranges, transitions and check signs overlapping one span of up to 4 s, names the pictures to open, and writes 12 dense frames (`at-frames-1.jpg`, about 1.7 Mpx at 1920×1080).
 
 ## mark
 

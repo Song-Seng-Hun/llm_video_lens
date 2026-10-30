@@ -96,16 +96,18 @@ Model paths come from `<workspace>/models.json` (see [Model paths](#model-paths)
 | `look.md` | Read this first. One line per tracking window. |
 | `look-full.md` | Major moves per group, moved-together lines, warning counts, links to the full reports. `focus --look <dir> --shot shot-0007` prints one shot. |
 | `look.json`, `steps.log` | The same record as data, and a receipt for every step. |
-| `<window>-onion.jpg`, `onion-sheet-N.jpg`, `frame-sheet-N.jpg` | Pictures, below. |
+| `<window>-onion.jpg`, `onion-sheet-N.jpg`, `frame-sheet-N.jpg`, `check-sheet-N.jpg` | Pictures, below. |
 
 ### Reading look.md
 
-Each window line starts with the shot framing (전신, 무릎 위, 상반신, 얼굴 클로즈업) and then says:
+At the top, **먼저 확인할 곳** lists up to four spans where the tool itself is least sure: overlapping person boxes, lost tracks or poses, frames with no pose (so missing from the text) and runs of short cuts. Each has dense frames in `check-sheet-N.jpg`. Spans not listed can be wrong too: two people merged into one box (Kaguya 18–22 s) was not caught, so read the frame sheets as well.
+
+Below it, each window line starts with the shot framing (전신, 무릎 위, 상반신, 얼굴 클로즈업) and then says:
 
 - **전체**: how the whole frame (camera) and the body centre moved, said once.
 - **몸 기준**: what each arm, leg or move point did on top of that, measured against the body centre. Paths are split where they turn ("아래 → 위"); "몸 쪽으로/바깥으로" is the change in distance from the body axis. Sides are screen sides.
 - **속도**: each major move has up to five speeds in time order, e.g. "속도 9→5→3→1 px/f". Judge the timing from these numbers. A move that starts on the window's first frame says its start was not seen.
-- **화면 전체**: a camera move of 24 px or more. Moves that only follow it are left out.
+- **화면 전체**: a camera move of 24 px or more, with speeds in time order, a move that went out and came back ("오른쪽 80px까지 갔다 돌아옴") and zoom ("줌 인 ×1.25"). Moves that only follow it are left out. When under half the frames could be matched it says "카메라 모름": screen moves may then include the camera.
 - **높이별 흐름**: the person box split into five bands, with each band's shift. It needs no named points, so a hip pushed out under a skirt or a prop still shows.
 - **많이 움직인 곳** (`move-a`…): unnamed points placed where the shape changed most.
 
@@ -123,7 +125,18 @@ Notes that change how to read a line:
 - `<window>-onion.jpg`: the first frame in cyan and the last in red, with band shifts as arrows. A grey panel on the right shows the frame most unlike the first, so a move that goes out and comes back is not read as still. Each part's lead point is drawn as white-rimmed dots, one per frame (big circle at the start, big square at the end): wide spacing is fast, tight spacing is slow.
 - `onion-sheet-N.jpg`: all onion images of the run with their time ranges. Ranges too short to track appear as a single "still" frame, and the six windows most likely to show a turn get a strip of five frames.
 - `frame-sheet-N.jpg`: whole frames spread evenly over the clip, about one per 1.25 s, up to 96.
+- `check-sheet-N.jpg`: one per "먼저 확인할 곳" span, dense frames in time order.
 - `zoom --video <clip> --out <dir> --at 18-22` shows dense whole frames for up to two spans of 4 s. Readers tend not to zoom where they were wrong, so the frame sheets come first.
+
+### Asking about one span: at
+
+When a question is about one span ("what happens at 18–22 s?"), ask for that span instead of rereading the whole summary.
+
+```bash
+python -m image_lens --workspace W at --look W/look-clip --span 18-22 --out W/at-18-22
+```
+
+`at.md` collects the lines, skipped cuts, transitions and "먼저 확인할 곳" signs that overlap the span, and names the pictures to open. `at-frames-1.jpg` holds 12 dense frames of the span. Spans are 4 s at most. The reader asks the question; the tool only gathers the evidence for that span.
 
 ### When pose seeds fail: grid and mark
 
