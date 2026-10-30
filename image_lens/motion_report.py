@@ -33,6 +33,26 @@ def _simplify(xy,a,b,tolerance,keep):
     i=max(range(a+1,b),key=lambda j:(offset(xy[j]),-j))
     if offset(xy[i])>tolerance:keep.add(i);_simplify(xy,a,i,tolerance,keep);_simplify(xy,i,b,tolerance,keep)
 
+EASE=dict(min_samples=6,ratio=1.5)
+EASE_KO=dict(ease_in='빨라짐',ease_out='느려짐',ease_in_out='천천히-빠르게-천천히',even='일정')
+
+def ease(ts,path):
+    """Timing of one stroke from progress along its own direction in thirds of its time: ease_in (speeds up),
+    ease_out (slows down), ease_in_out (fast middle), even; None when the stroke is too short to tell."""
+    if len(path)<EASE['min_samples'] or ts[-1]<=ts[0]:return None
+    dx,dy=path[-1][0]-path[0][0],path[-1][1]-path[0][1];length=math.hypot(dx,dy)
+    if not length:return None
+    progress=[((p[0]-path[0][0])*dx+(p[1]-path[0][1])*dy)/length for p in path]
+    def at(t):
+        j=next((k for k in range(1,len(ts)) if ts[k]>=t),len(ts)-1);f=(t-ts[j-1])/(ts[j]-ts[j-1]) if ts[j]>ts[j-1] else 1.
+        return progress[j-1]+f*(progress[j]-progress[j-1])
+    t0,t3=ts[0],ts[-1];a,b,c=(at(t0+(t3-t0)*k/3)-at(t0+(t3-t0)*(k-1)/3) if k>1 else at(t0+(t3-t0)/3) for k in (1,2,3))
+    a,b,c=max(a,0.),max(b,0.),max(c,0.);r=EASE['ratio']
+    if b>r*max(a,c):return 'ease_in_out'
+    if c>r*a and c>=b:return 'ease_in'
+    if a>r*c and a>=b:return 'ease_out'
+    return 'even'
+
 def strokes(fs,ts,xy):
     """Coarse readable movement units over one continuous run; summary only, raw coordinates are untouched."""
     half=STROKE['median_samples']//2
@@ -54,7 +74,9 @@ def strokes(fs,ts,xy):
             if state=='hold' and u['distance_px']>=STROKE['hold_px']:u['direction']=direction(u['dx_px'],u['dy_px'])
         else:units.append(dict(start_frame=fs[a],end_frame=fs[b],start_seconds=ts[a],end_seconds=ts[b],direction=state,dx_px=dx,dy_px=dy,distance_px=distance))
     largest=max((u['distance_px'] for u in units if u['direction']!='hold'),default=0.)
+    index={f:i for i,f in enumerate(fs)}
     for u in units:
+        u['ease']=ease(ts[index[u['start_frame']]:index[u['end_frame']]+1],smooth[index[u['start_frame']]:index[u['end_frame']]+1]) if u['direction']!='hold' else None
         elapsed=u['end_seconds']-u['start_seconds'];u['mean_speed_px_per_s']=u['distance_px']/elapsed if elapsed>0 else 0.
         u['major']=u['direction']!='hold' and u['distance_px']>=max(largest/2,STROKE['major_min_px'])
     return dict(units=units[:STROKE['max_strokes']],omitted_unit_count=max(0,len(units)-STROKE['max_strokes']),params=STROKE,

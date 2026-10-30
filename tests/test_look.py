@@ -69,4 +69,20 @@ class Cut(unittest.TestCase):
         window, _ = look.next_window(dict(start_frame=0, end_frame=199), 42, poses, {42, 43})
         self.assertEqual(window, dict(seed=44, end=199))
 
+
+class Camera(unittest.TestCase):
+    def test_strokes_that_only_follow_the_frame_are_set_aside(self):
+        unit = lambda dx: dict(major=True, start_frame=1, end_frame=20, start_seconds=.04, end_seconds=.8, dx_px=dx, dy_px=0., direction='left', distance_px=abs(dx))
+        report = dict(features=[dict(point_id='a', continuous_runs=[dict(frames=[1, 20], strokes=dict(units=[unit(-33.)]))]),
+                                dict(point_id='b', continuous_runs=[dict(frames=[1, 20], strokes=dict(units=[unit(-90.)]))])])
+        lines, summary = look._summary(report, dict(seed=0, end=20), 'move', 'x', 'y', {1: (0., 0., 1.), 20: (-33., 0., 1.)})
+        self.assertEqual(summary['camera_only_moves'], 1); self.assertEqual(len(summary['major_moves']), 1)
+        self.assertIn('b 화면 왼쪽 90px', lines[0])
+
+    def test_small_camera_shift_does_not_remove_a_move(self):
+        unit = dict(major=True, start_frame=1, end_frame=20, start_seconds=.04, end_seconds=.8, dx_px=0., dy_px=-25., direction='up', distance_px=25.)
+        report = dict(features=[dict(point_id='a', continuous_runs=[dict(frames=[1, 20], strokes=dict(units=[unit]))])])
+        _, summary = look._summary(report, dict(seed=0, end=20), 'move', 'x', 'y', {1: (0., 0., 1.), 20: (0., -12., 1.)})
+        self.assertEqual(summary['camera_only_moves'], 0); self.assertEqual(len(summary['major_moves']), 1)
+
 if __name__ == '__main__': unittest.main()

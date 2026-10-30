@@ -35,6 +35,16 @@ class Contracts(unittest.TestCase):
                               cwd='/private/tmp' if Path('/private/tmp').exists() else self.root,
                               capture_output=True, text=True, timeout=10)
 
+    def test_model_paths_default_from_workspace_models_json(self):
+        import argparse
+        from image_lens import cli
+        a = argparse.Namespace(detector=None, pose_model='given.onnx')
+        with self.assertRaisesRegex(ValueError, '--detector not given'):
+            cli.models(a, 'detector', 'pose_model')
+        (self.root/'models.json').write_text(json.dumps(dict(detector='saved.onnx', pose_model='saved-pose.onnx')))
+        cli.models(a, 'detector', 'pose_model')
+        self.assertEqual((a.detector, a.pose_model), ('saved.onnx', 'given.onnx'))
+
     def test_actual_isolated_cli_and_no_overwrite(self):
         result = self.cli('brief', '--shots', 'shots.json', '--out', 'brief.json')
         self.assertEqual(result.returncode, 0, result.stderr)

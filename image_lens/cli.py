@@ -5,11 +5,26 @@ from pathlib import Path
 import sys
 from image_lens import paths
 
-COMMANDS = ('look', 'scan', 'compare', 'brief', 'catalog', 'pose', 'seed', 'bind', 'prepare', 'validate', 'track', 'analyze')
+COMMANDS = ('look', 'scan', 'compare', 'brief', 'catalog', 'pose', 'seed', 'bind', 'prepare', 'validate', 'track', 'analyze', 'grid', 'mark', 'focus', 'zoom')
 
 
 def parser(command, description):
     return argparse.ArgumentParser(prog='image-lens '+command, description=description)
+
+
+def models(a, *names):
+    """Fill model paths left out on the command line from <workspace>/models.json (per machine, Git-ignored), e.g.
+    {"detector": "...onnx", "pose_model": "...onnx", "checkpoint": "...pth"}. A flag given on the command line wins."""
+    missing = [n for n in names if getattr(a, n) is None]
+    if not missing:
+        return a
+    path = paths.workspace_root()/'models.json'
+    saved = json.loads(path.read_text(encoding='utf-8')) if path.is_file() else {}
+    for n in missing:
+        if not saved.get(n):
+            raise ValueError(f"--{n.replace('_', '-')} not given and not in {path}")
+        setattr(a, n, saved[n])
+    return a
 
 
 def selected_entry(module, arguments):
@@ -120,25 +135,56 @@ def dispatch(command, arguments):
         output = paths.write(a.out, brief.markdown(result)) if a.format == 'markdown' else paths.write_json(a.out, result)
         return dict(status='written', output=str(output), source_status=result['status'],
                     returned_shots=result['coverage']['returned_segments'], images_written=0, model_loaded=False)
+    if command == 'grid':
+        from image_lens import mark
+        ap = parser(command, 'One frame (or a box of it) with a labelled source-pixel grid, for reading point positions by eye.')
+        ap.add_argument('--video', required=True); ap.add_argument('--frame', type=int, required=True)
+        ap.add_argument('--box', help='x0,y0,x1,y1 zoom box in source pixels'); ap.add_argument('--out', required=True)
+        a = ap.parse_args(arguments)
+        return mark.grid(a.video, a.frame, a.out, tuple(int(v) for v in a.box.split(',')) if a.box else None)
+    if command == 'mark':
+        from image_lens import mark
+        ap = parser(command, 'Track agent-placed, agent-named points from one frame (names are the agent reading, not verified).')
+        ap.add_argument('--video', required=True); ap.add_argument('--shots', required=True, help='shots.json from scan or look')
+        ap.add_argument('--frame', type=int, required=True); ap.add_argument('--end', type=int)
+        ap.add_argument('--point', action='append', required=True, help='name=x,y in source pixels; repeat up to 8 times')
+        ap.add_argument('--no-snap', action='store_true', help='keep the given positions instead of the nearest corner')
+        ap.add_argument('--checkpoint', help='default: models.json'); ap.add_argument('--out', required=True, help='new output directory')
+        a = models(ap.parse_args(arguments), 'checkpoint')
+        return mark.run(a.video, a.shots, a.frame, a.point, a.checkpoint, a.out, a.end, not a.no_snap)
+    if command == 'focus':
+        from image_lens import digest
+        ap = parser(command, 'Print one shot of a look run in full detail (look-full.md).')
+        ap.add_argument('--look', required=True, help='look output directory'); ap.add_argument('--shot', required=True)
+        a = ap.parse_args(arguments)
+        return dict(status='ok', shot=a.shot, text=digest.focus(a.look, a.shot))
+    if command == 'zoom':
+        from image_lens import zoom
+        ap = parser(command, 'Second read: dense whole frames for at most two spans the reader could not tell, at a fixed frame budget.')
+        ap.add_argument('--video', required=True); ap.add_argument('--out', required=True, help='new output directory')
+        ap.add_argument('--at', action='append', default=[], help='start-end seconds, at most 4 s; repeat once more at most')
+        ap.add_argument('--even', action='store_true', help='control: 24 frames spread evenly over the clip, as many as two full --at spans')
+        a = ap.parse_args(arguments)
+        return zoom.run(a.video, a.out, a.at, a.even)
     if command == 'look':
         from image_lens import look
         ap = parser(command, 'One-command look: scan, pose, pose-seeded tracking per shot window, one short look.md.')
-        ap.add_argument('--video', required=True); ap.add_argument('--detector', required=True)
-        ap.add_argument('--pose-model', required=True); ap.add_argument('--checkpoint', required=True)
+        ap.add_argument('--video', required=True); ap.add_argument('--detector', help='default: models.json')
+        ap.add_argument('--pose-model', help='default: models.json'); ap.add_argument('--checkpoint', help='default: models.json')
         ap.add_argument('--out', required=True, help='new output directory inside the workspace')
         ap.add_argument('--max-shots', type=int, default=look.LOOK['max_shots']); ap.add_argument('--max-seconds', type=int, default=1800)
-        a = ap.parse_args(arguments)
-        if not 1 <= a.max_shots <= 64 or not 60 <= a.max_seconds <= 7200:
-            raise ValueError('--max-shots 1..64 and --max-seconds 60..7200')
+        a = models(ap.parse_args(arguments), 'detector', 'pose_model', 'checkpoint')
+        if not 1 <= a.max_shots <= 256 or not 60 <= a.max_seconds <= 7200:
+            raise ValueError('--max-shots 1..256 and --max-seconds 60..7200')
         return look.run(a.video, a.detector, a.pose_model, a.checkpoint, a.out, a.max_shots, a.max_seconds)
     if command == 'pose':
         from image_lens import pose
         ap = parser(command, 'Optional local whole-body pose (pinned user-supplied ONNX weights); per-shot track IDs and overlap flags.')
-        ap.add_argument('--shots', required=True); ap.add_argument('--detector', required=True)
-        ap.add_argument('--pose-model', required=True); ap.add_argument('--out', required=True)
+        ap.add_argument('--shots', required=True); ap.add_argument('--detector', help='default: models.json')
+        ap.add_argument('--pose-model', help='default: models.json'); ap.add_argument('--out', required=True)
         ap.add_argument('--start', type=int, default=0); ap.add_argument('--end', type=int)
         ap.add_argument('--max-seconds', type=int, default=300)
-        a = ap.parse_args(arguments)
+        a = models(ap.parse_args(arguments), 'detector', 'pose_model')
         paths.confined(a.out, new=True)
         if not 1 <= a.max_seconds <= 1800:
             raise ValueError('wall budget must be 1..1800 seconds')
@@ -164,6 +210,7 @@ def dispatch(command, arguments):
         return dict(status='written', output=str(paths.write_json(a.out, packet)),
                     jobs={j['name']: [p['point_id'] for p in j['points']] for j in packet['jobs']},
                     frames=[packet['jobs'][0]['start_frame'], packet['jobs'][0]['end_frame']],
+                    skeleton=packet['seed_source']['skeleton'],
                     seed_frame_flagged=packet['seed_source']['seed_frame_flagged'], images_written=sum(len(j['points']) for j in packet['jobs']),
                     model_loaded=False)
     if command == 'bind':
@@ -232,7 +279,9 @@ def main(argv=None):
     try:
         paths.configure(a.workspace)
         result = dispatch(a.command, a.arguments)
-        if result is not None:
+        if a.command == 'focus':
+            print(result['text'], end='')  # plain Markdown for the reader, not a JSON receipt
+        elif result is not None:
             print(json.dumps(result, ensure_ascii=False, allow_nan=False))
         return 0
     except (ValueError, OSError, KeyError, TypeError, ImportError, TimeoutError, OverflowError) as error:
