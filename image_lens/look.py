@@ -8,7 +8,7 @@ import time
 from pathlib import Path
 from image_lens import paths
 
-LOOK = dict(max_shots=16, window_frames=160, min_frames=12, track_seconds=300, strips=6, groups=('head', 'arms', 'hands', 'legs', 'move'))
+LOOK = dict(max_shots=16, window_frames=160, min_frames=12, seed_shift=3, track_seconds=300, strips=6, groups=('head', 'arms', 'hands', 'legs', 'move'))
 NAMES = dict(head='머리', arms='팔', hands='손끝', legs='다리', move='많이 움직인 곳', marked='찍은 점')
 STEP_ERRORS = (ValueError, OSError, KeyError, TypeError, ImportError, TimeoutError, OverflowError)
 
@@ -84,6 +84,12 @@ def next_window(segment, start, pose_frames, flagged, length=LOOK['window_frames
         if seed is None:
             skipped.append(dict(frames=[start, end], reason='no unflagged pose track'))
             break
+        # One bad pose frame at the seed names no limbs for the whole window (3D clip f368: a sleeve read as a 3.16
+        # shoulder-width arm, f369 fine): seed on the next frame that passes when one is this close.
+        from image_lens import body_motion
+        if not body_motion.skeleton_check(body_motion.largest(pose_frames[seed]))[0]:
+            seed = next((n for n in range(seed+1, min(end, seed+LOOK['seed_shift'])+1) if pose_frames.get(n) and n not in flagged
+                         and body_motion.skeleton_check(body_motion.largest(pose_frames[n]))[0]), seed)
         stop = min(end, seed+length-1)
         if stop-seed+1 >= min_frames:
             return dict(seed=seed, end=stop), skipped
@@ -119,6 +125,18 @@ def cut_frame(track_packets, window, min_frames=LOOK['min_frames']):
             seen = [e for e in gone if e is not None]
             cuts.append(max(seen) if seen else window['seed'])
     return min(cuts) if cuts else None
+
+
+def changed_after(video, frame):
+    """Largest downscaled grey difference over the two frame steps after `frame`, on motion_view's change scale. Points
+    lost together over a still picture were hidden or moved too fast (3D clip, clip B: <=7); a new drawing jumps (kaguya
+    f73, on twos: 22)."""
+    import cv2
+    import numpy as np
+    from image_lens import frames, motion_view
+    grey = [cv2.resize(cv2.cvtColor(f, cv2.COLOR_BGR2GRAY), motion_view.CHANGE['thumb'], interpolation=cv2.INTER_AREA).astype(np.int16)
+            for f in frames.window(video, frame, frame+2)]
+    return max((float(np.mean(np.abs(b-a))) for a, b in zip(grey, grey[1:])), default=0.)
 
 
 def lost(report, window, min_frames=LOOK['min_frames']):
@@ -369,7 +387,13 @@ def _run(video, detector, pose_model, checkpoint, out, max_shots=LOOK['max_shots
             except Exception as error:  # OpenCV raises its own error type; the view is optional
                 errors.append(dict(window=w, step='onion', error=str(error)[:300]))
         if end < w['end']:
-            slot.append(f"  - f{end} 뒤 점이 한꺼번에 끊김(그림 바뀜·화면 전환 추정): f{end+1}부터 점을 다시 놓음")
+            from image_lens import motion_view
+            try:
+                done['cut_redrawn'] = changed_after(source, end) >= motion_view.CHANGE['min_mean_abs_diff']
+                why = '그림 바뀜·화면 전환 추정' if done['cut_redrawn'] else '가려짐·빠른 동작 추정, 그림은 그대로'
+            except Exception as error:  # OpenCV raises its own error type; without the frames the cause stays open
+                errors.append(dict(window=w, step='cut_diff', error=str(error)[:300])); why = '그림 바뀜·가려짐·화면 밖'
+            slot.append(f"  - f{end} 뒤 점이 한꺼번에 끊김({why}): f{end+1}부터 점을 다시 놓음")
         if done['groups']:slot.append(f"  - 자세히: {base.name}-<head|arms|legs>.report.md, 그림 {base.name}-<묶음>-traj/trajectory.png")
         last_end = end if done['groups'] else None
         if person:
