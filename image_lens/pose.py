@@ -17,6 +17,7 @@ FLAGS = dict(overlap_iou=.10, jump_diagonals=.15, min_score=.30)
 # the two crops found the two eyes as two heads; real pairs were 0.08 or more. Fit on clip D 18-22 s, clip A's
 # stacked copies and that one close-up.
 SPLIT = dict(min_detection=.30, crop=.60, head_score=.45, head_gap=.35, min_eyes=.06)
+PART_FRAMES = 90  # a pose part is written at the first cut after this many frames
 SEED = dict(min_score=.30, max_frames=160, border_px=32, uncertainty_px=(8., 24.))
 BODY = dict(nose=0, eye_l=1, eye_r=2, ear_l=3, ear_r=4, shoulder_l=5, shoulder_r=6, elbow_l=7, elbow_r=8,
             wrist_l=9, wrist_r=10, hip_l=11, hip_r=12, knee_l=13, knee_r=14, ankle_l=15, ankle_r=16)
@@ -77,7 +78,9 @@ def _detector_class():
     return ScoredYOLOX
 
 
-def run(shots, detector, pose_model, start=0, end=None):
+def run(shots, detector, pose_model, start=0, end=None, part=None):
+    """Pose packet for start..end. With `part`, look's pose child also hands over packets for runs of whole shots as
+    they finish (track IDs and flags never cross a cut, so a part reads the same as that range of the whole)."""
     scan, scan_path = paths.load(shots)
     shot_boundaries.validate(scan)
     if scan.get('scan_scope') != 'full_source':
@@ -113,7 +116,18 @@ def run(shots, detector, pose_model, start=0, end=None):
     if any(m.session.get_providers() != ['CoreMLExecutionProvider', 'CPUExecutionProvider'] for m in (det, pose)):
         raise ValueError('unexpected execution provider')
     segments = {n: s['segment_id'] for s in scan['analysis_segments'] for n in range(s['start_frame'], s['end_frame']+1)}
-    fps = scan['fps']; frames = []; tracker = None; segment = None
+    fps = scan['fps']; frames = []; tracker = None; segment = None; parted = 0
+    def packet(rows):
+        return dict(schema='image-lens.pose/1', source_video=str(video), source_sha256=scan['source_sha256'],
+                    width=scan['width'], height=scan['height'], fps=fps, native_range=[rows[0]['frame'], rows[-1]['frame']],
+                    canonical_shots=dict(path=str(scan_path), sha256=paths.sha(scan_path)),
+                    models={k: dict(path=str(v), sha256=MODELS[k][1]) for k, v in models.items()}, params=dict(PARAMS, split=SPLIT),
+                    runtime=dict(onnxruntime=onnxruntime.__version__, supervision=supervision.__version__, opencv=cv2.__version__),
+                    pose_module_sha256=paths.sha(__file__), elapsed_seconds=round(time.monotonic()-started, 3),
+                    flags=flags(rows), frames=rows,
+                    limitations=['human-trained model on drawn characters: face/hand points are rough; hair and pupils are not modelled',
+                                 'overlapping copies (echo, afterimage) can merge into one wrong skeleton without any flag',
+                                 'a merged box is split only in two, left and right, when both crops find a head; split skeletons see half a box'])
     def detected(n):
         ok, image = cap.read()
         if not ok or round(cap.get(cv2.CAP_PROP_POS_FRAMES)) != n+1 or image.shape[:2] != (scan['height'], scan['width']):
@@ -137,6 +151,8 @@ def run(shots, detector, pose_model, start=0, end=None):
                 if n < end:
                     following = ahead.submit(detected, n+1)
                 if segments[n] != segment:
+                    if part and len(frames)-parted >= PART_FRAMES:
+                        part(packet(frames[parted:])); parted = len(frames)
                     # Track IDs never cross a detected cut.
                     segment = segments[n]
                     tracker = supervision.ByteTrack(track_activation_threshold=PARAMS['track_activation'], lost_track_buffer=PARAMS['lost_track_buffer'],
@@ -161,16 +177,9 @@ def run(shots, detector, pose_model, start=0, end=None):
                          scores=[round(float(s), 4) for s in tracks.data['scores'][j]]) for j in range(len(tracks))]))
     finally:
         cap.release()
-    return dict(schema='image-lens.pose/1', source_video=str(video), source_sha256=scan['source_sha256'],
-                width=scan['width'], height=scan['height'], fps=fps, native_range=[start, end],
-                canonical_shots=dict(path=str(scan_path), sha256=paths.sha(scan_path)),
-                models={k: dict(path=str(v), sha256=MODELS[k][1]) for k, v in models.items()}, params=dict(PARAMS, split=SPLIT),
-                runtime=dict(onnxruntime=onnxruntime.__version__, supervision=supervision.__version__, opencv=cv2.__version__),
-                pose_module_sha256=paths.sha(__file__), elapsed_seconds=round(time.monotonic()-started, 3),
-                flags=flags(frames), frames=frames,
-                limitations=['human-trained model on drawn characters: face/hand points are rough; hair and pupils are not modelled',
-                             'overlapping copies (echo, afterimage) can merge into one wrong skeleton without any flag',
-                             'a merged box is split only in two, left and right, when both crops find a head; split skeletons see half a box'])
+    if part and parted:
+        part(packet(frames[parted:]))
+    return packet(frames)
 
 
 def _split(image, boxes, conf, keypoints, scores, pose):

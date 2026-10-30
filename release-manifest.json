@@ -20,7 +20,7 @@
   ],
   "manifest_self_excluded": true,
   "file_count": 133,
-  "total_bytes": 1402243,
+  "total_bytes": 1409832,
   "files": [
     {
       "path": ".gitattributes",
@@ -79,8 +79,8 @@
     },
     {
       "path": "docs/look-notes.md",
-      "bytes": 20736,
-      "sha256": "402eb6f464731a5096ed5e48c2dd724903b8e181c77c1642d3d9807808419566"
+      "bytes": 21669,
+      "sha256": "50665061d12ef3cab3a537d7d60a49a4008e6fe57bca130a4b5263045014bee9"
     },
     {
       "path": "docs/provenance.md",
@@ -139,8 +139,8 @@
     },
     {
       "path": "image_lens/cli.py",
-      "bytes": 20318,
-      "sha256": "b2adc280ecf22b5c17707d171539af0e14595df2f1c5cfcef09b175eb50b708f"
+      "bytes": 20907,
+      "sha256": "59c93fd41eaecfc3d98d80c87f30bac1ddb5ee52a0b77a7a1c6b241fc07ca45d"
     },
     {
       "path": "image_lens/digest.py",
@@ -164,8 +164,8 @@
     },
     {
       "path": "image_lens/look.py",
-      "bytes": 28839,
-      "sha256": "431c12dff544236e327b36239dcf0224233585d2d3f7c6a91d738c2b87428b4e"
+      "bytes": 32093,
+      "sha256": "99e17acfb69c123375980743dcb3ef74da67998270a1c468007b1b6873856937"
     },
     {
       "path": "image_lens/mark.py",
@@ -209,8 +209,8 @@
     },
     {
       "path": "image_lens/pose.py",
-      "bytes": 24828,
-      "sha256": "bec79eecc47cc61868af55b0f18848e51a6f854af96dc20ca8c3b6df6c1f7628"
+      "bytes": 25478,
+      "sha256": "aeea2a8f531b1b9ad947d9118f04fa9f646c221dfc60d2876bfd7f2d429b7ff5"
     },
     {
       "path": "image_lens/run_point_tracker.py",
@@ -649,8 +649,8 @@
     },
     {
       "path": "tests/test_look.py",
-      "bytes": 7238,
-      "sha256": "aff8c5f3434abb0b22b51ea37692ff038335696571c1142a78e89a78a3b0f8ae"
+      "bytes": 8837,
+      "sha256": "7ab4b0975156a846a8dbe749e955faf5702f6f9cd45405f1748c16ef91139b6a"
     },
     {
       "path": "tests/test_mark.py",
@@ -674,8 +674,8 @@
     },
     {
       "path": "tests/test_pose.py",
-      "bytes": 9635,
-      "sha256": "4f5a3e9aa28d115b7bb9ea77a5d20dd010b5fcc69e91c3f927f8f344c3dfac2b"
+      "bytes": 10199,
+      "sha256": "0326108c48aad733ebcf6dda6358cb31de2fad1d87082865fc1dcf2210387c52"
     },
     {
       "path": "tests/test_zoom.py",
