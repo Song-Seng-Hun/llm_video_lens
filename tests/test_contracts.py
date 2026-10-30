@@ -155,6 +155,13 @@ class Contracts(unittest.TestCase):
         for sha in helpers:
             self.assertEqual(sha(big), hashlib.sha256(b'b'*2097152).hexdigest())
 
+    def test_kept_pose_packet_follows_a_rewrite(self):
+        from image_lens import analyze_motion
+        pose = self.root/'pose.json'; paths.write_json(pose, dict(schema='a'))
+        self.assertIs(analyze_motion._pose_packet(pose)[0], analyze_motion._pose_packet(pose)[0])
+        pose.write_text(json.dumps(dict(schema='b')))
+        self.assertEqual(analyze_motion._pose_packet(pose)[0], dict(schema='b'))
+
     def test_prepare_imports_no_torch(self):
         paths.write_json('queries.json', self.query())
         script = '''import sys

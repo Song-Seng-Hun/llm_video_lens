@@ -3,6 +3,7 @@ import argparse
 import hashlib
 import json
 import math
+import os
 from pathlib import Path
 import statistics
 import runpy
@@ -11,6 +12,7 @@ from image_lens.paths import workspace_root
 SHOT = runpy.run_path(str(Path(__file__).with_name('shot_boundaries.py')))
 _SHOT_LAST = [None, None]
 _VIEW = []
+_POSE = []
 PARAMS = dict(min_samples=12, static_extent_px=1.5, min_travel_px=12.,
               max_perpendicular_ratio=.15, max_backward_step_ratio=.08,
               max_fit_rmse=.08, min_fit_margin=.02, background_agreement_px=2.)
@@ -32,6 +34,14 @@ def _view_module():
         spec=importlib.util.spec_from_file_location('motion_view',path)
         module=importlib.util.module_from_spec(spec);spec.loader.exec_module(module);_VIEW[:]=[digest,module]
     return _VIEW[1]
+
+def _pose_packet(path):
+    """The pose packet, parsed once while the file is unchanged (3.5 MB on clip B, read for every group's trajectory view).
+    Only read here, never changed."""
+    from image_lens import paths as lens_paths
+    st=os.stat(path);key=(str(Path(path).resolve()),st.st_dev,st.st_ino,st.st_size,st.st_mtime_ns,st.st_ctime_ns)
+    if _POSE[:1]!=[key]:_POSE[:]=[key,lens_paths.load(path,max_bytes=64*1024*1024)]
+    return _POSE[1]
 
 def finite(value):
     try:
@@ -407,7 +417,7 @@ def main():
             pose_flags=None
             if args.pose:
                 from image_lens import paths as lens_paths
-                pose_packet,pose_path=lens_paths.load(args.pose,max_bytes=64*1024*1024)
+                pose_packet,pose_path=_pose_packet(args.pose)
                 if pose_packet.get('schema')!='image-lens.pose/1' or pose_packet.get('source_sha256')!=result['source_video_sha256']:
                     raise ValueError('pose packet for the same pinned source required')
                 pose_flags=dict(path=str(pose_path),sha256=lens_paths.sha(pose_path),native_range=pose_packet['native_range'],

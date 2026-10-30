@@ -63,7 +63,7 @@ def configure_spatial_shape(predictor, shape):
 
 
 # A serving child (tracking_child.py --serve) keeps these between jobs: the checkpoint hash per file state and the loaded model.
-_CHECKED, _MODELS, _SHA = {}, {}, {}
+_CHECKED, _MODELS, _SHA, _FRAMES = {}, {}, {}, []
 
 
 def checkpoint_sha(path):
@@ -192,29 +192,35 @@ def main():
     shot_api=runpy.run_path(str(shot_module))
     import cv2
     import numpy as np
-    cap = cv2.VideoCapture(str(video_path))
-    images, timestamps = [], []
-    if not cap.isOpened() or abs(cap.get(cv2.CAP_PROP_FPS) - job['fps']) > 1e-6:
-        raise ValueError('decode/fps mismatch')
-    try:
-        # Seek like pose.py (the frame index and PTS checks below catch a bad seek); decoding from frame 0 made
-        # each window cost more the later it starts (clip B: 0.9 s at frame 29, 2.5 s at frame 1169).
-        cap.set(cv2.CAP_PROP_POS_FRAMES, start)
-        for n in range(start, end + 1):
-            ok, image = cap.read()
-            if not ok:
-                raise ValueError('incomplete source decode')
-            if round(cap.get(cv2.CAP_PROP_POS_FRAMES)) != n + 1:
-                raise ValueError('decoded frame index mismatch')
-            if image.shape != (height, width, 3):
-                raise ValueError('decoded frame shape mismatch')
-            pts = cap.get(cv2.CAP_PROP_POS_MSEC) / 1000.
-            if not finite(pts) or abs(pts - n / job['fps']) > .002:
-                raise ValueError('selected decoder PTS mismatch')
-            images.append(cv2.cvtColor(image, cv2.COLOR_BGR2RGB))
-            timestamps.append(pts)
-    finally:
-        cap.release()
+    # The groups of one window decode the same frames; the serving child keeps the last window's checked frames.
+    st = os.stat(video_path)
+    window = (str(video_path), st.st_dev, st.st_ino, st.st_size, st.st_mtime_ns, st.st_ctime_ns, start, end, width, height, job['fps'])
+    if _FRAMES[:1] != [window]:
+        cap = cv2.VideoCapture(str(video_path))
+        images, timestamps = [], []
+        if not cap.isOpened() or abs(cap.get(cv2.CAP_PROP_FPS) - job['fps']) > 1e-6:
+            raise ValueError('decode/fps mismatch')
+        try:
+            # Seek like pose.py (the frame index and PTS checks below catch a bad seek); decoding from frame 0 made
+            # each window cost more the later it starts (clip B: 0.9 s at frame 29, 2.5 s at frame 1169).
+            cap.set(cv2.CAP_PROP_POS_FRAMES, start)
+            for n in range(start, end + 1):
+                ok, image = cap.read()
+                if not ok:
+                    raise ValueError('incomplete source decode')
+                if round(cap.get(cv2.CAP_PROP_POS_FRAMES)) != n + 1:
+                    raise ValueError('decoded frame index mismatch')
+                if image.shape != (height, width, 3):
+                    raise ValueError('decoded frame shape mismatch')
+                pts = cap.get(cv2.CAP_PROP_POS_MSEC) / 1000.
+                if not finite(pts) or abs(pts - n / job['fps']) > .002:
+                    raise ValueError('selected decoder PTS mismatch')
+                images.append(cv2.cvtColor(image, cv2.COLOR_BGR2RGB))
+                timestamps.append(pts)
+        finally:
+            cap.release()
+        _FRAMES[:] = [window, images, timestamps]
+    images, timestamps = list(_FRAMES[1]), list(_FRAMES[2])
     cached_scan=None
     if 'canonical_shots' in frozen:
         ref=frozen['canonical_shots']
