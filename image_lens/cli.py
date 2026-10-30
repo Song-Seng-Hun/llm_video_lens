@@ -240,43 +240,63 @@ def dispatch(command, arguments):
         return prepare(a.queries, a.shots, a.out, a.job, a.allow_tracking, a.max_seconds)
     if command in ('validate', 'track'):
         from image_lens import run_point_tracker
-        ap = parser(command, 'Source/PTS/cut preflight without Torch.' if command == 'validate' else 'Experimental optional pinned local CoTracker; no automatic download or retry.')
-        ap.add_argument('--job', required=True); ap.add_argument('--queries', required=True)
-        ap.add_argument('--frozen', required=True); ap.add_argument('--out', required=True, help='new artifact path; validation does not create tracks')
-        ap.add_argument('--max-seconds', type=int, default=120)
-        if command == 'track':
-            ap.add_argument('--checkpoint', required=True)
-        a = ap.parse_args(arguments)
-        args = ['--job', a.job, '--queries', str(paths.confined(a.queries, exists=True)),
-                '--frozen', str(paths.confined(a.frozen, exists=True)), '--out', str(paths.confined(a.out, new=True)),
-                '--max-seconds', str(a.max_seconds)]
-        paths.confined(a.out).parent.mkdir(parents=True, exist_ok=True)
+        command_args, a = _tracker_arguments(command, arguments)
         if command == 'validate':
-            args.append('--validate-only')
-        else:
-            args.extend(['--checkpoint', a.checkpoint])
-        if command == 'validate':
-            return selected_entry(run_point_tracker, args)
+            return selected_entry(run_point_tracker, command_args)
         # Native Torch code may defer Python signal delivery; the parent owns
         # an independent hard deadline and reaps only this job's process group.
         from image_lens import watchdog
-        child = Path(__file__).with_name('tracking_child.py')
-        command = [sys.executable, '-I', '-B', str(child), '--workspace', str(paths.workspace_root())]
         try:
             if watchdog.shared is not None:
-                returncode, stdout, stderr = watchdog.shared.run(command, args, a.max_seconds)
+                reply = watchdog.shared.run(_tracker(), command_args, a.max_seconds)
             else:
-                returncode, stdout, stderr = watchdog.run([*command, *args], a.max_seconds)
+                reply = watchdog.run([*_tracker(), *command_args], a.max_seconds)
         except watchdog.ChildTimeout as error:
             if error.stdout: print(error.stdout, end='')
             if error.stderr: print(error.stderr, end='', file=sys.stderr)
             raise
-        if stdout: print(stdout, end='')
-        if stderr: print(stderr, end='', file=sys.stderr)
-        if returncode:
-            raise ValueError('experimental tracking child failed; inspect its error above; no retry')
-        return None
+        return finish_track(reply)
     raise ValueError('unsupported command')
+
+
+def _tracker_arguments(command, arguments):
+    ap = parser(command, 'Source/PTS/cut preflight without Torch.' if command == 'validate' else 'Experimental optional pinned local CoTracker; no automatic download or retry.')
+    ap.add_argument('--job', required=True); ap.add_argument('--queries', required=True)
+    ap.add_argument('--frozen', required=True); ap.add_argument('--out', required=True, help='new artifact path; validation does not create tracks')
+    ap.add_argument('--max-seconds', type=int, default=120)
+    if command == 'track':
+        ap.add_argument('--checkpoint', required=True)
+    a = ap.parse_args(arguments)
+    args = ['--job', a.job, '--queries', str(paths.confined(a.queries, exists=True)),
+            '--frozen', str(paths.confined(a.frozen, exists=True)), '--out', str(paths.confined(a.out, new=True)),
+            '--max-seconds', str(a.max_seconds)]
+    paths.confined(a.out).parent.mkdir(parents=True, exist_ok=True)
+    if command == 'validate':
+        args.append('--validate-only')
+    else:
+        args.extend(['--checkpoint', a.checkpoint])
+    return args, a
+
+
+def _tracker():
+    return [sys.executable, '-I', '-B', str(Path(__file__).with_name('tracking_child.py')), '--workspace', str(paths.workspace_root())]
+
+
+def submit_track(arguments):
+    """Queue one track job on the shared child and return its handle; finish_track(watchdog.shared.result(handle))
+    later prints its output and raises on failure, as `track` does (look tracks a window while it reports the last)."""
+    from image_lens import watchdog
+    command_args, a = _tracker_arguments('track', arguments)
+    return watchdog.shared.submit(_tracker(), command_args, a.max_seconds)
+
+
+def finish_track(reply):
+    returncode, stdout, stderr = reply
+    if stdout: print(stdout, end='')
+    if stderr: print(stderr, end='', file=sys.stderr)
+    if returncode:
+        raise ValueError('experimental tracking child failed; inspect its error above; no retry')
+    return None
 
 
 def main(argv=None):

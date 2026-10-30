@@ -1,10 +1,11 @@
-"""The last decoded frame window of one source, shared by the per-window steps.
+"""The last decoded frame windows, shared by the per-window steps.
 Seed points, crops, camera, trajectory sheet, onion, peak and motif each read the same window from its own seek
-(clip B: 8 decodes of every window); now the first reads it and the rest are cut from it. The arrays are shared:
-callers must not write into them."""
+(clip B: 8 decodes of every window); now the first reads it and the rest are cut from it. look reports a window
+after seeding the next, so the last KEEP reads are kept. The arrays are shared: callers must not write into them."""
 import os
 
-_LAST = []
+_LAST = []  # [key, start, end, [(bgr, pos)]], most recent first
+KEEP = 3
 
 
 def window(video, start, end):
@@ -23,7 +24,8 @@ def checked(video, start, end, width, height, error):
 def _read(video, start, end):
     s = os.stat(video)
     key = (str(video), s.st_dev, s.st_ino, s.st_size, s.st_mtime_ns, s.st_ctime_ns)
-    if not (_LAST and _LAST[0] == key and _LAST[1] <= start and end <= _LAST[2]):
+    kept = next((k for k in _LAST if k[0] == key and k[1] <= start and end <= k[2]), None)
+    if kept is None:
         import cv2
         cap = cv2.VideoCapture(str(video)); got = []
         try:
@@ -36,5 +38,8 @@ def _read(video, start, end):
                     got.append((bgr, round(cap.get(cv2.CAP_PROP_POS_FRAMES))))
         finally:
             cap.release()
-        _LAST[:] = [key, start, end, got]
-    return _LAST[3][start-_LAST[1]:end-_LAST[1]+1]
+        kept = [key, start, end, got]
+    else:
+        _LAST.remove(kept)
+    _LAST[:] = [kept]+_LAST[:KEEP-1]
+    return kept[3][start-kept[1]:end-kept[1]+1]

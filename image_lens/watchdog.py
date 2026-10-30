@@ -47,49 +47,86 @@ def _kill(process):
 
 class Worker:
     """One long-lived tracker child for many jobs (`tracking_child.py --serve`): each job keeps its own hard deadline,
-    and a timeout or interruption kills and reaps the whole group; the next job starts a fresh child."""
+    and a timeout or interruption kills and reaps the whole group; the next job starts a fresh child.
+    submit() queues a job and returns at once, so the parent can work while the child tracks; result() takes the
+    replies in submit order. A failed job ends the child, and the jobs queued behind it are sent again to a fresh one."""
     def __init__(self):
         self.process = None
         self.command = None
+        self.pending = []
 
     def run(self, command, arguments, max_seconds):
+        return self.result(self.submit(command, arguments, max_seconds))
+
+    def submit(self, command, arguments, max_seconds):
         if os.name != 'posix':
             raise ValueError('experimental tracking currently requires a POSIX parent watchdog')
         if not 0 < max_seconds <= 600:
             raise ValueError('invalid parent wall budget')
-        if self.process is not None and (self.command != command or self.process.poll() is not None):
+        if self.process is not None and self.command != command:
             self.close()
+        job = (command, [str(a) for a in arguments], max_seconds)
+        self.pending.append(job)
+        self._send(job)
+        return job
+
+    def _send(self, job):
+        if self.process is not None and self.process.poll() is not None:
+            self.process = None
         if self.process is None:
-            self.command = command
-            self.process = subprocess.Popen([*command, '--serve'], stdin=subprocess.PIPE, stdout=subprocess.PIPE,
+            self.command = job[0]
+            self.process = subprocess.Popen([*job[0], '--serve'], stdin=subprocess.PIPE, stdout=subprocess.PIPE,
                                             text=True, start_new_session=True)
+        try:
+            self.process.stdin.write(json.dumps(job[1])+'\n')
+            self.process.stdin.flush()
+        except BaseException:
+            self._drop()
+            raise
+
+    def result(self, job):
+        if not self.pending or self.pending[0] is not job:
+            raise ValueError('tracking replies are taken in submit order')
         process = self.process
         try:
-            process.stdin.write(json.dumps([str(a) for a in arguments])+'\n')
-            process.stdin.flush()
-            ready, _, _ = select.select([process.stdout], [], [], max_seconds)
+            # The deadline starts when the parent waits for this job: never sooner than the job could have started.
+            ready, _, _ = select.select([process.stdout], [], [], job[2])
             if not ready:
-                self.process = None
-                _kill(process)
+                self._drop()
                 raise ChildTimeout(process.pid, '', '')
             line = process.stdout.readline()
         except ChildTimeout:
             raise
         except BaseException:
-            self.process = None
-            _kill(process)
+            self._drop()
             raise
+        self.pending.pop(0)
         if not line:  # the child died without answering
             self.process = None
             process.stdin.close()
-            return process.wait() or 1, '', 'tracking worker exited without a reply'
+            code = process.wait() or 1
+            self._resend()
+            return code, '', 'tracking worker exited without a reply'
         reply = json.loads(line)
         if reply['returncode']:  # the child exits after a failed job
-            self.close()
+            self.process = None
+            process.stdin.close()
+            process.wait()
+            self._resend()
         return reply['returncode'], reply['stdout'], reply['stderr']
 
+    def _resend(self):
+        for job in self.pending:
+            self._send(job)
+
+    def _drop(self):
+        """Kill the child; the jobs still queued are dropped, so a later result() for them fails."""
+        process, self.process, self.pending = self.process, None, []
+        if process is not None:
+            _kill(process)
+
     def close(self):
-        process, self.process = self.process, None
+        process, self.process, self.pending = self.process, None, []
         if process is None:
             return
         process.stdin.close()
