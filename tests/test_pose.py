@@ -63,7 +63,10 @@ class Seeds(unittest.TestCase):
             self.assertFalse((root/'crops').exists())
 
     def test_groups_fit_report_and_observation_caps(self):
-        self.assertTrue(all(len(names) <= 8 for names in pose.GROUPS.values()))
+        from image_lens import onion
+        # move tracks up to 12 candidates (observation cap) but reports at most onion.GAPS['points'] (report cap 8)
+        self.assertTrue(all(len(names) <= 8 for group, names in pose.GROUPS.items() if group != 'move'))
+        self.assertLessEqual(len(pose.GROUPS['move']), 12); self.assertLessEqual(onion.GAPS['points'], 8)
 
 
 class Flags(unittest.TestCase):
@@ -128,5 +131,11 @@ class Together(unittest.TestCase):
         groups = motion_report.together(report)
         self.assertEqual([g['points'] for g in groups], [['nose', 'eye-l']])
 
+
+    def test_group_members_all_overlap(self):
+        report = dict(features=[self.feature('a', 0, 100, 'right', 100.), self.feature('b', 0, 50, 'right', 100.),
+                                self.feature('c', 50, 100, 'right', 100.)])
+        groups = motion_report.together(report)
+        self.assertTrue(all(not ({'b', 'c'} <= set(g['points'])) for g in groups))
 
 if __name__ == '__main__': unittest.main()

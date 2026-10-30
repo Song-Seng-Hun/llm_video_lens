@@ -14,9 +14,15 @@ FLAGS = dict(overlap_iou=.10, jump_diagonals=.15, min_score=.30)
 SEED = dict(min_score=.30, max_frames=160, border_px=32, uncertainty_px=(8., 24.))
 BODY = dict(nose=0, eye_l=1, eye_r=2, ear_l=3, ear_r=4, shoulder_l=5, shoulder_r=6, elbow_l=7, elbow_r=8,
             wrist_l=9, wrist_r=10, hip_l=11, hip_r=12, knee_l=13, knee_r=14, ankle_l=15, ankle_r=16)
+# COCO-WholeBody hand blocks start at 91 (left) and 112 (right); +4 is the thumb tip, +8 the index tip. Rough on drawn hands.
+HAND = dict(thumb_l=95, index_l=99, thumb_r=116, index_r=120)
 GROUPS = dict(head=('nose', 'eye_l', 'eye_r', 'hair_front', 'head_top', 'hair_side_l', 'hair_side_r'),
               arms=('shoulder_l', 'shoulder_r', 'elbow_l', 'elbow_r', 'wrist_l', 'wrist_r'),
-              legs=('hip_l', 'hip_r', 'knee_l', 'knee_r', 'ankle_l', 'ankle_r'))
+              hands=('thumb_l', 'index_l', 'thumb_r', 'index_r'),
+              legs=('hip_l', 'hip_r', 'thigh_l', 'thigh_r', 'knee_l', 'knee_r', 'ankle_l', 'ankle_r'),
+              move=tuple(f'move_{c}' for c in 'abcdefghijkl'))
+# When the skeleton is implausible (props, folded or cut-off bodies), arm/leg names would be confident and wrong:
+# keep the face, drop named limbs, and track unnamed high-contrast corners inside the person box instead.
 # Hair seeds sit on a head frame built from the two eyes: d = eye distance, up = away from the nose.
 # Offsets in d units; checked by eye on AKAGE only, so every seed stays a candidate surface point.
 HAIR = dict(front=(0., .8), top=(0., 1.7), side=(1.3, -.2))
@@ -186,6 +192,15 @@ def seed_points(track, width, height):
     for name, i in BODY.items():
         if s[i] >= SEED['min_score']:
             points[name] = dict(xy=list(k[i]), seed_rule=f'coco133 joint {i} score {s[i]:.2f}')
+    for name, i in HAND.items():
+        if s[i] >= SEED['min_score']:
+            points[name] = dict(xy=list(k[i]), seed_rule=f'coco133 hand tip {i} score {s[i]:.2f}')
+    for side in 'lr':
+        # Knees below the frame come back clamped to the edge, but hip->knee still points down the thigh.
+        hip, knee = BODY[f'hip_{side}'], BODY[f'knee_{side}']
+        if min(s[hip], s[knee]) >= SEED['min_score']:
+            points[f'thigh_{side}'] = dict(xy=[k[hip][0]+.5*(k[knee][0]-k[hip][0]), k[hip][1]+.5*(k[knee][1]-k[hip][1])],
+                                           seed_rule=f'midway from hip {hip} to knee {knee}')
     head = _head_frame(k, s)
     if head:
         (cx, cy), d, (ux, uy) = head
@@ -209,7 +224,9 @@ def seed_points(track, width, height):
 
 
 LABELS = dict(head='머리·눈·머리카락 (포즈 기준 자동 배치, 부위 미검증)', arms='팔 (포즈 관절에서 시작, 부위 미검증)',
-              legs='다리 (포즈 관절에서 시작, 부위 미검증)')
+              hands='엄지·검지 끝 (포즈 손 키포인트, 그림 손에서는 거침, 부위 미검증)',
+              move='많이 움직인 곳 (어니언 틈 후보 중 같이 움직이는 것끼리 묶은 대표, 부위 이름 없음)',
+              legs='다리·허벅지 (포즈 관절에서 시작, 허벅지는 엉덩이-무릎 중간, 부위 미검증)')
 
 
 def _marked_crops(video, frame, width, height, seeds, directory):
@@ -266,6 +283,19 @@ def seed(pose_path, frame, job, evidence_dir, track_id=None, length=SEED['max_fr
     if end == frame:
         raise ValueError('seed frame is the last frame of its shot')
     seeds = seed_points(track, packet['width'], packet['height'])
+    from image_lens import body_motion
+    plausible, reason = body_motion.skeleton_check(track)
+    shot = body_motion.framing(track, packet['width'], packet['height']); scope = 'full' if plausible else None
+    if not plausible and shot == 'upper':
+        # Hips below the frame: name the arms from the shoulders, leave the legs out.
+        plausible, why = body_motion.upper_check(track)
+        if plausible:
+            scope = 'upper'; reason = f'upper body (full check: {reason})'
+            seeds = {name: p for name, p in seeds.items() if name not in GROUPS['legs']}
+    if not plausible:
+        seeds = {name: p for name, p in seeds.items() if name in GROUPS['head']}
+    from image_lens import onion
+    seeds.update(onion.gap_seeds(video, frame, end, track['bbox'], GROUPS['move']))
     if not any(name in seeds for names in GROUPS.values() for name in names):
         raise ValueError('no usable pose seeds on this frame')
     crops = _marked_crops(video, frame, packet['width'], packet['height'], seeds, paths.confined(evidence_dir, new=True))
@@ -284,7 +314,7 @@ def seed(pose_path, frame, job, evidence_dir, track_id=None, length=SEED['max_fr
                              observation_scope='visible_surface_2d', anatomical_claims=False, common_metric_excluded_frames=[frame]))
     flagged = any(r['frame'] == frame for r in packet['flags']['frames'])
     return dict(schema='team-eye.observations/1', seed_source=dict(pose=str(pose_file), pose_sha256=paths.sha(pose_file),
-                track_id=track['track_id'], frame=frame, seed_frame_flagged=flagged,
+                track_id=track['track_id'], frame=frame, seed_frame_flagged=flagged, skeleton=dict(plausible=plausible, reason=reason, scope=scope, framing=shot),
                 basis='pose-model joints and eye-based hair geometry; candidate visible-surface seeds, not verified anatomy'),
                 jobs=jobs)
 

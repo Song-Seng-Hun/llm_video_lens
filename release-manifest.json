@@ -1,6 +1,6 @@
 {
   "schema": "image-lens.source-release/1",
-  "date_kst": "2026-10-30",
+  "date_kst": "2026-10-29",
   "source_only": true,
   "authored_code_license": "not granted by this extraction; preserve owner decision",
   "vendor_licenses": {
@@ -19,8 +19,8 @@
     "historical experiment outputs"
   ],
   "manifest_self_excluded": true,
-  "file_count": 105,
-  "total_bytes": 1093450,
+  "file_count": 120,
+  "total_bytes": 1311075,
   "files": [
     {
       "path": ".gitattributes",
@@ -34,18 +34,18 @@
     },
     {
       "path": "README.en.md",
-      "bytes": 10439,
-      "sha256": "cc391bb48e2ce8a4f71417d07ed11d417dccf7ef0406ded1c46261c1e94fc20f"
+      "bytes": 24987,
+      "sha256": "9d1881119d91825fa6704fb8f2cf983b8675f3a85927e2d814f3c341d7b2e94f"
     },
     {
       "path": "README.ja.md",
-      "bytes": 14121,
-      "sha256": "6eebdd768d4f3a24383a1a490a30cea0d2da88745f89858222ba2f1d2e6f4f2c"
+      "bytes": 33718,
+      "sha256": "c50d5e053831e15c1e7639d17bbe45700eebd37f3c8244b9baed13ec5a62af9f"
     },
     {
       "path": "README.md",
-      "bytes": 12757,
-      "sha256": "6e82daa505431bece57fc2d426f839a0b62997fb0e146cb947ff4f2d04c03978"
+      "bytes": 30392,
+      "sha256": "1c4252817679008c36b10db5ee76824a21f7676dfa45c6767f4c3a098aa2c32a"
     },
     {
       "path": "assets/banner-dark.svg",
@@ -103,9 +103,19 @@
       "sha256": "430a74560012f3a335e812c02547a59b90e2b00ea7f7b6a6a4d99d55beabbe07"
     },
     {
+      "path": "image_lens/body_motion.py",
+      "bytes": 28116,
+      "sha256": "6eab27b00e32bdfd5d32247eb1e936edd40297db206da29298a490d70c3b1a61"
+    },
+    {
       "path": "image_lens/brief.py",
       "bytes": 12244,
       "sha256": "51fc65c7451a88c4dec643f737b4b77fbaf672743f2103f091eb5be662c3162d"
+    },
+    {
+      "path": "image_lens/camera.py",
+      "bytes": 2903,
+      "sha256": "5a3125791029e95564415cf0dc37184eba5cb22b2a53e2cb38c561f739c3f7d5"
     },
     {
       "path": "image_lens/checkpoint-manifest.json",
@@ -114,8 +124,13 @@
     },
     {
       "path": "image_lens/cli.py",
-      "bytes": 14513,
-      "sha256": "bf1a806d7952b5dbb28d25ff29963d07632ac93a4ed57511bb3a760ad542fe3d"
+      "bytes": 19083,
+      "sha256": "25d07231d946ae75d033d291b91e6965eedf86f3d3cc615c8e36bd5d17d047d4"
+    },
+    {
+      "path": "image_lens/digest.py",
+      "bytes": 21086,
+      "sha256": "d9d0680aea06ce6db0c13124747c37149aa603d5ea89aef056dd1c1d4e8a6bfe"
     },
     {
       "path": "image_lens/foreground_regions.py",
@@ -128,9 +143,24 @@
       "sha256": "b3ec971ca2fb53ebb2a7cb5c73a8f2f54733770ef6c6ee445599fcca2ebc5b39"
     },
     {
+      "path": "image_lens/look.py",
+      "bytes": 25354,
+      "sha256": "34b0f3fdde8fbccbffa72b91920a3d0f96464fcebb25674905bf256d6f9a0b56"
+    },
+    {
+      "path": "image_lens/mark.py",
+      "bytes": 9359,
+      "sha256": "94197c20106192ce7e772ae75190af9987f575b8f787eb956ee8e86eb9ec6d70"
+    },
+    {
+      "path": "image_lens/motif.py",
+      "bytes": 2261,
+      "sha256": "dd6d322b824676be11e2eb6a0d9730bccf812cb030925103baf5ce9937bc7d87"
+    },
+    {
       "path": "image_lens/motion_report.py",
-      "bytes": 32585,
-      "sha256": "4839415f63eaf7e2694910044d3f7e36085f4b8e5506672d117a13e090af3379"
+      "bytes": 34974,
+      "sha256": "2491b000bb8eb9ea8993e3f8c33de2543d7cc0d8b3fa439f5fd12895095f25a1"
     },
     {
       "path": "image_lens/motion_view.py",
@@ -141,6 +171,11 @@
       "path": "image_lens/observations.py",
       "bytes": 6560,
       "sha256": "e7ccd7ce6828861ac9fd9a3598b5a04b81fd4df6c290eb4b88792132e03e8f9a"
+    },
+    {
+      "path": "image_lens/onion.py",
+      "bytes": 21478,
+      "sha256": "c77bd2fd463c7898a441ba81bbf15d97d334b7b7d6ff8a10e921c5858d019c3f"
     },
     {
       "path": "image_lens/part_regions.py",
@@ -154,8 +189,8 @@
     },
     {
       "path": "image_lens/pose.py",
-      "bytes": 18744,
-      "sha256": "d4101bcd39db568e2dd49d7e8e72643c9762e81deafbe1e30f4173765180958c"
+      "bytes": 21109,
+      "sha256": "6aa2d1b8f7dac1b6e8d3c18e1eb2e7e9f94a76f4ef741cc9bf24fe5085f3692a"
     },
     {
       "path": "image_lens/run_point_tracker.py",
@@ -498,6 +533,11 @@
       "sha256": "decb9ea9b4211f089a04a41867f09de46e5bd697ba25251db9dffdbf5089fbea"
     },
     {
+      "path": "image_lens/zoom.py",
+      "bytes": 6016,
+      "sha256": "a74073aaece632a77db61346ce13837d606d44a1316546c2a7d2fc7a3ebf307c"
+    },
+    {
       "path": "image_lens_cli.py",
       "bytes": 254,
       "sha256": "6c96d0ec6c2351966f9a261fdfdeafeafedc1d9c3c36198153600c4ddab989bc"
@@ -528,19 +568,54 @@
       "sha256": "91b6ad9d9b2045fdcb06869ec84290a5e9d443d7c9d304f810b599e1bf8bff55"
     },
     {
+      "path": "tests/test_body_motion.py",
+      "bytes": 12645,
+      "sha256": "6b9c09987e5df3351c93a7ba78326d05711a5f7d46fb669e6d81fcf038b24fba"
+    },
+    {
       "path": "tests/test_contracts.py",
-      "bytes": 17770,
-      "sha256": "baad7c5ac555f1997c4531c67bd6e52cb9aebba3817506b18708e53d5a8dd2d3"
+      "bytes": 18340,
+      "sha256": "3ed8977035472f055f138c959782027d5a6be32717d9e514b3ab9523455d242b"
+    },
+    {
+      "path": "tests/test_digest.py",
+      "bytes": 8220,
+      "sha256": "adca740e0a859488d741644f6ce629a942b07361940bfebe5b79a5bfef3bc21a"
+    },
+    {
+      "path": "tests/test_look.py",
+      "bytes": 4991,
+      "sha256": "3ea5a42449d2cac36dc356ba119a34dfef64e77ed9ef7c1ce4c196749cdadaad"
+    },
+    {
+      "path": "tests/test_mark.py",
+      "bytes": 1479,
+      "sha256": "b074dd0cb4ec4e03963d11e4ca0d4a9177e217af36449097c8d6c291b0d98bcc"
+    },
+    {
+      "path": "tests/test_motif.py",
+      "bytes": 912,
+      "sha256": "59feba6abf645d4cead6b52adcfcd6b2e3f58a5afa604ecfbfad857163c7840a"
     },
     {
       "path": "tests/test_motion_readability.py",
-      "bytes": 3220,
-      "sha256": "366e459e154809b46283acee3258366609af7db1e5454c50fca14f63a32e4928"
+      "bytes": 3727,
+      "sha256": "6879318101bd4f71a003aa742efd173929e4f50bb96c7475739152b049bd6945"
+    },
+    {
+      "path": "tests/test_onion.py",
+      "bytes": 6156,
+      "sha256": "fbd7ba1e4d9eb6b81e98f1a3c63a81af6709b2e5f9fed3d66d99871198128b78"
     },
     {
       "path": "tests/test_pose.py",
-      "bytes": 7631,
-      "sha256": "57c5766aaf083ed3c34359aaf8f7d228105565d99bac289381252e0dbd06e07b"
+      "bytes": 8284,
+      "sha256": "adb86f02b4e1b52c4578a8756eb4d374825c53716a33b0de4f806ea38f706f4e"
+    },
+    {
+      "path": "tests/test_zoom.py",
+      "bytes": 3815,
+      "sha256": "220c994e1b34812ae6edfcb96d565848f333dd5b76d44ca551b0947b90fe926d"
     },
     {
       "path": "tools/build_banner.py",
