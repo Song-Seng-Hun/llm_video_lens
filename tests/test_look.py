@@ -89,9 +89,10 @@ if __name__ == '__main__': unittest.main()
 
 
 class Ahead(unittest.TestCase):
-    def look(self, d, said, code=0):
+    def look(self, d, said, code=0, track=None):
         """look._run on a 60-frame pan with three 20-frame shots; the fake pose child writes parts 0..39 and 40..59 and
-        pose.json, then prints `said` (a list of lines, or None for the two part lines). Returns the seed calls."""
+        pose.json, then prints `said` (a list of lines, or None for the two part lines). Returns the seed calls.
+        With a `track` list, each seed queues one job, and submits and takes are logged to it (every take fails)."""
         import json, subprocess, sys
         from image_lens import paths
         from tests.test_check import pan_video
@@ -105,12 +106,20 @@ class Ahead(unittest.TestCase):
         def step(command, arguments):
             if command == 'seed':
                 calls.append((arguments[arguments.index('--frame')+1], Path(arguments[arguments.index('--pose')+1]).name))
+                if track is not None:
+                    track.append(('seed', arguments[arguments.index('--frame')+1]))
             out = Path(arguments[arguments.index('--out')+1]) if '--out' in arguments else None
             if command == 'scan':
                 out.write_text(json.dumps(dict(fps=10, source_frame_count=60, source_sha256='0', analysis_segments=segments)))
             elif command == 'seed' and arguments[arguments.index('--frame')+1] == 40:
                 raise ValueError('no seed')
+            if command == 'seed' and track is not None:
+                return dict(jobs=[arguments[arguments.index('--job')+1]+'-head'])
             return dict(jobs=[])
+        def submit(arguments):
+            track.append(('submit', arguments[arguments.index('--job')+1])); return arguments[arguments.index('--job')+1]
+        def finish(handle):
+            track.append(('take', handle)); raise ValueError('no tracker here')
         def pose_child(arguments):
             parts = Path(arguments[arguments.index('--parts-dir')+1]); parts.mkdir()
             lines = said
@@ -121,12 +130,14 @@ class Ahead(unittest.TestCase):
                 Path(arguments[arguments.index('--out')+1]).write_text(packet(0, 59))
             return subprocess.Popen([sys.executable, '-c', f'import sys; print({chr(10).join(["load model"]+lines)!r}); sys.exit({code})'],
                                     stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
-        plain = look._step, look.fit, look._pose_child
+        plain = look._step, look.fit, look._pose_child, look._submit, look._finish
         look._step, look.fit, look._pose_child = step, lambda source, root: (source, False), pose_child
+        if track is not None:
+            look._submit, look._finish = submit, finish
         try:
             look.run(video, 'det', 'pose', 'ckpt', Path(d)/'look')
         finally:
-            look._step, look.fit, look._pose_child = plain
+            look._step, look.fit, look._pose_child, look._submit, look._finish = plain
         return calls
 
     def test_shots_are_seeded_from_their_pose_part_once_and_a_failure_stays_in_place(self):
@@ -140,6 +151,16 @@ class Ahead(unittest.TestCase):
             text = (Path(d)/'look'/'look-full.md').read_text()
             self.assertLess(text.index('## shot-0002'), text.index('점 배치 실패: no seed'))
             self.assertIn('load model', (Path(d)/'look'/'steps.log').read_text())
+
+    def test_the_next_shot_is_queued_before_this_window_is_taken(self):
+        import json, tempfile
+        with tempfile.TemporaryDirectory(dir=REPO/'workspace') as d:
+            track = []; self.look(d, None, track=track)
+            # Shot 2's part is already heard when shot 1 is queued: it is seeded ahead too (and fails in place).
+            self.assertEqual(track, [('seed', 0), ('submit', 'shot-0000-w0-head'), ('seed', 20), ('submit', 'shot-0001-w0-head'),
+                                     ('take', 'shot-0000-w0-head'), ('seed', 40), ('take', 'shot-0001-w0-head')])
+            record = json.loads((Path(d)/'look'/'look.json').read_text())
+            self.assertEqual([[e.get('job') for e in s['errors']] for s in record['shots']], [['shot-0000-w0-head'], ['shot-0001-w0-head'], [None]])
 
     def test_a_failed_pose_child_fails_the_look_with_its_error(self):
         import json, tempfile
