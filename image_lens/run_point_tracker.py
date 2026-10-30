@@ -63,7 +63,7 @@ def configure_spatial_shape(predictor, shape):
 
 
 # A serving child (tracking_child.py --serve) keeps these between jobs: the checkpoint hash per file state and the loaded model.
-_CHECKED, _MODELS, _SHA, _FRAMES = {}, {}, {}, []
+_CHECKED, _MODELS, _SHA, _FRAMES, _FEATURES = {}, {}, {}, [], []
 
 
 def checkpoint_sha(path):
@@ -269,8 +269,21 @@ def main():
     if model is None:
         model = CoTrackerPredictor(checkpoint=str(checkpoint), offline=True, v2=False, window_len=60).to(PARAMS['device']).eval()
         model.model.forward = partial(model.model.forward, fmaps_chunk_size=PARAMS['feature_chunk_size'])
+        # The frame features depend on the video only, never on the queries: the groups of one window reuse the
+        # features of the first, call by call, so each group's tracking runs on the same numbers as before.
+        fnet = model.model.fnet; plain = fnet.forward
+        def shared(x):
+            kept, i = _FEATURES[1], _FEATURES[2]; _FEATURES[2] += 1
+            if i == len(kept):
+                kept.append(plain(x))
+            return kept[i]
+        fnet.forward = shared
         _MODELS[str(checkpoint)] = model
     configure_spatial_shape(model, resolution)
+    features = (window, str(checkpoint), tuple(resolution))
+    if _FEATURES[:1] != [features]:
+        _FEATURES[:] = [features, [], 0]
+    _FEATURES[2] = 0
     print(json.dumps({'stage': 'inference_started', 'job': args.job, 'device': PARAMS['device']}), file=sys.stderr, flush=True)
     inference_started = time.monotonic()
     with torch.inference_mode():
