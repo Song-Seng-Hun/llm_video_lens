@@ -262,3 +262,26 @@ class Disagree(unittest.TestCase):
         for f in frames.values(): f[0]['scores'][10] = .1
         r = body_motion.describe([packet(self.paths())], dict(seed=0, end=20), frames)
         self.assertEqual([l['point_id'] for l in r['limbs']], ['wrist-r'])
+
+
+class Chibi(unittest.TestCase):
+    def track(self, eye_gap, height, ankle_score=.9):
+        k = [[0., 0.]]*17; k[1], k[2] = [200.+eye_gap/2, 100.], [200.-eye_gap/2, 100.]
+        k[15], k[16] = [220., 100.+height], [180., 100.+height]
+        s = [.9]*17; s[15] = s[16] = ankle_score
+        return dict(keypoints=k, scores=s, bbox=[0, 0, 400, 800])
+
+    def test_a_big_head_over_short_legs_is_chibi_and_human_proportions_are_not(self):
+        # Chibi 3D clip: eye gap .45-.50 of eye to ankle; human-proportion clips <= .08, flat graphic clip B <= .32.
+        self.assertAlmostEqual(body_motion.chibi([self.track(90, 200)]*5), .45, places=2)
+        self.assertIsNone(body_motion.chibi([self.track(30, 500)]*5))
+        self.assertIsNone(body_motion.chibi([self.track(64, 200)]*5))
+
+    def test_unseen_ankles_or_too_few_frames_say_nothing(self):
+        self.assertIsNone(body_motion.chibi([self.track(90, 200, ankle_score=.3)]*5))
+        self.assertIsNone(body_motion.chibi([self.track(90, 200)]*2))
+
+    def test_the_digest_note_names_chibi_instead_of_a_bad_skeleton(self):
+        from image_lens import digest
+        line = digest.window_line(dict(window=dict(seed=0, end=20), skeleton=False, chibi=.45, groups=[]), 50.)
+        self.assertIn('SD 체형: 팔다리 이름 안 붙임', line); self.assertNotIn('골격 신뢰 낮음', line)

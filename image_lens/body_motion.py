@@ -271,6 +271,31 @@ def bridge_lines(result):
 SKELETON = dict(min_score=.30, mean_min=.45, torso=(1., 2.6), hip_width=(.45, 1.6), max_arm=2.5)
 
 
+# Chibi (SD) proportions: eye gap over the eye-to-ankle distance, median over the window's frames where both eyes and
+# both ankles are confident. Pose models trained on human proportions miss even the shoulders and hips there (chibi
+# 3D clip, 15 hand-clicked frames: trunk 6-7 of 26 within a quarter of the body scale, left/right flipped on one;
+# cutting or squashing the head in the input did not help). Window medians: chibi clip .45-.50 on 9 of 10 windows;
+# 3D, live-action, kaguya and seedance clips <= .08; clip B (flat graphic, big heads) <= .32.
+CHIBI = dict(min_score=.5, min_frames=3, ratio=.38)
+
+
+def head_ratio(track):
+    """Eye gap over the eye-to-ankle distance, or None when an eye or an ankle is not confident."""
+    k, s = track['keypoints'], track['scores']
+    if min(s[1], s[2], s[15], s[16]) < CHIBI['min_score']:
+        return None
+    height = math.dist(_mean([k[1], k[2]]), _mean([k[15], k[16]]))
+    return math.dist(k[1], k[2])/height if height else None
+
+
+def chibi(tracks):
+    """Median head ratio of these pose tracks (one per frame) when it marks chibi proportions, else None."""
+    found = sorted(r for r in map(head_ratio, tracks) if r is not None)
+    if len(found) < CHIBI['min_frames'] or found[len(found)//2] < CHIBI['ratio']:
+        return None
+    return found[len(found)//2]
+
+
 def skeleton_check(track):
     """(plausible, reason) for naming arm and leg points from this pose. Faces are judged separately and kept."""
     k, s = track['keypoints'], track['scores']

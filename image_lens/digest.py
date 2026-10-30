@@ -198,7 +198,9 @@ def window_line(done, fps, first=None):
     fields += events(done.get('events'), fps)
     fields += people(done.get('people'), fps)
     notes = []
-    if not done.get('skeleton', True):
+    if done.get('chibi'):
+        notes.append('SD 체형: 팔다리 이름 안 붙임')
+    elif not done.get('skeleton', True):
         notes.append('골격 신뢰 낮음')
     hidden = [f"{_side(u['side'])}{u['kind']}" for u in (done.get('body') or {}).get('unknown', [])]
     if hidden:
