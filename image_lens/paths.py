@@ -44,11 +44,26 @@ def confined(value, *, exists=False, new=False, max_bytes=None):
     return path
 
 
+_SHA = {}
+
+
+def _state(path):
+    st = os.stat(path)
+    return st.st_dev, st.st_ino, st.st_size, st.st_mtime_ns, st.st_ctime_ns
+
+
 def sha(path):
+    """SHA-256 of a file. A file of 1 MiB or more keeps its digest while its state is unchanged (any write moves ctime),
+    since every step re-checks the source (clip B: about 450 times a look)."""
+    key = _state(path)
+    if key in _SHA:
+        return _SHA[key]
     h = hashlib.sha256()
     with Path(path).open('rb') as stream:
         for block in iter(lambda: stream.read(1048576), b''):
             h.update(block)
+    if key[2] >= 1048576 and _state(path) == key:
+        _SHA[key] = h.hexdigest()
     return h.hexdigest()
 
 

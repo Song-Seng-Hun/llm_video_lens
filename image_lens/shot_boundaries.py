@@ -3,6 +3,7 @@ import argparse
 import hashlib
 import json
 import math
+import os
 from pathlib import Path
 import signal
 import sys
@@ -18,10 +19,19 @@ PARAMS = dict(detector='PySceneDetect.AdaptiveDetector', version='0.6.7.1',
 LIMITS = dict(max_frames=18000, max_seconds=600, max_pixels=8294400,
               max_file_bytes=512*1024*1024, scan_timeout_seconds=120, evidence_frames=3)
 
+_SHA={}
+
+def _state(path):
+    st=os.stat(path);return st.st_dev,st.st_ino,st.st_size,st.st_mtime_ns,st.st_ctime_ns
+
 def sha(path):
+    """A file of 1 MiB or more keeps its digest while its state is unchanged (any write moves ctime)."""
+    key=_state(path)
+    if key in _SHA:return _SHA[key]
     h=hashlib.sha256()
     with Path(path).open('rb') as f:
         for block in iter(lambda:f.read(1048576),b''):h.update(block)
+    if key[2]>=1048576 and _state(path)==key:_SHA[key]=h.hexdigest()
     return h.hexdigest()
 
 def finite(x):

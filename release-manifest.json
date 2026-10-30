@@ -20,7 +20,7 @@
   ],
   "manifest_self_excluded": true,
   "file_count": 132,
-  "total_bytes": 1381252,
+  "total_bytes": 1383602,
   "files": [
     {
       "path": ".gitattributes",
@@ -79,8 +79,8 @@
     },
     {
       "path": "docs/look-notes.md",
-      "bytes": 16293,
-      "sha256": "16bfd25573098a68ead77ced01ff4f06cbcc4b7054b1e5e432322e6d4812db60"
+      "bytes": 16749,
+      "sha256": "3d83509b87cd2990f37b86e55642b2fc5c65e1db168288144f1f4a8c0e86bddc"
     },
     {
       "path": "docs/provenance.md",
@@ -199,8 +199,8 @@
     },
     {
       "path": "image_lens/paths.py",
-      "bytes": 2509,
-      "sha256": "f502c36b5a83bcbc3554248c7f672749c30b2b7f0387acd01903068ee241b5d4"
+      "bytes": 2992,
+      "sha256": "2ff77c28b7a031dbb0296d59724aa34da46ccf580da0c0805c6bc7356084f910"
     },
     {
       "path": "image_lens/pose.py",
@@ -209,8 +209,8 @@
     },
     {
       "path": "image_lens/run_point_tracker.py",
-      "bytes": 18826,
-      "sha256": "679cd18f128fe63994f97b4fd163978ff073baa7ea51bacec31002356cbeacb8"
+      "bytes": 19273,
+      "sha256": "b62625c4587ce4fa6a38260a3bd18d4e6a830920ce315b4c3c1049853669f5e8"
     },
     {
       "path": "image_lens/shot-detector-pins.json",
@@ -219,8 +219,8 @@
     },
     {
       "path": "image_lens/shot_boundaries.py",
-      "bytes": 20237,
-      "sha256": "5ac050aba1cca27e3e7f1b87cd69a349a490bc9e4f390a87c7ac3c8825b31f23"
+      "bytes": 20595,
+      "sha256": "cb56ed9bda8eb192adb18b7e6412dfd9d7844c3c9b0c16edd8af01ce5ef2f765"
     },
     {
       "path": "image_lens/source-manifest.json",
@@ -629,8 +629,8 @@
     },
     {
       "path": "tests/test_contracts.py",
-      "bytes": 19994,
-      "sha256": "0522e8072acdfbe1f92ae1eb8dbad82cb8c64fdc10228c2ee8c3e0c3cc472a1b"
+      "bytes": 20600,
+      "sha256": "08ac8eb87be95af846b05f347f251579e8e7cf6848184501581385a27247a568"
     },
     {
       "path": "tests/test_digest.py",
