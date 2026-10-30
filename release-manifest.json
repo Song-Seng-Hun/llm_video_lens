@@ -20,7 +20,7 @@
   ],
   "manifest_self_excluded": true,
   "file_count": 102,
-  "total_bytes": 998831,
+  "total_bytes": 1004496,
   "files": [
     {
       "path": ".gitattributes",
@@ -34,8 +34,8 @@
     },
     {
       "path": "README.md",
-      "bytes": 10878,
-      "sha256": "0b30592d93fb26fe09548d89ef7426b42dcefcd4a39c53260534bf51addd0cc7"
+      "bytes": 11319,
+      "sha256": "da4a9ce5dd10f2bbf3bfb320e0579258af73e892d6cb6e29a49d3df7d44f00c8"
     },
     {
       "path": "docs/import-provenance.json",
@@ -109,8 +109,8 @@
     },
     {
       "path": "image_lens/look.py",
-      "bytes": 10305,
-      "sha256": "7c3471623906bb9273dde024508bed84d6fa036f5a1b35a8fc88c507b91e429c"
+      "bytes": 13638,
+      "sha256": "cea5c4d9fba0285896f7638d0f0f5da1587c020dcfd832bd8ae7ab6ccaef3b54"
     },
     {
       "path": "image_lens/motion_report.py",
@@ -519,8 +519,8 @@
     },
     {
       "path": "tests/test_look.py",
-      "bytes": 1722,
-      "sha256": "15d275e6b41d5f17fb312312c7044b48bde08d928610632e170567e9f01a235a"
+      "bytes": 3613,
+      "sha256": "97ccd57d9c08e21f4599b5bac16791f5e983913c930468a5fa72dc21f84e4a49"
     },
     {
       "path": "tests/test_motion_readability.py",
