@@ -97,6 +97,7 @@ python -m image_lens --workspace W mark --video V --shots W/look/shots.json --fr
 자세한 문서는 영어입니다.
 
 - [전체 안내](docs/guide.md): 모든 명령과 옵션, `look.md` 읽는 법 전체, 결과 파일 목록, brief 형식, 작업(job)과 추적, 자세 시드
+- [LAN API](lan/README.md): 집 안의 다른 PC(Windows 등)에서 이 Mac의 `look`과 `at`을 쓰게 해 주는 서버와 클라이언트
 - [look 노트](docs/look-notes.md): `look`의 기준값과 그 근거가 된 확인 기록
 - [한계](docs/limitations.md) · [검증](docs/verification.md) · [출처와 라이선스](docs/provenance.md) · [작업 계약](docs/jobs.md)
 - 테스트 실행: `python -B -m unittest discover -s tests -v`
