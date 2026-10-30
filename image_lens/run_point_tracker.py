@@ -173,12 +173,15 @@ def main():
     if not cap.isOpened() or abs(cap.get(cv2.CAP_PROP_FPS) - job['fps']) > 1e-6:
         raise ValueError('decode/fps mismatch')
     try:
-        for n in range(end + 1):
+        # Seek like pose.py (the frame index and PTS checks below catch a bad seek); decoding from frame 0 made
+        # each window cost more the later it starts (clip B: 0.9 s at frame 29, 2.5 s at frame 1169).
+        cap.set(cv2.CAP_PROP_POS_FRAMES, start)
+        for n in range(start, end + 1):
             ok, image = cap.read()
             if not ok:
                 raise ValueError('incomplete source decode')
-            if n < start:
-                continue
+            if round(cap.get(cv2.CAP_PROP_POS_FRAMES)) != n + 1:
+                raise ValueError('decoded frame index mismatch')
             if image.shape != (height, width, 3):
                 raise ValueError('decoded frame shape mismatch')
             pts = cap.get(cv2.CAP_PROP_POS_MSEC) / 1000.
