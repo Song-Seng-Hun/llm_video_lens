@@ -27,6 +27,15 @@ class Path_(unittest.TestCase):
             # The view moved 780 px, more than its 640 px width: the start frame shares nothing with the last one.
             self.assertIn(39, found); self.assertAlmostEqual(found[39][0], -780, delta=30); self.assertAlmostEqual(found[39][1], 0, delta=10)
 
+    def test_a_shorter_request_is_cut_from_the_kept_path(self):
+        with tempfile.TemporaryDirectory(dir=REPO/'workspace') as d:
+            video = Path(d)/'pan.avi'; pan_video(video)
+            camera.path(video, 0, 39)
+            kept = camera.path(video, 0, 20); fresh = camera._path(video, 0, 20)
+            self.assertEqual(kept, fresh); self.assertEqual(max(kept), 20)
+            kept[20] = None  # callers get their own copy
+            self.assertEqual(camera.path(video, 0, 20), fresh)
+
 
 class Describe(unittest.TestCase):
     def test_pan_then_hold_has_speeds(self):
