@@ -312,6 +312,11 @@ class App:
         self.worker.start()
 
     def _commit(self):
+        try:  # a `git archive` snapshot has no .git: the install step writes COMMIT
+            with open(os.path.join(self.cfg["repo"], "COMMIT"), encoding="ascii") as f:
+                return f.read().strip() or None
+        except (OSError, UnicodeDecodeError):
+            pass
         try:
             p = subprocess.run(["/usr/bin/git", "-C", self.cfg["repo"], "rev-parse", "--short", "HEAD"], timeout=5,
                                stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,

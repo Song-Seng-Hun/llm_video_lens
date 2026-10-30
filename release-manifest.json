@@ -20,7 +20,7 @@
   ],
   "manifest_self_excluded": true,
   "file_count": 132,
-  "total_bytes": 1363369,
+  "total_bytes": 1364185,
   "files": [
     {
       "path": ".gitattributes",
@@ -559,8 +559,8 @@
     },
     {
       "path": "lan/README.md",
-      "bytes": 5516,
-      "sha256": "0faa01dd8e2690b2f4df36af225ac8b08c45808111e3c51a48fa57382e244590"
+      "bytes": 5604,
+      "sha256": "fb7889b13148135a8d4a03c3813ce0741ea5cb725adc71ce5a2ae7edf0f478b2"
     },
     {
       "path": "lan/api.example.json",
@@ -569,8 +569,8 @@
     },
     {
       "path": "lan/com.image-lens.lan-api.plist.template",
-      "bytes": 1054,
-      "sha256": "9d9164a5a5db2f971329143e1bf4db22bff1a91f34c1a2d9c750daadb2c097f0"
+      "bytes": 1156,
+      "sha256": "67f64faff1104d45e8eb8ef0df5d82fd232df9be411f16e697ba124cb1ae7f71"
     },
     {
       "path": "lan/image-lens-client.mjs",
@@ -579,8 +579,8 @@
     },
     {
       "path": "lan/server.py",
-      "bytes": 36245,
-      "sha256": "1409767323c6eb7fb9322a59d8f80837c4e99e991e773bab3a7cea41b04e269c"
+      "bytes": 36529,
+      "sha256": "1a1d0466650b5d3012f03647ce1d10cf5b7ff33754573fc474a446f31331dd59"
     },
     {
       "path": "lan/sign.py",
@@ -639,8 +639,8 @@
     },
     {
       "path": "tests/test_lan.py",
-      "bytes": 9503,
-      "sha256": "0dddd784c467a64c97b94ca090c7651e55e1d5296885bf3622693e03cf396e26"
+      "bytes": 9845,
+      "sha256": "c064c79388a58a91b99736fdd5057153859d332eab2956656131b53dba38db07"
     },
     {
       "path": "tests/test_look.py",

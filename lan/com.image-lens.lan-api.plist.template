@@ -20,7 +20,8 @@
   <key>ThrottleInterval</key>
   <integer>60</integer>
   <key>ProcessType</key>
-  <string>Background</string>
+  <!-- Not Background: macOS then throttles the look to efficiency cores (5 s clip: 515 s vs 52 s). -->
+  <string>Standard</string>
   <key>WorkingDirectory</key>
   <string>/</string>
   <key>StandardOutPath</key>
