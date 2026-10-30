@@ -281,6 +281,12 @@ raise SystemExit(main(['--workspace', sys.argv[2], 'prepare', '--queries', 'quer
             self.assertNotEqual(third[1], first[1])
             self.assertEqual(worker.run(command, ['fail'], 5)[0], 1)
             self.assertNotEqual(worker.run(command, ['d'], 5)[1], third[1])
+            # Queued jobs: the one behind a failure is answered by a fresh child.
+            jobs = [worker.submit(command, [name], 5) for name in ('e', 'fail', 'f')]
+            e, failed, f = [worker.result(job) for job in jobs]
+            self.assertEqual((e[0], failed[0], f[0]), (0, 1, 0)); self.assertEqual(e[1], failed[1]); self.assertNotEqual(f[1], e[1])
+            with self.assertRaises(ValueError):
+                worker.result(jobs[0])
         finally:
             worker.close()
 

@@ -48,6 +48,15 @@ class Frames(unittest.TestCase):
             with self.assertRaises(ValueError):
                 frames.checked(video, 30, 45, 640, 360, 'past the end')
 
+    def test_the_window_before_the_last_is_still_kept(self):
+        with tempfile.TemporaryDirectory(dir=REPO/'workspace') as d:
+            video = Path(d)/'pan.avi'; pan_video(video)
+            first = frames.window(video, 0, 9); frames.window(video, 20, 29); frames.window(video, 25, 25)
+            self.assertIs(frames.window(video, 0, 9)[3], first[3])
+            camera.path(video, 0, 9); camera.path(video, 20, 29)
+            self.assertEqual([k[0][3] for k in camera._LAST], [20, 0])  # the window before the last is still kept
+            self.assertEqual(camera.path(video, 0, 5), camera._path(video, 0, 5))
+
     def test_a_rewritten_source_is_read_again(self):
         with tempfile.TemporaryDirectory(dir=REPO/'workspace') as d:
             video = Path(d)/'pan.avi'; pan_video(video)

@@ -41,13 +41,15 @@ def path(video, start, end):
     CAMERA['chain_spread'] of the frame (ORB leaves a 31 px border, so about .94 is the most at 1920 px): frame to frame, a big figure over a still layout moves as one piece and read
     as the camera (clip A 2.76 s: 50 px, really 0; the figure spans about 70% of the width).
     A frame's value depends only on the frames before it, so the last path is kept and a shorter or equal request from
-    the same start is cut from it (seed and look both ask for each window: clip B 42 x 0.4 s)."""
+    the same start is cut from it (seed and look both ask for each window: clip B 42 x 0.4 s). Two are kept: look
+    reports a window after seeding the next."""
     import os
     stat = os.stat(video); key = (str(video), stat.st_size, stat.st_mtime_ns, start)
-    if _LAST and _LAST[0] == key and _LAST[1] >= end:
-        return {n: v for n, v in _LAST[2].items() if n <= end}
+    for kept_key, kept_end, kept in _LAST:
+        if kept_key == key and kept_end >= end:
+            return {n: v for n, v in kept.items() if n <= end}
     result = _path(video, start, end)
-    _LAST[:] = [key, end, result]
+    _LAST[:] = [(key, end, result)]+_LAST[:1]
     return dict(result)
 
 

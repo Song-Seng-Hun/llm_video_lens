@@ -29,6 +29,26 @@ def _step(command, arguments):
             signal.alarm(0)
 
 
+def _submit(arguments):
+    """Log and queue one track step on the shared child; _finish(handle) logs its output and raises as `track` does."""
+    import contextlib
+    from image_lens import cli
+    try:
+        with LOG.open('a') as log, contextlib.redirect_stdout(log):
+            print(json.dumps(dict(step='track', arguments=[str(a) for a in arguments])), flush=True)
+            return cli.submit_track([str(a) for a in arguments])
+    finally:
+        if hasattr(signal, 'SIGALRM'):
+            signal.alarm(0)
+
+
+def _finish(handle):
+    import contextlib
+    from image_lens import cli, watchdog
+    with LOG.open('a') as log, contextlib.redirect_stdout(log):
+        return cli.finish_track(watchdog.shared.result(handle))
+
+
 def next_window(segment, start, pose_frames, flagged, length=LOOK['window_frames'], min_frames=LOOK['min_frames']):
     """The next tracking window at or after `start`, seeded on the first frame with a pose track that is not pose-flagged."""
     skipped = []; end = segment['end_frame']
@@ -178,6 +198,112 @@ def _run(video, detector, pose_model, checkpoint, out, max_shots=LOOK['max_shots
     pose_frames = {f['frame']: f['tracks'] for f in pose_packet['frames']}
     flagged = {r['frame'] for r in pose_packet['flags']['frames']}
     shots = []; lines = []; last_end = None; looks = []; stripping = []
+    pending = None
+    def report(window):
+        """Everything after tracking for one window; look runs it while the child tracks the next window. Its lines and
+        errors go where the window began, so look-full.md and look.json read as if it had run in order."""
+        nonlocal last_end
+        entry, sid, w, end, base, people, receipt, tracked, done, slot, at = window
+        errors = []; quiet = []; fps = scan['fps']
+        from image_lens import body_motion
+        if last_end is not None:
+            done['bridge'] = body_motion.bridge(body_motion.largest(pose_frames.get(last_end)), body_motion.largest(pose_frames.get(w['seed'])),
+                                                (last_end, w['seed']))
+            slot += body_motion.bridge_lines(done['bridge'])
+        slot.append(f"- 구간 f{w['seed']}..{end} (점 배치 f{w['seed']}" + (f", {people}명 중 가장 큰 사람" if people > 1 else '') + ')')
+        skeleton = receipt.get('skeleton') or dict(plausible=True); done['skeleton'] = skeleton['plausible']
+        done['framing'] = skeleton.get('framing'); done['scope'] = skeleton.get('scope')
+        if not skeleton['plausible']:
+            slot.append(f"  - 골격 신뢰 낮음({skeleton['reason']}): 팔·다리 이름 없이 얼굴과 많이 움직인 곳(move-a…)만 봄")
+        from image_lens import camera, motion_report
+        try:
+            frame_motion = camera.path(source, w['seed'], end)
+        except Exception as error:  # OpenCV raises its own error type; a missing estimate only disables the filter
+            frame_motion = None; errors.append(dict(window=w, step='camera', error=str(error)[:300]))
+        cam = camera.between(frame_motion, w['seed'], end)
+        done['camera'] = camera.describe(frame_motion, w['seed'], end, motion_report.STROKE['major_min_px'])
+        from image_lens import digest
+        camera_text = digest.camera(done['camera'], fps)
+        if camera_text:
+            slot.append(f"  - 화면 전체: {camera_text} (카메라·배경 이동 추정; 카메라만 따라간 이동은 아래에서 뺌)")
+        # Move candidates: report one per group that moved together (see onion.parts); the rest stay in the tracks file.
+        from image_lens import onion
+        for k, (name, group, stem, tracks) in enumerate(tracked):
+            if group == 'move':
+                keep = set(onion.parts(tracks, end, frame_motion))
+                done['move_candidates'] = len(tracks['frames'][0]['points']) if tracks['frames'] else 0
+                tracked[k] = (name, group, stem, dict(tracks, frames=[dict(f, points=[p for p in f['points'] if p['point_id'] in keep])
+                                                                      for f in tracks['frames']]))
+        for name, group, stem, tracks in tracked:
+            if group == 'move' and not (tracks['frames'] and tracks['frames'][0]['points']):
+                quiet.append(NAMES[group]); continue
+            try:
+                _step('bind', ['--queries', base.with_suffix('.obs.json'), '--tracks', stem.with_suffix('.tracks.json'),
+                               '--job', name, '--out', stem.with_suffix('.bindings.json')])
+                binding = stem.with_suffix('.bindings.json')
+                if group == 'move':
+                    keep = {p['point_id'] for p in tracks['frames'][0]['points']}
+                    bindings, _ = paths.load(binding)
+                    for actor in bindings['actors']:
+                        actor['features'] = [f for f in actor['features'] if f['point_id'] in keep]
+                    binding = paths.write_json(stem.with_name(stem.name+'-parts.bindings.json'), bindings)
+                _step('analyze', ['--tracks', stem.with_suffix('.tracks.json'), '--shots', root/'shots.json',
+                                  '--report-bindings', binding, '--start', w['seed'], '--end', end,
+                                  '--format', 'json', '--out', stem.with_suffix('.report.json'),
+                                  '--trajectory-dir', stem.with_name(stem.name+'-traj'), '--pose', root/'pose.json'])
+                found, _ = paths.load(stem.with_suffix('.report.json'))
+                from image_lens import motion_report
+                md = paths.write(stem.with_suffix('.report.md'), motion_report.markdown(found))
+                group_lines, summary = _summary(found, dict(w, end=end), group, md.relative_to(root), stem.with_name(stem.name+'-traj').relative_to(root)/'trajectory.png', frame_motion)
+                slot += ['  '+l for l in group_lines]; done['groups'].append(summary)
+                if not group_lines:quiet.append(NAMES[group])
+            except STEP_ERRORS as error:
+                errors.append(dict(window=w, job=name, error=str(error)[:300]))
+                slot.append(f'  - {group} 실패: {str(error)[:120]}')
+        if quiet:slot.append(f"  - {'·'.join(quiet)}: 화면 기준 큰 이동({motion_report.STROKE['major_min_px']:.0f}px 이상) 없음")
+        if tracked and skeleton['plausible']:
+            done['body'] = body_motion.describe([t[3] for t in tracked], dict(w, end=end))
+            slot += ['  '+l for l in body_motion.lines(done['body'])]
+        done['events'] = body_motion.pose_events(pose_frames, dict(w, end=end), fps)
+        done['people'] = body_motion.people(pose_frames, dict(w, end=end), fps, cam)
+        if len(done['people']['people']) > 1:
+            from image_lens import onion
+            try:
+                done['who'] = onion.who(source, w['seed'], done['people']['people'], base.with_name(base.name+'-who.jpg'))
+            except Exception as error:  # OpenCV raises its own error type; the picture is optional
+                errors.append(dict(window=w, step='who', error=str(error)[:300]))
+        from image_lens import digest
+        slot += ['  - '+f for f in digest.events(done['events'], fps)]
+        person = body_motion.largest(pose_frames.get(w['seed']))
+        if tracked and person:
+            from image_lens import onion
+            picture = base.with_name(base.name+'-onion.jpg')
+            try:
+                moving = cam if cam and math.hypot(*cam) >= motion_report.STROKE['major_min_px'] else None
+                from image_lens import digest
+                leads = [f['point'] for f in digest.limbs(done['body'])] if done.get('body') else []
+                done['trails'] = onion.trails([t[3] for t in tracked], leads, w['seed'], end, frame_motion if moving else None)
+                done['bands'] = onion.bands(source, w['seed'], end, person['bbox'], moving, picture, done['trails'])
+                done['onion'] = picture.name
+                done['peak'] = onion.peak(source, w['seed'], end, person['bbox'], picture)
+                turns = [e['share'] for e in (done.get('events') or {}).get('width', []) if e['share'] >= body_motion.EVENTS['turn']]
+                if turns:
+                    done['turn_share'] = max(turns); stripping.append((done, end, person['bbox'], base))
+                slot += ['  '+l for l in onion.lines(done['bands'], picture.name)]
+            except Exception as error:  # OpenCV raises its own error type; the view is optional
+                errors.append(dict(window=w, step='onion', error=str(error)[:300]))
+        if end < w['end']:
+            slot.append(f"  - f{end} 뒤 점이 한꺼번에 끊김(그림 바뀜·화면 전환 추정): f{end+1}부터 점을 다시 놓음")
+        if done['groups']:slot.append(f"  - 자세히: {base.name}-<head|arms|legs>.report.md, 그림 {base.name}-<묶음>-traj/trajectory.png")
+        last_end = end if done['groups'] else None
+        if person:
+            from image_lens import motif
+            try:
+                looks.append((done, dict(start=motif.thumb(source, w['seed'], person['bbox']), end=motif.thumb(source, end, person['bbox']),
+                                         frames=end-w['seed']+1)))
+            except Exception as error:  # OpenCV raises its own error type; without thumbs the window is never a repeat
+                errors.append(dict(window=w, step='motif', error=str(error)[:300]))
+        entry['errors'][at:at] = errors
     segments = scan['analysis_segments']
     for segment in segments[:max_shots]:
         sid = segment['segment_id']; s0, s1 = segment['start_frame'], segment['end_frame']
@@ -210,7 +336,7 @@ def _run(video, detector, pose_model, checkpoint, out, max_shots=LOOK['max_shots
                 break
             base = root/f'{sid}-w{i}'; job = f'{sid}-w{i}'; i += 1; start = w['end']+1
             people = len(pose_frames[w['seed']])
-            done = dict(window=w, groups=[]); still = []; tracked = []
+            done = dict(window=w, groups=[]); tracked = []
             try:
                 receipt = _step('seed', ['--pose', root/'pose.json', '--frame', w['seed'], '--job', job, '--length', w['end']-w['seed']+1,
                                          '--out', base.with_suffix('.obs.json'), '--evidence-dir', base.with_name(base.name+'-crops')])
@@ -219,14 +345,25 @@ def _run(video, detector, pose_model, checkpoint, out, max_shots=LOOK['max_shots
                 lines += [f"- 구간 f{w['seed']}..{w['end']}", f'  - 점 배치 실패: {str(error)[:120]}']
                 entry['windows'].append(done)
                 continue
+            queued = []
             for name in receipt['jobs']:
                 group = name.rsplit('-', 1)[1]; stem = base.with_name(f'{base.name}-{group}')
                 try:
                     _step('prepare', ['--queries', base.with_suffix('.obs.json'), '--shots', root/'shots.json', '--job', name,
                                       '--out', stem.with_suffix('.freeze.json'), '--allow-tracking', '--max-seconds', LOOK['track_seconds']])
-                    _step('track', ['--job', name, '--queries', base.with_suffix('.obs.json'), '--frozen', stem.with_suffix('.freeze.json'),
-                                    '--out', stem.with_suffix('.tracks.json'), '--checkpoint', checkpoint,
-                                    '--max-seconds', max(1, min(LOOK['track_seconds'], int(remaining())))])
+                    queued.append((name, group, stem, _submit(['--job', name, '--queries', base.with_suffix('.obs.json'), '--frozen', stem.with_suffix('.freeze.json'),
+                                                               '--out', stem.with_suffix('.tracks.json'), '--checkpoint', checkpoint,
+                                                               '--max-seconds', max(1, min(LOOK['track_seconds'], int(remaining())))]), None))
+                except STEP_ERRORS as error:
+                    queued.append((name, group, stem, None, error))
+            # The child tracks this window while the last one is reported (clip B: 44 s tracking, 45 s of CPU work around it).
+            if pending:
+                report(pending); pending = None
+            for name, group, stem, handle, error in queued:
+                try:
+                    if error:
+                        raise error
+                    _finish(handle)
                     tracked.append((name, group, stem, paths.load(stem.with_suffix('.tracks.json'))[0]))
                 except STEP_ERRORS as error:
                     entry['errors'].append(dict(window=w, job=name, error=str(error)[:300]))
@@ -235,113 +372,19 @@ def _run(video, detector, pose_model, checkpoint, out, max_shots=LOOK['max_shots
             # Hand tips flicker on drawn hands, so only head, arms and legs decide a cut.
             cut = cut_frame([t[3] for t in tracked if t[1] != 'hands'], w)
             end = w['end'] if cut is None else min(w['end'], max(cut, w['seed']+LOOK['min_frames']-1))
-            from image_lens import body_motion
-            if last_end is not None:
-                done['bridge'] = body_motion.bridge(body_motion.largest(pose_frames.get(last_end)), body_motion.largest(pose_frames.get(w['seed'])),
-                                                    (last_end, w['seed']))
-                lines += body_motion.bridge_lines(done['bridge'])
-            lines.append(f"- 구간 f{w['seed']}..{end} (점 배치 f{w['seed']}" + (f", {people}명 중 가장 큰 사람" if people > 1 else '') + ')')
-            skeleton = receipt.get('skeleton') or dict(plausible=True); done['skeleton'] = skeleton['plausible']
-            done['framing'] = skeleton.get('framing'); done['scope'] = skeleton.get('scope')
-            if not skeleton['plausible']:
-                lines.append(f"  - 골격 신뢰 낮음({skeleton['reason']}): 팔·다리 이름 없이 얼굴과 많이 움직인 곳(move-a…)만 봄")
-            from image_lens import camera, motion_report
-            try:
-                frame_motion = camera.path(source, w['seed'], end)
-            except Exception as error:  # OpenCV raises its own error type; a missing estimate only disables the filter
-                frame_motion = None; entry['errors'].append(dict(window=w, step='camera', error=str(error)[:300]))
-            cam = camera.between(frame_motion, w['seed'], end)
-            done['camera'] = camera.describe(frame_motion, w['seed'], end, motion_report.STROKE['major_min_px'])
-            from image_lens import digest
-            camera_text = digest.camera(done['camera'], fps)
-            if camera_text:
-                lines.append(f"  - 화면 전체: {camera_text} (카메라·배경 이동 추정; 카메라만 따라간 이동은 아래에서 뺌)")
-            # Move candidates: report one per group that moved together (see onion.parts); the rest stay in the tracks file.
-            from image_lens import onion
-            for k, (name, group, stem, tracks) in enumerate(tracked):
-                if group == 'move':
-                    keep = set(onion.parts(tracks, end, frame_motion))
-                    done['move_candidates'] = len(tracks['frames'][0]['points']) if tracks['frames'] else 0
-                    tracked[k] = (name, group, stem, dict(tracks, frames=[dict(f, points=[p for p in f['points'] if p['point_id'] in keep])
-                                                                          for f in tracks['frames']]))
-            for name, group, stem, tracks in tracked:
-                if group == 'move' and not (tracks['frames'] and tracks['frames'][0]['points']):
-                    still.append(NAMES[group]); continue
-                try:
-                    _step('bind', ['--queries', base.with_suffix('.obs.json'), '--tracks', stem.with_suffix('.tracks.json'),
-                                   '--job', name, '--out', stem.with_suffix('.bindings.json')])
-                    binding = stem.with_suffix('.bindings.json')
-                    if group == 'move':
-                        keep = {p['point_id'] for p in tracks['frames'][0]['points']}
-                        bindings, _ = paths.load(binding)
-                        for actor in bindings['actors']:
-                            actor['features'] = [f for f in actor['features'] if f['point_id'] in keep]
-                        binding = paths.write_json(stem.with_name(stem.name+'-parts.bindings.json'), bindings)
-                    _step('analyze', ['--tracks', stem.with_suffix('.tracks.json'), '--shots', root/'shots.json',
-                                      '--report-bindings', binding, '--start', w['seed'], '--end', end,
-                                      '--format', 'json', '--out', stem.with_suffix('.report.json'),
-                                      '--trajectory-dir', stem.with_name(stem.name+'-traj'), '--pose', root/'pose.json'])
-                    report, _ = paths.load(stem.with_suffix('.report.json'))
-                    from image_lens import motion_report
-                    md = paths.write(stem.with_suffix('.report.md'), motion_report.markdown(report))
-                    group_lines, summary = _summary(report, dict(w, end=end), group, md.relative_to(root), stem.with_name(stem.name+'-traj').relative_to(root)/'trajectory.png', frame_motion)
-                    lines += ['  '+l for l in group_lines]; done['groups'].append(summary)
-                    if not group_lines:still.append(NAMES[group])
-                except STEP_ERRORS as error:
-                    entry['errors'].append(dict(window=w, job=name, error=str(error)[:300]))
-                    lines.append(f'  - {group} 실패: {str(error)[:120]}')
-            if still:lines.append(f"  - {'·'.join(still)}: 화면 기준 큰 이동({motion_report.STROKE['major_min_px']:.0f}px 이상) 없음")
-            if tracked and skeleton['plausible']:
-                done['body'] = body_motion.describe([t[3] for t in tracked], dict(w, end=end))
-                lines += ['  '+l for l in body_motion.lines(done['body'])]
-            done['events'] = body_motion.pose_events(pose_frames, dict(w, end=end), fps)
-            done['people'] = body_motion.people(pose_frames, dict(w, end=end), fps, cam)
-            if len(done['people']['people']) > 1:
-                from image_lens import onion
-                try:
-                    done['who'] = onion.who(source, w['seed'], done['people']['people'], base.with_name(base.name+'-who.jpg'))
-                except Exception as error:  # OpenCV raises its own error type; the picture is optional
-                    entry['errors'].append(dict(window=w, step='who', error=str(error)[:300]))
-            from image_lens import digest
-            lines += ['  - '+f for f in digest.events(done['events'], fps)]
-            person = body_motion.largest(pose_frames.get(w['seed']))
-            if tracked and person:
-                from image_lens import onion
-                picture = base.with_name(base.name+'-onion.jpg')
-                try:
-                    moving = cam if cam and math.hypot(*cam) >= motion_report.STROKE['major_min_px'] else None
-                    from image_lens import digest
-                    leads = [f['point'] for f in digest.limbs(done['body'])] if done.get('body') else []
-                    done['trails'] = onion.trails([t[3] for t in tracked], leads, w['seed'], end, frame_motion if moving else None)
-                    done['bands'] = onion.bands(source, w['seed'], end, person['bbox'], moving, picture, done['trails'])
-                    done['onion'] = picture.name
-                    done['peak'] = onion.peak(source, w['seed'], end, person['bbox'], picture)
-                    turns = [e['share'] for e in (done.get('events') or {}).get('width', []) if e['share'] >= body_motion.EVENTS['turn']]
-                    if turns:
-                        done['turn_share'] = max(turns); stripping.append((done, end, person['bbox'], base))
-                    lines += ['  '+l for l in onion.lines(done['bands'], picture.name)]
-                except Exception as error:  # OpenCV raises its own error type; the view is optional
-                    entry['errors'].append(dict(window=w, step='onion', error=str(error)[:300]))
             if end < w['end']:
                 done['cut_after'] = end; start = end+1
-                lines.append(f"  - f{end} 뒤 점이 한꺼번에 끊김(그림 바뀜·화면 전환 추정): f{end+1}부터 점을 다시 놓음")
-            if done['groups']:lines.append(f"  - 자세히: {base.name}-<head|arms|legs>.report.md, 그림 {base.name}-<묶음>-traj/trajectory.png")
-            last_end = end if done['groups'] else None
-            if person:
-                from image_lens import motif
-                try:
-                    looks.append((done, dict(start=motif.thumb(source, w['seed'], person['bbox']), end=motif.thumb(source, end, person['bbox']),
-                                             frames=end-w['seed']+1)))
-                except Exception as error:  # OpenCV raises its own error type; without thumbs the window is never a repeat
-                    entry['errors'].append(dict(window=w, step='motif', error=str(error)[:300]))
-            entry['windows'].append(done)
+            slot = []; lines.append(slot); entry['windows'].append(done)
+            pending = (entry, sid, w, end, base, people, receipt, tracked, done, slot, len(entry['errors']))
         lines.append('')
+    if pending:
+        report(pending)
     if len(segments) > max_shots:
         lines.append(f'생략된 장면 {len(segments)-max_shots}개 (--max-shots {max_shots}).')
     head = ['# 영상 움직임 자세히 (요약은 look.md)', '',
             f"영상 {source.name}: {scan['source_frame_count']}프레임, {scan['fps']:g}fps, 장면 {len(segments)}개. 점은 포즈 기준 자동 배치(머리카락은 눈 기준 기하), 부위·동일인 미검증.",
             '경고는 "원본부터 비교하라"는 뜻이다. 가짜 움직임이라는 판정이 아니다. 자세한 수치는 장면별 report.json에 있다.', '']
-    paths.write(root/'look-full.md', '\n'.join(head+lines).rstrip('\n')+'\n')
+    paths.write(root/'look-full.md', '\n'.join(head+[l for l in lines for l in (l if isinstance(l, list) else [l])]).rstrip('\n')+'\n')
     from image_lens import onion
     # Frame strips for the largest shoulder-width swings only: on clip B all 18 turn candidates got one, the sheets went
     # from 8 to 14 and a fresh reader scored about the same (13 vs 12.5 of 21); hair and a cat on the shoulder swing too.
