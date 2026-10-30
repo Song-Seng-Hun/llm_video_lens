@@ -224,8 +224,20 @@ def _run(video, detector, pose_model, checkpoint, out, max_shots=LOOK['max_shots
     global POSER
     POSER = _pose_child(['--shots', root/'shots.json', '--detector', detector, '--pose-model', pose_model, '--out', root/'pose.json',
                          '--max-seconds', max(1, min(1800, int(remaining()))), '--parts-dir', root/'pose-parts'])
+    # A thread reads the child's lines, so look can take a part that has arrived without waiting for the next one: the
+    # next shot is seeded ahead only once its part is taken (clip B: every third shot missed it, the child idled 0.6-1 s).
+    import queue, threading
+    heard = queue.Queue()
+    def listen(stream):
+        try:
+            for line in stream:
+                heard.put(line)
+        except (OSError, ValueError):
+            pass  # _stop_pose closed the pipe
+        heard.put('')
+    threading.Thread(target=listen, args=(POSER.stdout,), daemon=True).start()
     scan, _ = paths.load(root/'shots.json')
-    pose_frames = {}; flagged = set(); posed = []  # posed: (first, last, packet path)
+    pose_frames = {}; flagged = set(); posed = []; failed = {}  # posed: (first, last, packet path)
     def take(path):
         packet, _ = paths.load(path, max_bytes=64*1024*1024)
         pose_frames.update({f['frame']: f['tracks'] for f in packet['frames']})
@@ -233,14 +245,18 @@ def _run(video, detector, pose_model, checkpoint, out, max_shots=LOOK['max_shots
         posed.append((*packet['native_range'], path))
     def covered(frame):
         return next((p for lo, hi, p in posed if lo <= frame <= hi), None)
-    def pose_for(frame):
-        """The pose packet holding `frame`: a part, or pose.json when the clip fits in one; waits for the child's line."""
-        failed = None
+    def pose_for(frame, wait=True):
+        """The pose packet holding `frame`: a part, or pose.json when the clip fits in one; waits for the child's line,
+        or with wait=False takes only the lines already heard and returns None if none holds it."""
         while covered(frame) is None:
-            line = POSER.stdout.readline()
+            try:
+                line = heard.get(block=wait)
+            except queue.Empty:
+                return None
             if not line:
+                heard.put('')  # the end stays heard for later calls
                 if POSER.wait() or failed or not (root/'pose.json').is_file():
-                    raise ValueError((failed or {}).get('error', 'pose step failed'))
+                    raise ValueError(failed.get('error', 'pose step failed'))
                 if posed:
                     raise ValueError('pose parts do not cover the clip')
                 take(root/'pose.json')
@@ -254,7 +270,7 @@ def _run(video, detector, pose_model, checkpoint, out, max_shots=LOOK['max_shots
             if type(said) is dict and 'pose_part' in said:
                 take(Path(said['pose_part']))
             elif type(said) is dict and said.get('status') == 'failed':
-                failed = said
+                failed.update(said)
         return covered(frame)
     shots = []; lines = []; last_end = None; looks = []; stripping = []
     pending = None
@@ -367,11 +383,25 @@ def _run(video, detector, pose_model, checkpoint, out, max_shots=LOOK['max_shots
         base = root/f'{sid}-w{i}'
         return _step('seed', ['--pose', pose_for(w['seed']), '--frame', w['seed'], '--job', f'{sid}-w{i}', '--length', w['end']-w['seed']+1,
                               '--out', base.with_suffix('.obs.json'), '--evidence-dir', base.with_name(base.name+'-crops')])
-    ahead = None  # (sid, window, receipt, error): the next shot's first window, seeded while the child tracks
+    def queue(base, receipt):
+        queued = []
+        for name in receipt['jobs']:
+            group = name.rsplit('-', 1)[1]; stem = base.with_name(f'{base.name}-{group}')
+            try:
+                _step('prepare', ['--queries', base.with_suffix('.obs.json'), '--shots', root/'shots.json', '--job', name,
+                                  '--out', stem.with_suffix('.freeze.json'), '--allow-tracking', '--max-seconds', LOOK['track_seconds']])
+                queued.append((name, group, stem, _submit(['--job', name, '--queries', base.with_suffix('.obs.json'), '--frozen', stem.with_suffix('.freeze.json'),
+                                                           '--out', stem.with_suffix('.tracks.json'), '--checkpoint', checkpoint,
+                                                           '--max-seconds', max(1, min(LOOK['track_seconds'], int(remaining())))]), None))
+            except STEP_ERRORS as error:
+                queued.append((name, group, stem, None, error))
+        return queued
+    # (sid, window, receipt, error, queued): the next shot's first window, seeded and queued while the child tracks
+    ahead = None
     segments = scan['analysis_segments']; shown = segments[:max_shots]
     for order, segment in enumerate(shown):
         sid = segment['segment_id']; s0, s1 = segment['start_frame'], segment['end_frame']
-        if pending and covered(s1) is None:
+        if pending and pose_for(s1, wait=False) is None:
             report(pending); pending = None  # report the last window while this shot is still being posed
         pose_for(s1)
         fps = scan['fps']
@@ -404,9 +434,10 @@ def _run(video, detector, pose_model, checkpoint, out, max_shots=LOOK['max_shots
             base = root/f'{sid}-w{i}'; i += 1; start = w['end']+1
             people = len(pose_frames[w['seed']])
             done = dict(window=w, groups=[]); tracked = []
+            queued = None
             try:
                 if ahead and ahead[:2] == (sid, w):
-                    receipt, error = ahead[2:]; ahead = None
+                    receipt, error, queued = ahead[2:]; ahead = None
                     if error:
                         raise error
                 else:
@@ -416,30 +447,24 @@ def _run(video, detector, pose_model, checkpoint, out, max_shots=LOOK['max_shots
                 lines += [f"- 구간 f{w['seed']}..{w['end']}", f'  - 점 배치 실패: {str(error)[:120]}']
                 entry['windows'].append(done)
                 continue
-            queued = []
-            for name in receipt['jobs']:
-                group = name.rsplit('-', 1)[1]; stem = base.with_name(f'{base.name}-{group}')
-                try:
-                    _step('prepare', ['--queries', base.with_suffix('.obs.json'), '--shots', root/'shots.json', '--job', name,
-                                      '--out', stem.with_suffix('.freeze.json'), '--allow-tracking', '--max-seconds', LOOK['track_seconds']])
-                    queued.append((name, group, stem, _submit(['--job', name, '--queries', base.with_suffix('.obs.json'), '--frozen', stem.with_suffix('.freeze.json'),
-                                                               '--out', stem.with_suffix('.tracks.json'), '--checkpoint', checkpoint,
-                                                               '--max-seconds', max(1, min(LOOK['track_seconds'], int(remaining())))]), None))
-                except STEP_ERRORS as error:
-                    queued.append((name, group, stem, None, error))
+            if queued is None:
+                queued = queue(base, receipt)
             # The child tracks this window while the last one is reported (clip B: 44 s tracking, 45 s of CPU work around it).
             if pending:
                 report(pending); pending = None
             # A cut moves this shot's next window, but the next shot always starts at its first frame (clip B: 39 of 42
-            # windows): seed it while the child still tracks (25 s of waiting, 23 s of seeding).
+            # windows): seed it while the child still tracks (25 s of waiting, 23 s of seeding), and queue its jobs so the
+            # child goes on to them while this window is reported (clip B: 11 s idle between short shots). A window after
+            # a cut in this shot is queued behind them; the worker keeps their replies until they are taken.
             after = shown[order+1] if order+1 < len(shown) else None
-            if not ahead and after and after['end_frame'] > after['start_frame'] and covered(after['end_frame']) and remaining() >= 60:
+            if not ahead and after and after['end_frame'] > after['start_frame'] and pose_for(after['end_frame'], wait=False) and remaining() >= 60:
                 first, _ = next_window(after, after['start_frame'], pose_frames, flagged)
                 if first:
                     try:
-                        ahead = (after['segment_id'], first, seed(after['segment_id'], first, 0), None)
+                        receipt_ahead = seed(after['segment_id'], first, 0)
+                        ahead = (after['segment_id'], first, receipt_ahead, None, queue(root/f"{after['segment_id']}-w0", receipt_ahead))
                     except STEP_ERRORS as error:
-                        ahead = (after['segment_id'], first, None, error)
+                        ahead = (after['segment_id'], first, None, error, None)
             for name, group, stem, handle, error in queued:
                 try:
                     if error:
@@ -463,7 +488,9 @@ def _run(video, detector, pose_model, checkpoint, out, max_shots=LOOK['max_shots
     pose_for(scan['source_frame_count']-1)  # pose.json covers the whole clip, past --max-shots too
     if posed[-1][2] != root/'pose.json':
         with LOG.open('a') as log:
-            log.writelines(POSER.stdout)  # its receipt: the child writes pose.json after its last part
+            line = heard.get()
+            while line:  # its receipt: the child writes pose.json after its last part
+                log.write(line); line = heard.get()
         if POSER.wait() or not (root/'pose.json').is_file():
             raise ValueError('pose step failed after its last part')
     if len(segments) > max_shots:

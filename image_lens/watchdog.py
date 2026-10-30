@@ -49,12 +49,14 @@ def _kill(process):
 class Worker:
     """One long-lived tracker child for many jobs (`tracking_child.py --serve`): each job keeps its own hard deadline,
     and a timeout or interruption kills and reaps the whole group; the next job starts a fresh child.
-    submit() queues a job and returns at once, so the parent can work while the child tracks; result() takes the
-    replies in submit order. A failed job ends the child, and the jobs queued behind it are sent again to a fresh one."""
+    submit() queues a job and returns at once, so the parent can work while the child tracks; result() takes any queued
+    job's reply, keeping the replies of the jobs queued before it (the child answers in submit order). A failed job ends
+    the child, and the jobs queued behind it are sent again to a fresh one."""
     def __init__(self):
         self.process = None
         self.command = None
         self.pending = []
+        self.taken = []  # (job, reply or the error it raised): replies read while a later job was waited for
         self.buffer = b''
 
     def run(self, command, arguments, max_seconds):
@@ -87,8 +89,23 @@ class Worker:
             raise
 
     def result(self, job):
-        if not self.pending or self.pending[0] is not job:
-            raise ValueError('tracking replies are taken in submit order')
+        for i, (kept, outcome) in enumerate(self.taken):
+            if kept is job:
+                del self.taken[i]
+                if isinstance(outcome, BaseException):
+                    raise outcome
+                return outcome
+        while any(queued is job for queued in self.pending):
+            head = self.pending[0]
+            if head is job:
+                return self._take(head)
+            try:
+                self.taken.append((head, self._take(head)))
+            except ChildTimeout as error:
+                self.taken.append((head, error))
+        raise ValueError('tracking job was never queued, already taken, or dropped with its child')
+
+    def _take(self, job):
         process = self.process
         try:
             # The deadline starts when the parent waits for this job: never sooner than the job could have started.
@@ -138,7 +155,7 @@ class Worker:
             _kill(process)
 
     def close(self):
-        process, self.process, self.pending = self.process, None, []
+        process, self.process, self.pending, self.taken = self.process, None, [], []
         if process is None:
             return
         process.stdin.close()

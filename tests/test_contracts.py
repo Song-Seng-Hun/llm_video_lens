@@ -291,6 +291,16 @@ raise SystemExit(main(['--workspace', sys.argv[2], 'prepare', '--queries', 'quer
             import time
             jobs = [worker.submit(command, [name], .3) for name in ('g', 'h')]; time.sleep(.5)
             self.assertEqual([worker.result(job)[0] for job in jobs], [0, 0])
+            # Taken out of submit order: the earlier reply is kept; a timeout drops the jobs behind it with the child.
+            jobs = [worker.submit(command, [name], 5) for name in ('i', 'j')]
+            j, i = worker.result(jobs[1]), worker.result(jobs[0])
+            self.assertEqual((i[0], j[0]), (0, 0)); self.assertEqual(i[1], j[1])
+            jobs = [worker.submit(command, [name], .3) for name in ('sleep', 'k')]
+            with self.assertRaises(ValueError):
+                worker.result(jobs[1])
+            with self.assertRaises(watchdog.ChildTimeout):
+                worker.result(jobs[0])
+            self.assertEqual(worker.run(command, ['l'], 5)[0], 0)
         finally:
             worker.close()
 
