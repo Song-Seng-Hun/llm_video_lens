@@ -4,7 +4,7 @@ limbs did on top of them, so one slide is not repeated for every tracked point. 
 pose differences between two frames: the path between them is not observed."""
 import math
 import re
-from image_lens import body_motion, motion_report
+from image_lens import body_motion, motion_report, zoom
 
 DIGEST = dict(parts=3, same_share=.5, repeat_px=8., repeat_share=.25)
 ARM = ('손목', '팔꿈치', '엄지 끝', '검지 끝')
@@ -261,6 +261,9 @@ def markdown(record, scan, full_name):
         out.insert(-1, f"어니언 모음 그림: {', '.join(record['onion_sheets'])} (구간마다 청록=시작, 빨강=끝, 초록 화살표=높이별 이동, 오른쪽 회색=시작과 가장 다른 가운데 프레임: 돌거나 갔다 돌아오는 동작은 여기서 보임; "
                        '"who"=사람이 여럿인 구간의 P1·P2 상자; "still"=추적하기엔 짧은 컷의 한 장면, 붙어 있는 컷은 한 줄에 시간 순서; "strip"=몸 돌림 후보 구간의 프레임 5장을 시간 순서로). '
                        '손 모양(하트·브이)처럼 글에 안 나오는 동작은 그림에서 본다.')
+    if record.get('frame_sheets'):
+        out.insert(-1, f"전체 화면 모음: {', '.join(record['frame_sheets'])} (영상 처음부터 끝까지 {zoom.ZOOM['every_s']:g}초 간격, 장마다 시간 표시: "
+                       '사람끼리 하는 동작(당기기·기대기·찌르기)과 넘어짐은 포즈 상자가 합쳐져 글에 안 나오니 여기서 본다.)')
     windows = [d for s in record['shots'] for d in s['windows']]
     seen = {}
     for d in windows:

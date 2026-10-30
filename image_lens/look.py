@@ -344,12 +344,18 @@ def run(video, detector, pose_model, checkpoint, out, max_shots=LOOK['max_shots'
                                           for s in shots for d in s['windows'] if d.get('strip')]
                                        + [(k['frames'][0]/fps, (k['frames'][1]+1)/fps, k['still'], 'still')
                                           for s in shots for k in s['skipped'] if k.get('still')]))
+    from image_lens import zoom
+    errors = []
+    try:
+        frame_sheets = zoom.overview(source, root)
+    except Exception as error:  # OpenCV raises its own error type; the overview is optional
+        frame_sheets = []; errors.append(dict(step='frame_sheets', error=str(error)[:300]))
     from image_lens import motif
     for (done, _), label in zip(looks, motif.assign([l for _, l in looks])):
         if label:
             done['motif'] = label
     record = dict(schema='image-lens.look/1', source_video=str(source), source_sha256=scan['source_sha256'], params=LOOK,
-                  max_shots=max_shots, scaled=scaled, onion_sheets=sheets, elapsed_seconds=round(time.monotonic()-started, 1), shots=shots)
+                  max_shots=max_shots, scaled=scaled, onion_sheets=sheets, frame_sheets=frame_sheets, errors=errors, elapsed_seconds=round(time.monotonic()-started, 1), shots=shots)
     paths.write_json(root/'look.json', record)
     from image_lens import digest
     look_md = paths.write(root/'look.md', digest.markdown(record, scan, 'look-full.md'))

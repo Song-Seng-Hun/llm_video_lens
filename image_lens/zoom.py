@@ -1,10 +1,11 @@
 """Second read. After reading a look, the reader names at most two short spans it could not tell; zoom shows each as
 dense whole frames in time order (who pulls whom, a fall: Kaguya 18-22 s was one merged pose box, so pose lines and
 person crops cannot show it). The frame budget is fixed and counted, so a gain can be checked against the same number
-of frames spread evenly over the clip (--even)."""
+of frames spread evenly over the clip (--even). There the even frames gained more (Kaguya 8.5 -> 12 of 20 against
+10.5 -> 11.5 for the reader's own spans), so `look` also writes such frames for the whole clip (`overview`)."""
 import json
 
-ZOOM = dict(spans=2, span_s=4., frames=12, budget=24, columns=4, tile=480, label=22)
+ZOOM = dict(spans=2, span_s=4., frames=12, budget=24, columns=4, tile=480, label=22, every_s=1.25, max_overview=96)
 
 
 def spans(texts):
@@ -49,6 +50,45 @@ def sheet(frames, fps, path):
     return path.name
 
 
+def _write(cap, fps, groups, root, prefix):
+    """One sheet per (name, frame numbers) group as <prefix>-N.jpg; [{span, image, frames, pixels}]."""
+    import cv2
+    written = []
+    for i, (name, numbers) in enumerate(groups, 1):
+        frames = []
+        for n in numbers:
+            cap.set(cv2.CAP_PROP_POS_FRAMES, n)
+            ok, image = cap.read()
+            if ok:
+                frames.append((n, image))
+        if frames:
+            path = root/f'{prefix}-{i}.jpg'
+            sheet(frames, fps, path)
+            h, w = cv2.imread(str(path)).shape[:2]
+            written.append(dict(span=name, image=path.name, frames=[n for n, _ in frames], pixels=w*h))
+    return written
+
+
+def overview_count(count, fps):
+    return max(1, min(ZOOM['max_overview'], round(count/fps/ZOOM['every_s'])))
+
+
+def overview(video, root):
+    """Whole frames every ZOOM['every_s'] seconds over the whole clip (at most ZOOM['max_overview']), 12 per sheet, as
+    frame-sheet-N.jpg: what people do to each other and falls, which one merged pose box cannot show."""
+    import cv2
+    cap = cv2.VideoCapture(str(video))
+    try:
+        fps, count = cap.get(cv2.CAP_PROP_FPS), int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+        if not fps or not count:
+            return []
+        numbers = picks(0, count-1, overview_count(count, fps))
+        k = ZOOM['frames']
+        return [s['image'] for s in _write(cap, fps, [('all', numbers[i:i+k]) for i in range(0, len(numbers), k)], root, 'frame-sheet')]
+    finally:
+        cap.release()
+
+
 def run(video, out, at=(), even=False):
     """Writes zoom-N.jpg (one per span, or two halves for --even) and zoom.json with the frames and their cost."""
     import cv2
@@ -69,19 +109,7 @@ def run(video, out, at=(), even=False):
             groups = [(f'{a:g}-{b:g}s', picks(min(round(a*fps), count-1), min(round(b*fps), count-1), ZOOM['frames']))
                       for a, b in spans(at)]
         root.mkdir(parents=True)
-        written = []
-        for i, (name, numbers) in enumerate(groups, 1):
-            frames = []
-            for n in numbers:
-                cap.set(cv2.CAP_PROP_POS_FRAMES, n)
-                ok, image = cap.read()
-                if ok:
-                    frames.append((n, image))
-            if frames:
-                path = root/f'zoom-{i}.jpg'
-                sheet(frames, fps, path)
-                h, w = cv2.imread(str(path)).shape[:2]
-                written.append(dict(span=name, image=path.name, frames=[n for n, _ in frames], pixels=w*h))
+        written = _write(cap, fps, groups, root, 'zoom')
     finally:
         cap.release()
     result = dict(status='ok', video=source.name, fps=fps, mode='even' if even else 'spans', sheets=written,
