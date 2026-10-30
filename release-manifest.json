@@ -20,7 +20,7 @@
   ],
   "manifest_self_excluded": true,
   "file_count": 132,
-  "total_bytes": 1385642,
+  "total_bytes": 1386277,
   "files": [
     {
       "path": ".gitattributes",
@@ -79,8 +79,8 @@
     },
     {
       "path": "docs/look-notes.md",
-      "bytes": 17313,
-      "sha256": "4633fd59c0bfaf24982900649dd56b704c0559bca548f38553969df06e70f4f7"
+      "bytes": 17621,
+      "sha256": "e2bb8d15213092fc625966fabf97e26f3d4b24f9c8fb20a65cd6a5a2a344d466"
     },
     {
       "path": "docs/provenance.md",
@@ -124,8 +124,8 @@
     },
     {
       "path": "image_lens/camera.py",
-      "bytes": 7427,
-      "sha256": "7ca2ec0ee78fdcf83042c514e0d66d83f6e09205056e5bad352eaaa93c36c7e1"
+      "bytes": 7754,
+      "sha256": "afe83515d06ac80363f78d16c2d114b575e16651eb03267351e78bcda7e12a34"
     },
     {
       "path": "image_lens/check.py",
