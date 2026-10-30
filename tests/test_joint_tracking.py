@@ -132,7 +132,7 @@ class GeometrySources(unittest.TestCase):
             self.assertEqual(r['limbs'],[])
             self.assertEqual(r['centre_shift']['distance_px'],0)
             self.assertEqual(selected,before)
-            self.assertEqual(r['geometry']['source'],'raw_tracker_source_switch')
+            self.assertEqual(r['geometry']['source'],'per_joint_source_stable')
             self.assertIn(pid,r['geometry']['source_switches'])
             from image_lens import digest
             done=dict(window=dict(seed=0,end=30),body=r,body_geometry=r['geometry'],groups=[],motif='A')
@@ -168,7 +168,7 @@ class GeometrySources(unittest.TestCase):
         self.assertTrue(r['limbs']);self.assertEqual(r['limbs'][0]['strokes'][0]['direction'],'right')
     def test_missing_raw_reference_keeps_window_provenance_in_first_and_repeat(self):
         from image_lens import body_motion,digest
-        selected,raw=self.packets()
+        selected,raw=self.packets('shoulder-l')
         for f in raw['frames']:
             for q in f['points']:
                 if q['point_id'].startswith('shoulder'):q['visible']=False
@@ -192,6 +192,99 @@ class GeometrySources(unittest.TestCase):
         self.assertIn('모름','\n'.join(body_motion.lines(r)))
         line=digest.window_line(dict(window=w,body=r,body_geometry=policy,groups=[]),30)
         self.assertIn('모름',line);self.assertNotIn('팔다리 12px 미만',line)
+    def test_switching_wrist_does_not_discard_stable_elbow_or_reference(self):
+        from image_lens import body_motion
+        selected,raw=self.packets()
+        for f in selected['frames']:
+            for p in f['points']:
+                if p['point_id']=='elbow-l':p.update(xy=[330+4*f['frame'],350],coordinate_source='pose')
+        for f in raw['frames']:
+            for p in f['points']:
+                if p['point_id'].startswith('shoulder'):p['visible']=False
+        r=body_motion.describe([selected],dict(seed=0,end=30),timing_packets=[raw])
+        self.assertEqual(r['reference'],'shoulders')
+        elbow=next(l for l in r['limbs'] if l['point_id']=='elbow-l')
+        self.assertEqual(elbow['strokes'][0]['direction'],'right')
+        self.assertIsNone(elbow['strokes'][0]['speeds'])
+
+    def test_no_stroke_or_travel_bridges_invisible_point(self):
+        from image_lens import body_motion,digest
+        selected,raw=self.packets(switch='unused')
+        for f in selected['frames']:
+            for p in f['points']:
+                if p['point_id']=='wrist-l':
+                    p['xy'][0]=360 if f['frame']<15 else 560
+                    p['visible']=f['frame']!=15
+        r=body_motion.describe([selected],dict(seed=0,end=30))
+        self.assertEqual(r['limbs'],[]);self.assertIn('wrist-l',r['incomplete'])
+        done=dict(window=dict(seed=0,end=30),body=r,groups=[],motif='A')
+        for first in (None,done):
+            line=digest.window_line(done,30,first)
+            self.assertIn('그 사이 동작 모름',line)
+            self.assertNotIn('팔다리 12px 미만',line)
+
+    def test_face_membership_jump_is_not_body_or_limb_motion(self):
+        from tests.test_body_motion import packet
+        from image_lens import body_motion,digest
+        p=packet({name:{n:xy for n in range(31)} for name,xy in
+                  [('eye-l',(100.,100.)),('eye-r',(200.,100.)),('nose',(300.,200.)),('wrist-l',(350.,300.))]})
+        for f in p['frames']:
+            for q in f['points']:
+                if q['point_id']=='nose':q['visible']=f['frame']<15
+        r=body_motion.describe([p],dict(seed=0,end=30))
+        self.assertIsNone(r['centre_shift']);self.assertEqual(r['limbs'],[])
+        done=dict(window=dict(seed=0,end=30),body=r,groups=[],motif='A')
+        for first in (None,done):self.assertIn('이동 모름',digest.window_line(done,30,first))
+
+    def test_source_boundary_is_not_joined_in_limb_summary(self):
+        from tests.test_body_motion import packet
+        from image_lens import body_motion,digest
+        p=packet({name:{n:(x+ (4*n if name=='wrist-l' else 0),y) for n in range(31)} for name,x,y in
+                  [('shoulder-l',300.,300.),('shoulder-r',100.,300.),('wrist-l',350.,400.)]})
+        for f in p['frames']:
+            for q in f['points']:
+                if q['point_id']=='wrist-l' and f['frame']==15:q['visible']=False
+        r=body_motion.describe([p],dict(seed=0,end=30))
+        limb=r['limbs'][0]
+        self.assertEqual(limb['runs'],[[1,14],[16,30]])
+        self.assertEqual(limb['axis_px'],0)
+        self.assertTrue(all(not(s['frames'][0]<15<s['frames'][1]) for s in limb['strokes']))
+        self.assertIn('관측 끊김',digest.limbs(r)[0]['text'])
+        self.assertLess(limb['travel_px'],4*29)
+
+    def test_short_runs_are_unknown_not_motion(self):
+        from tests.test_body_motion import packet
+        from image_lens import body_motion
+        p=packet({name:{n:(x+100*(n//3) if name=='wrist-l' else x,y) for n in range(31)} for name,x,y in
+                  [('shoulder-l',300.,300.),('shoulder-r',100.,300.),('wrist-l',350.,400.)]})
+        for f in p['frames']:
+            for q in f['points']:
+                if q['point_id']=='wrist-l' and f['frame']%3==0:q['visible']=False
+        r=body_motion.describe([p],dict(seed=0,end=30))
+        self.assertEqual(r['limbs'],[]);self.assertIn('wrist-l',r['incomplete'])
+
+    def test_raw_timing_face_membership_change_returns_unknown(self):
+        from tests.test_body_motion import packet
+        from image_lens import body_motion
+        p=packet({name:{n:(x+4*n if name=='wrist-l' else x,y) for n in range(31)} for name,x,y in
+                  [('eye-l',100.,100.),('eye-r',200.,100.),('nose',200.,100.),('wrist-l',350.,400.)]})
+        raw=copy.deepcopy(p)
+        for f in raw['frames']:
+            for q in f['points']:
+                if q['point_id']=='nose' and f['frame']>=15:q['visible']=False
+        r=body_motion.describe([p],dict(seed=0,end=30),timing_packets=[raw])
+        self.assertTrue(r['limbs']);self.assertIsNone(r['limbs'][0]['strokes'][0]['speeds'])
+
+    def test_short_reference_is_not_whole_window_stillness(self):
+        from tests.test_body_motion import packet
+        from image_lens import body_motion,digest
+        p=packet({name:{n:xy for n in range(5)} for name,xy in
+                  [('eye-l',(100.,100.)),('eye-r',(200.,100.)),('wrist-l',(350.,300.))]})
+        r=body_motion.describe([p],dict(seed=0,end=30))
+        self.assertIsNone(r['centre_shift'])
+        line=digest.window_line(dict(window=dict(seed=0,end=30),body=r,groups=[]),30)
+        self.assertIn('전체 이동 모름',line);self.assertNotIn('몸 그대로',line)
+
     def test_mixed_source_without_raw_geometry_is_refused(self):
         from image_lens import body_motion
         selected,_=self.packets()

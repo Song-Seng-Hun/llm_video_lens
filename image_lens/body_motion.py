@@ -125,9 +125,8 @@ def disagreement(points, kind, centre, size, pose_frames):
 
 
 def geometry_policy(packets, window, raw_packets=None):
-    """Choose one geometry stream per window; source jumps are not physical displacement.
-    Keep state across missing frames, but exclude anchors and post-cut rows. Never edit snapshots.
-    """
+    """Choose one source per point for this window. A changing point uses raw geometry;
+    other points retain selected estimates. Neither source switches nor anchors are motion."""
     previous = {}; switches = {}; selected = set()
     for packet in packets:
         for frame in packet['frames']:
@@ -147,54 +146,102 @@ def geometry_policy(packets, window, raw_packets=None):
         raw_seen = {(f['frame'], p['point_id']) for packet in raw_packets for f in packet['frames']
                     if window['seed'] < f['frame'] <= window['end'] for p in f['points'] if p['visible']}
         for _, pid in selected-raw_seen:
-            lost[pid] = lost.get(pid, 0)+1
-    return dict(source='raw_tracker_source_switch' if switches else 'selected_estimates',
+            if pid in switches:
+                lost[pid] = lost.get(pid, 0)+1
+    return dict(source='per_joint_source_stable' if switches else 'selected_estimates',
                 source_switches={pid: switches[pid] for pid in sorted(switches)},
                 lost_observations={pid: lost[pid] for pid in sorted(lost)})
 
 
+def geometry_packets(packets, window, raw_packets, policy=None):
+    """A point changes source at most once per window, before measuring any displacement.
+    Raw observations can be missing; never fill them with a selected observation."""
+    policy = policy or geometry_policy(packets, window, raw_packets)
+    switched = policy['source_switches']
+    if not switched:
+        return packets
+    if raw_packets is None:
+        raise ValueError('mixed coordinate sources require raw geometry packets')
+    raw = {(f['frame'], p['point_id']): p for packet in raw_packets for f in packet['frames'] for p in f['points']}
+    return [dict(packet, frames=[dict(f, points=[raw[(f['frame'], p['point_id'])] if p['point_id'] in switched else p
+                                               for p in f['points'] if p['point_id'] not in switched or (f['frame'], p['point_id']) in raw])
+                                for f in packet['frames']]) for packet in packets]
+
+
+def reference_signatures(packets, window, kind):
+    """Reference contributors and their sources. A changing face subset is a new centre."""
+    found = {}
+    ids = ('shoulder-l', 'shoulder-r') if kind == 'shoulders' else HEAD
+    for packet in packets:
+        for f in packet['frames']:
+            if window['seed'] < f['frame'] <= window['end']:
+                for p in f['points']:
+                    if p['visible'] and p['point_id'] in ids:
+                        found.setdefault(f['frame'], {})[p['point_id']] = p.get('coordinate_source', 'point_tracker')
+    return {n: tuple(sorted(v.items())) for n, v in found.items()}
+
+
+def motion_runs(frames, signatures):
+    """Split at a missing observation or a changed reference; no interpolation across either."""
+    runs = []
+    for n in frames:
+        if not runs or n != runs[-1][-1]+1 or signatures.get(n) != signatures.get(runs[-1][-1]):
+            runs.append([])
+        runs[-1].append(n)
+    return runs
+
+
 def geometry_note(policy):
     """Short provenance shared by detailed and repeat-window summaries."""
-    if not policy or policy['source'] != 'raw_tracker_source_switch':
+    if not policy or policy['source'] not in ('raw_tracker_source_switch', 'per_joint_source_stable'):
         return None
     ids = list(policy['source_switches'])
     points = ', '.join(ids[:2]) + (f" 외 {len(ids)-2}점" if len(ids) > 2 else '')
-    text = f"좌표 출처 전환({points}): 이 구간 몸 동작은 원시 추적으로 계산"
+    text = f"좌표 출처 전환({points}): " + ('해당 점만 원시 추적으로 계산' if policy['source'] == 'per_joint_source_stable'
+                                              else '이 구간 몸 동작은 원시 추적으로 계산')
     if policy['lost_observations']:
         text += f"; 원시 관절 관측 {len(policy['lost_observations'])}점 누락, 그 움직임 모름"
     return text
 
 
 def describe(packets, window, pose_frames=None, timing_packets=None):
-    """Body centre shift plus per-limb relative strokes (direction, size, frames) and toward/away from the body axis.
-    With pose_frames, a limb point the pose disagrees with is listed as uncertain instead of described."""
+    """Per-point source-stable geometry. Displacements never join missing frames or
+    different body-reference contributors. Raw surface observations alone supply timing."""
     geometry = geometry_policy(packets, window, timing_packets)
-    if geometry['source'] == 'raw_tracker_source_switch':
-        if timing_packets is None:
-            raise ValueError('mixed coordinate sources require raw geometry packets')
-        packets = timing_packets
+    packets = geometry_packets(packets, window, timing_packets, geometry)
     points = series(packets, window)
-    # Position may be pose-assisted; speeds/ease must still come from a continuous raw tracker path.
-    timing_points = series(timing_packets, window) if timing_packets is not None else None
-    timing_kind, timing_centre, _ = reference(timing_points, window) if timing_points is not None else (None, {}, None)
-    def timing(pid, ns, fallback):
-        if timing_points is None:
-            return motion_report.ease(ns, fallback), motion_report.speeds(ns, fallback)
-        if timing_kind != reference_kind or ns != list(range(ns[0], ns[-1]+1)) or any(n not in timing_centre or (pid is not None and n not in timing_points.get(pid, {})) for n in ns):
+    reference_kind, centre, size = reference(points, window)
+    if not reference_kind:
+        return None
+    signatures = reference_signatures(packets, window, reference_kind)
+    timing_points = series(timing_packets, window) if timing_packets is not None else points
+    timing_kind, timing_centre, _ = reference(timing_points, window)
+    timing_signatures = reference_signatures(timing_packets if timing_packets is not None else packets, window, timing_kind)
+    timing_sources = {(f['frame'], p['point_id']): p.get('coordinate_source', 'point_tracker')
+                      for packet in (timing_packets if timing_packets is not None else packets)
+                      for f in packet['frames'] for p in f['points'] if p['visible']}
+    def timing(pid, ns):
+        if any(any(source != 'point_tracker' for _, source in timing_signatures.get(n, ()))
+               or (pid is not None and timing_sources.get((n, pid)) != 'point_tracker') for n in ns):
+            return None, None
+        if timing_kind != reference_kind or any(n not in timing_centre or (pid is not None and n not in timing_points.get(pid, {})) for n in ns):
+            return None, None
+        if len(motion_runs(ns, timing_signatures)) != 1:
             return None, None
         path = [timing_centre[n] if pid is None else (timing_points[pid][n][0]-timing_centre[n][0],
                                                     timing_points[pid][n][1]-timing_centre[n][1]) for n in ns]
         path = _median3(path)
         return motion_report.ease(ns, path), motion_report.speeds(ns, path)
-    reference_kind, centre, size = reference(points, window)
-    if not reference_kind:
-        return None
     apart = disagreement(points, reference_kind, centre, size, pose_frames) if pose_frames else {}
     uncertain = []
     limit = max(BODY_MOTION['min_px'], BODY_MOTION['min_ratio']*size)
-    frames = sorted(centre)
-    shift = (centre[frames[-1]][0]-centre[frames[0]][0], centre[frames[-1]][1]-centre[frames[0]][1])
-    centre_path = _median3([centre[n] for n in frames])
+    frames = sorted(centre); centre_runs = motion_runs(frames, signatures)
+    centre_shift = None
+    if len(centre_runs) == 1 and len(frames) >= BODY_MOTION['min_frames'] and len(frames) == window['end']-window['seed']:
+        shift = (centre[frames[-1]][0]-centre[frames[0]][0], centre[frames[-1]][1]-centre[frames[0]][1])
+        ease, speeds = timing(None, frames)
+        centre_shift = dict(direction=motion_report.direction(*shift), distance_px=round(math.hypot(*shift), 1),
+                            frames=[frames[0], frames[-1]], ease=ease, speeds=speeds)
     seen = coverage(packets, window)
     hidden = {k for k, (share, _) in seen.items() if share < BODY_MOTION['min_seen']}
     unknown = []
@@ -203,68 +250,74 @@ def describe(packets, window, pose_frames=None, timing_packets=None):
         ref = other if other is not None else sorted(c[0] for c in centre.values())[len(centre)//2]
         if x is not None:
             unknown.append(dict(kind=kind, side='화면 왼쪽' if x < ref else '화면 오른쪽', seen=round(seen[(kind, side)][0], 2)))
-    limbs = []
-    for pid, track in sorted(points.items()):
-        part = PARTS.get(pid.split('-')[0])
+    all_parts = {p['point_id'] for packet in packets for f in packet['frames'] for p in f['points'] if PARTS.get(p['point_id'].split('-')[0])}
+    incomplete = set(); limbs = []
+    if centre_shift is None or len(centre) < window['end']-window['seed']:
+        incomplete.add('body-centre')
+    for pid in sorted(all_parts):
+        track = points.get(pid, {}); part = PARTS[pid.split('-')[0]]
         common = [n for n in sorted(track) if n in centre]
-        if not part or len(common) < BODY_MOTION['min_frames'] or _limb(pid) in hidden:
+        runs = motion_runs(common, signatures)
+        usable = [ns for ns in runs if len(ns) >= BODY_MOTION['min_frames']]
+        if len(common) < window['end']-window['seed'] or len(usable) != 1 or len(usable) != len(runs):
+            incomplete.add(pid)
+        if not usable or _limb(pid) in hidden:
             continue
-        rel = _median3([(track[n][0]-centre[n][0], track[n][1]-centre[n][1]) for n in common])
-        strokes = []
-        for lo, hi in segments(rel, limit):
-            dx, dy = rel[hi][0]-rel[lo][0], rel[hi][1]-rel[lo][1]
-            if math.hypot(dx, dy) >= limit:
-                ease, speeds = timing(pid, common[lo:hi+1], rel[lo:hi+1])
-                # Raw body-relative timing; fusion coordinates never imply measured acceleration.
-                strokes.append(dict(direction=motion_report.direction(dx, dy), distance_px=round(math.hypot(dx, dy), 1),
-                                    frames=[common[lo], common[hi]], ease=ease, speeds=speeds,
-                                    # Windows start where the drawing changes: a stroke from the first frame was already
-                                    # moving, its speed-up is before the cut (clip A f47: 40 px in two frames, then settles).
-                                    from_start=lo == 0))
+        strokes = []; travel = 0.; spread = 0.
+        for ri, ns in enumerate(usable):
+            rel = _median3([(track[n][0]-centre[n][0], track[n][1]-centre[n][1]) for n in ns])
+            travel += sum(math.dist(a, b) for a, b in zip(rel, rel[1:]))
+            if len(usable) == len(runs) == 1:
+                spread = abs(rel[-1][0])-abs(rel[0][0])
+            for lo, hi in segments(rel, limit):
+                dx, dy = rel[hi][0]-rel[lo][0], rel[hi][1]-rel[lo][1]
+                if math.hypot(dx, dy) >= limit:
+                    ease, speeds = timing(pid, ns[lo:hi+1])
+                    strokes.append(dict(direction=motion_report.direction(dx, dy), distance_px=round(math.hypot(dx, dy), 1),
+                                        frames=[ns[lo], ns[hi]], ease=ease, speeds=speeds, run=ri, from_start=lo == 0))
         if not strokes:
             continue
-        spread = abs(rel[-1][0])-abs(rel[0][0])
-        # Screen side of the limb, not of the point: a hand crossing to the chest still belongs to its arm's side.
         anchor = points.get(('hip-' if part in ('허벅지', '무릎', '발목') else 'shoulder-')+pid.rsplit('-', 1)[-1], {})
         at = [anchor[n][0]-centre[n][0] for n in common if n in anchor]
-        x = sorted(at)[len(at)//2] if at else rel[0][0]
+        x = sorted(at)[len(at)//2] if at else track[common[0]][0]-centre[common[0]][0]
         if apart.get(pid, 0) >= BODY_MOTION['disagree_share']:
             uncertain.append(dict(point_id=pid, part=part, side='화면 왼쪽' if x < 0 else '화면 오른쪽', share=round(apart[pid], 2)))
             continue
         if part == PARTS['move']:
-            part = f"{part} {pid.rsplit('-', 1)[-1]}"  # unnamed: keep the letter so it matches the onion image and tracks
-        limbs.append(dict(point_id=pid, part=part, side='화면 왼쪽' if x < 0 else '화면 오른쪽',
-                          travel_px=round(sum(math.dist(a, b) for a, b in zip(rel, rel[1:])), 1),
+            part = f"{part} {pid.rsplit('-', 1)[-1]}"
+        limbs.append(dict(point_id=pid, part=part, side='화면 왼쪽' if x < 0 else '화면 오른쪽', travel_px=round(travel, 1),
                           strokes=strokes[:BODY_MOTION['max_segments']], omitted=max(0, len(strokes)-BODY_MOTION['max_segments']),
-                          axis_px=round(spread, 1) if abs(spread) >= limit else 0.))
-    centre_ease, centre_speeds = timing(None, frames, centre_path)
+                          runs=[[ns[0], ns[-1]] for ns in usable], axis_px=round(spread, 1) if abs(spread) >= limit else 0.))
     return dict(reference=reference_kind, geometry=geometry, size_px=round(size, 1), limit_px=round(limit, 1),
-                centre_shift=dict(direction=motion_report.direction(*shift), distance_px=round(math.hypot(*shift), 1),
-                                  frames=[frames[0], frames[-1]], ease=centre_ease, speeds=centre_speeds), limbs=limbs, unknown=unknown, uncertain=uncertain)
+                centre_shift=centre_shift, limbs=limbs, unknown=unknown, uncertain=uncertain, incomplete=sorted(incomplete))
 
 
 def lines(result):
-    """look.md lines: one for the body centre, one per moving limb point."""
+    """look-full.md: run gaps remain explicit, including an unavailable whole-window centre shift."""
     if not result:
         return ['- 몸 기준: 기준점(어깨·얼굴)이 부족해 계산 못 함']
     ref = '어깨 가운데' if result['reference'] == 'shoulders' else '얼굴 가운데'
     c = result['centre_shift']
     head = f"- 몸 기준 움직임 (몸 중심={ref}, 기준 {result['limit_px']:.0f}px):"
-    body = (f"  - 몸 중심: {motion_report.KO[c['direction']]} {c['distance_px']:.0f}px" if c['distance_px'] >= result['limit_px']
-            else '  - 몸 중심: 거의 그대로')
+    body = ('  - 몸 중심: 관측 끊김·기준점 변경, 전체 이동 모름' if c is None else
+            f"  - 몸 중심: {motion_report.KO[c['direction']]} {c['distance_px']:.0f}px" if c['distance_px'] >= result['limit_px'] else '  - 몸 중심: 거의 그대로')
     out = [head, body]
     for limb in result['limbs']:
-        moves = ' → '.join(f"{motion_report.KO[s['direction']].replace('화면 ', '')} {s['distance_px']:.0f}px(f{s['frames'][0]}..{s['frames'][1]})"
-                           for s in limb['strokes'])
+        moves = []
+        for i, s in enumerate(limb['strokes']):
+            sep = '' if not i else ' → ' if s.get('run') == limb['strokes'][i-1].get('run') else ' / 관측 끊김 / '
+            moves.append(sep+f"{motion_report.KO[s['direction']].replace('화면 ', '')} {s['distance_px']:.0f}px(f{s['frames'][0]}..{s['frames'][1]})")
         axis = '' if not limb['axis_px'] else f", 몸 {'바깥으로' if limb['axis_px'] > 0 else '쪽으로'} {abs(limb['axis_px']):.0f}px"
-        out.append(f"  - {limb['side']} {limb['part']}: {moves}{axis}")
+        out.append(f"  - {limb['side']} {limb['part']}: {''.join(moves)}{axis}")
     for u in result.get('unknown', []):
         out.append(f"  - {u['side']} {u['kind']}: 대부분 가려져 모름(보인 프레임 {u['seen']:.0%})")
     for u in result.get('uncertain', []):
         out.append(f"  - {u['side']} {u['part']}: 자세 모델과 추적이 어긋나 불확실(어긋난 프레임 {u['share']:.0%})")
+    if result.get('incomplete'):
+        out.append('  - 일부 관측 끊김·짧은 관측: 그 사이 동작 모름')
     if not result['limbs'] and not result.get('unknown') and not result.get('uncertain'):
-        out.append('  - 팔다리: 원시 추적 큰 이동 미검출(실제 동작은 모름)'
-                   if result.get('geometry', {}).get('source') == 'raw_tracker_source_switch'
+        out.append('  - 팔다리: 관측된 연속 구간에서 큰 이동 미검출(실제 동작은 모름)'
+                   if result.get('incomplete') or result.get('geometry', {}).get('source') in ('raw_tracker_source_switch', 'per_joint_source_stable')
                    else '  - 팔다리: 몸 기준으로도 기준 미만')
     return out
 
