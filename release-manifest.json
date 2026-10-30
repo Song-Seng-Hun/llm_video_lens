@@ -20,7 +20,7 @@
   ],
   "manifest_self_excluded": true,
   "file_count": 132,
-  "total_bytes": 1368884,
+  "total_bytes": 1370254,
   "files": [
     {
       "path": ".gitattributes",
@@ -59,8 +59,8 @@
     },
     {
       "path": "docs/guide.md",
-      "bytes": 17063,
-      "sha256": "f59e565b33ee216cd850eb7755c8d7dd311d6a5b10798741116cbcb54406f50e"
+      "bytes": 17153,
+      "sha256": "3eb46f913153fde3edde5a0ff5123109a2eb0f2ed7f26ee80391479cb8fc06a5"
     },
     {
       "path": "docs/import-provenance.json",
@@ -79,8 +79,8 @@
     },
     {
       "path": "docs/look-notes.md",
-      "bytes": 13627,
-      "sha256": "282cb648d87f3305e36fbfa0f7995af81d90638176aafd4a8858902fdba54b73"
+      "bytes": 14478,
+      "sha256": "354712199a765d00e481324376c3b692fd9fb2e353d1f1ff94321e12e5d50ec9"
     },
     {
       "path": "docs/provenance.md",
@@ -204,13 +204,13 @@
     },
     {
       "path": "image_lens/pose.py",
-      "bytes": 23324,
-      "sha256": "67154c7bac027bb0ae34bddc08b04d3dd782f9b35419a1d6e9b781a7debb2bb2"
+      "bytes": 23480,
+      "sha256": "5facb935835a42ca2767868108745e1fdf4f4b15529f031b063455fff9a5db01"
     },
     {
       "path": "image_lens/run_point_tracker.py",
-      "bytes": 17611,
-      "sha256": "aadb64e664a10249ab491c06638c8de8665b4dd9415fb0fa912499b20075bd30"
+      "bytes": 17884,
+      "sha256": "746bd07c996a373bb51c25448c87111e213601f5b6d4b1898c0ca5345629b8b8"
     },
     {
       "path": "image_lens/shot-detector-pins.json",
