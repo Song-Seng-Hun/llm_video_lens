@@ -300,7 +300,6 @@ def _run(video, detector, pose_model, checkpoint, out, max_shots=LOOK['max_shots
         nonlocal last_end
         entry, sid, w, end, base, people, receipt, tracked, done, slot, at = window
         errors = []; quiet = []; fps = scan['fps']
-        raw_packets = [paths.load(joint_tracking.track_path(t[2], t[1]))[0] if t[1] in joint_tracking.GROUPS else t[3] for t in tracked]
         from image_lens import body_motion
         if last_end is not None:
             done['bridge'] = body_motion.bridge(body_motion.largest(pose_frames.get(last_end)), body_motion.largest(pose_frames.get(w['seed'])),
@@ -334,6 +333,8 @@ def _run(video, detector, pose_model, checkpoint, out, max_shots=LOOK['max_shots
                 done['move_candidates'] = len(tracks['frames'][0]['points']) if tracks['frames'] else 0
                 tracked[k] = (name, group, stem, dict(tracks, frames=[dict(f, points=[p for p in f['points'] if p['point_id'] in keep])
                                                                       for f in tracks['frames']]))
+        # Preserve filtered non-body candidates in the raw geometry view.
+        raw_packets = [paths.load(joint_tracking.track_path(t[2], t[1]))[0] if t[1] in joint_tracking.GROUPS else t[3] for t in tracked]
         for name, group, stem, tracks in tracked:
             raw_tracks = joint_tracking.track_path(stem, group)
             if group == 'move' and not (tracks['frames'] and tracks['frames'][0]['points']):
@@ -363,6 +364,10 @@ def _run(video, detector, pose_model, checkpoint, out, max_shots=LOOK['max_shots
                 slot.append(f'  - {group} 실패: {str(error)[:120]}')
         if quiet:slot.append(f"  - {'·'.join(quiet)}: 화면 기준 큰 이동({motion_report.STROKE['major_min_px']:.0f}px 이상) 없음")
         if tracked and skeleton['plausible']:
+            done['body_geometry'] = body_motion.geometry_policy([t[3] for t in tracked], dict(w, end=end), raw_packets)
+            note = body_motion.geometry_note(done['body_geometry'])
+            if note:
+                slot.append('  - '+note)
             done['body'] = body_motion.describe([t[3] for t in tracked], dict(w, end=end), pose_frames,
                                                timing_packets=raw_packets)
             slot += ['  '+l for l in body_motion.lines(done['body'])]

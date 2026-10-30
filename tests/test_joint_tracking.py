@@ -113,4 +113,90 @@ class Timing(unittest.TestCase):
         self.assertTrue(any(s['speeds'] is not None for l in result['limbs'] for s in l['strokes']))
 
 
+class GeometrySources(unittest.TestCase):
+    def packets(self, switch='wrist-l'):
+        from tests.test_body_motion import packet
+        paths={p:{n:xy for n in range(31)} for p,xy in
+               [('shoulder-l',(300.,300.)),('shoulder-r',(100.,300.)),('elbow-l',(330.,350.)),('wrist-l',(360.,400.))]}
+        raw=packet(paths); selected=copy.deepcopy(raw)
+        for f in selected['frames']:
+            for q in f['points']:
+                q['coordinate_source']='pose' if q['point_id']==switch and 10<=f['frame']<=20 else 'point_tracker'
+                if q['coordinate_source']=='pose':q['xy'][0]+=160
+        return selected,raw
+    def test_switch_spike_is_not_a_limb_or_centre_move(self):
+        from image_lens import body_motion
+        for pid in ('wrist-l','shoulder-l'):
+            selected,raw=self.packets(pid);before=copy.deepcopy(selected)
+            r=body_motion.describe([selected],dict(seed=0,end=30),timing_packets=[raw])
+            self.assertEqual(r['limbs'],[])
+            self.assertEqual(r['centre_shift']['distance_px'],0)
+            self.assertEqual(selected,before)
+            self.assertEqual(r['geometry']['source'],'raw_tracker_source_switch')
+            self.assertIn(pid,r['geometry']['source_switches'])
+            from image_lens import digest
+            done=dict(window=dict(seed=0,end=30),body=r,body_geometry=r['geometry'],groups=[],motif='A')
+            for first in (None,done):
+                line=digest.window_line(done,30,first)
+                self.assertIn('실제 동작은 모름',line)
+                self.assertIn(pid,line)
+    def test_source_switch_scope_and_missing_frame(self):
+        from image_lens import body_motion
+        selected,raw=self.packets()
+        # One pose source after the seed, plus a raw seed and a post-cut row, is stable.
+        for f in selected['frames']:
+            for q in f['points']:
+                q['coordinate_source']='pose' if 1<=f['frame']<=20 else 'point_tracker'
+        p=body_motion.geometry_policy([selected],dict(seed=0,end=20),[raw])
+        self.assertEqual(p['source'],'selected_estimates')
+        # Keep source history across missing visibility; the first later tracker row changes source.
+        for f in selected['frames']:
+            for q in f['points']:
+                if q['point_id']=='wrist-l' and f['frame']==10:q['visible']=False
+                if q['point_id']=='wrist-l' and f['frame']>=11:q['coordinate_source']='point_tracker'
+        p=body_motion.geometry_policy([selected],dict(seed=0,end=20),[raw])
+        self.assertEqual(p['source_switches']['wrist-l'],[11])
+    def test_constant_pose_source_keeps_selected_geometry(self):
+        from image_lens import body_motion
+        selected,raw=self.packets()
+        for f in selected['frames']:
+            for q in f['points']:
+                q['coordinate_source']='pose'
+                if q['point_id']=='wrist-l':q['xy'][0]=360+4*f['frame']
+        r=body_motion.describe([selected],dict(seed=0,end=30),timing_packets=[raw])
+        self.assertEqual(r['geometry']['source'],'selected_estimates')
+        self.assertTrue(r['limbs']);self.assertEqual(r['limbs'][0]['strokes'][0]['direction'],'right')
+    def test_missing_raw_reference_keeps_window_provenance_in_first_and_repeat(self):
+        from image_lens import body_motion,digest
+        selected,raw=self.packets()
+        for f in raw['frames']:
+            for q in f['points']:
+                if q['point_id'].startswith('shoulder'):q['visible']=False
+        w=dict(seed=0,end=30);policy=body_motion.geometry_policy([selected],w,[raw])
+        self.assertIsNone(body_motion.describe([selected],w,timing_packets=[raw]))
+        done=dict(window=w,body=None,body_geometry=policy,motif='A',groups=[dict(moves=[])])
+        first=dict(window=w,body=None,groups=[],motif='A')
+        for original in (None,first):
+            line=digest.window_line(done,30,original)
+            self.assertIn('출처 전환',line);self.assertIn('모름',line)
+            self.assertNotIn('24px 이상 이동 없음',line)
+    def test_lost_raw_wrist_is_not_whole_limb_stillness(self):
+        from image_lens import body_motion,digest
+        selected,raw=self.packets()
+        for f in raw['frames']:
+            for q in f['points']:
+                if q['point_id']=='wrist-l' and f['frame']>0:q['visible']=False
+        w=dict(seed=0,end=30);policy=body_motion.geometry_policy([selected],w,[raw])
+        r=body_motion.describe([selected],w,timing_packets=[raw])
+        self.assertEqual(r['limbs'],[]);self.assertTrue(policy['lost_observations'])
+        self.assertIn('모름','\n'.join(body_motion.lines(r)))
+        line=digest.window_line(dict(window=w,body=r,body_geometry=policy,groups=[]),30)
+        self.assertIn('모름',line);self.assertNotIn('팔다리 12px 미만',line)
+    def test_mixed_source_without_raw_geometry_is_refused(self):
+        from image_lens import body_motion
+        selected,_=self.packets()
+        with self.assertRaisesRegex(ValueError,'raw geometry'):
+            body_motion.describe([selected],dict(seed=0,end=30))
+
+
 if __name__ == '__main__': unittest.main()

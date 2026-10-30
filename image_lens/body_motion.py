@@ -124,9 +124,55 @@ def disagreement(points, kind, centre, size, pose_frames):
     return result
 
 
+def geometry_policy(packets, window, raw_packets=None):
+    """Choose one geometry stream per window; source jumps are not physical displacement.
+    Keep state across missing frames, but exclude anchors and post-cut rows. Never edit snapshots.
+    """
+    previous = {}; switches = {}; selected = set()
+    for packet in packets:
+        for frame in packet['frames']:
+            n = frame['frame']
+            if not window['seed'] < n <= window['end']:
+                continue
+            for point in frame['points']:
+                if not point['visible']:
+                    continue
+                pid = point['point_id']; source = point.get('coordinate_source', 'point_tracker')
+                selected.add((n, pid))
+                if pid in previous and previous[pid] != source:
+                    switches.setdefault(pid, []).append(n)
+                previous[pid] = source
+    lost = {}
+    if switches and raw_packets is not None:
+        raw_seen = {(f['frame'], p['point_id']) for packet in raw_packets for f in packet['frames']
+                    if window['seed'] < f['frame'] <= window['end'] for p in f['points'] if p['visible']}
+        for _, pid in selected-raw_seen:
+            lost[pid] = lost.get(pid, 0)+1
+    return dict(source='raw_tracker_source_switch' if switches else 'selected_estimates',
+                source_switches={pid: switches[pid] for pid in sorted(switches)},
+                lost_observations={pid: lost[pid] for pid in sorted(lost)})
+
+
+def geometry_note(policy):
+    """Short provenance shared by detailed and repeat-window summaries."""
+    if not policy or policy['source'] != 'raw_tracker_source_switch':
+        return None
+    ids = list(policy['source_switches'])
+    points = ', '.join(ids[:2]) + (f" 외 {len(ids)-2}점" if len(ids) > 2 else '')
+    text = f"좌표 출처 전환({points}): 이 구간 몸 동작은 원시 추적으로 계산"
+    if policy['lost_observations']:
+        text += f"; 원시 관절 관측 {len(policy['lost_observations'])}점 누락, 그 움직임 모름"
+    return text
+
+
 def describe(packets, window, pose_frames=None, timing_packets=None):
     """Body centre shift plus per-limb relative strokes (direction, size, frames) and toward/away from the body axis.
     With pose_frames, a limb point the pose disagrees with is listed as uncertain instead of described."""
+    geometry = geometry_policy(packets, window, timing_packets)
+    if geometry['source'] == 'raw_tracker_source_switch':
+        if timing_packets is None:
+            raise ValueError('mixed coordinate sources require raw geometry packets')
+        packets = timing_packets
     points = series(packets, window)
     # Position may be pose-assisted; speeds/ease must still come from a continuous raw tracker path.
     timing_points = series(timing_packets, window) if timing_packets is not None else None
@@ -192,7 +238,7 @@ def describe(packets, window, pose_frames=None, timing_packets=None):
                           strokes=strokes[:BODY_MOTION['max_segments']], omitted=max(0, len(strokes)-BODY_MOTION['max_segments']),
                           axis_px=round(spread, 1) if abs(spread) >= limit else 0.))
     centre_ease, centre_speeds = timing(None, frames, centre_path)
-    return dict(reference=reference_kind, size_px=round(size, 1), limit_px=round(limit, 1),
+    return dict(reference=reference_kind, geometry=geometry, size_px=round(size, 1), limit_px=round(limit, 1),
                 centre_shift=dict(direction=motion_report.direction(*shift), distance_px=round(math.hypot(*shift), 1),
                                   frames=[frames[0], frames[-1]], ease=centre_ease, speeds=centre_speeds), limbs=limbs, unknown=unknown, uncertain=uncertain)
 
@@ -217,7 +263,9 @@ def lines(result):
     for u in result.get('uncertain', []):
         out.append(f"  - {u['side']} {u['part']}: 자세 모델과 추적이 어긋나 불확실(어긋난 프레임 {u['share']:.0%})")
     if not result['limbs'] and not result.get('unknown') and not result.get('uncertain'):
-        out.append('  - 팔다리: 몸 기준으로도 기준 미만')
+        out.append('  - 팔다리: 원시 추적 큰 이동 미검출(실제 동작은 모름)'
+                   if result.get('geometry', {}).get('source') == 'raw_tracker_source_switch'
+                   else '  - 팔다리: 몸 기준으로도 기준 미만')
     return out
 
 

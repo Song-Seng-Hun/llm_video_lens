@@ -20,7 +20,7 @@
   ],
   "manifest_self_excluded": true,
   "file_count": 135,
-  "total_bytes": 1460164,
+  "total_bytes": 1471518,
   "files": [
     {
       "path": ".gitattributes",
@@ -44,8 +44,8 @@
     },
     {
       "path": "README.md",
-      "bytes": 7240,
-      "sha256": "cdda2b4c9ef6b3adc83c93ff16cdf93c58ae680da4ad274919556341ec1c246c"
+      "bytes": 7410,
+      "sha256": "bca18855deb8088f89a5d3310c10dfe8fc102b3e0d055c49604d24f0ea9a2b24"
     },
     {
       "path": "assets/banner-dark.svg",
@@ -79,8 +79,8 @@
     },
     {
       "path": "docs/look-notes.md",
-      "bytes": 32834,
-      "sha256": "807e825535f4b8251406d1cb7ad4258dd7125e789ff26e0b35220e010032a4f9"
+      "bytes": 35039,
+      "sha256": "e3b801bdf7c06e91ab6abaeedb7cb8aff053830919e36db6e9d9818c312d6636"
     },
     {
       "path": "docs/provenance.md",
@@ -114,8 +114,8 @@
     },
     {
       "path": "image_lens/body_motion.py",
-      "bytes": 35029,
-      "sha256": "0137166f00e986b4964779f220c29b11cd8818caf52d1ac307076b9f4acd6d1b"
+      "bytes": 37590,
+      "sha256": "1f797f44ba0029b6df24cf325a8096f863090cb069ecc1fbeddcba45810851c2"
     },
     {
       "path": "image_lens/brief.py",
@@ -144,8 +144,8 @@
     },
     {
       "path": "image_lens/digest.py",
-      "bytes": 23526,
-      "sha256": "a15dec508b2aa1036c613086cd83ed47b479cbea348cacb79bc0fdc13e1adbb7"
+      "bytes": 24510,
+      "sha256": "80dda5063201b936b305ef36439c8e0ecbcf07a1ba79f5e99a66d29a2f287a61"
     },
     {
       "path": "image_lens/foreground_regions.py",
@@ -169,8 +169,8 @@
     },
     {
       "path": "image_lens/look.py",
-      "bytes": 37103,
-      "sha256": "d35338fbe6f5adb16ce34c37ca9eef32a1342666d18d4b5a4f900cf70ebca763"
+      "bytes": 37427,
+      "sha256": "1712a57e972c54c26d230b51a2b12de252ee699442e23e100300605ef2e84a80"
     },
     {
       "path": "image_lens/mark.py",
@@ -649,8 +649,8 @@
     },
     {
       "path": "tests/test_joint_tracking.py",
-      "bytes": 6650,
-      "sha256": "afa1c5f6943694c9794f9f5007a3e511fb023652e756c499576b01f1c20a5dce"
+      "bytes": 11760,
+      "sha256": "12cdac450c38e186c3b38d1503ee23e7c6bfaf8f8823f0afe842c4db25b42db3"
     },
     {
       "path": "tests/test_lan.py",
