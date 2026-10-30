@@ -244,8 +244,10 @@ def _run(video, detector, pose_model, checkpoint, out, max_shots=LOOK['max_shots
                          '--max-seconds', max(1, min(1800, int(remaining()))), '--parts-dir', root/'pose-parts'])
     # A thread reads the child's lines, so look can take a part that has arrived without waiting for the next one: the
     # next shot is seeded ahead only once its part is taken (clip B: every third shot missed it, the child idled 0.6-1 s).
-    import queue, threading
-    heard = queue.Queue()
+    # Named apart from the local queue() below: in this scope that def would shadow the module (only hit when the
+    # pose child falls behind tracking, as with the 384x288 pose model on clip B).
+    import queue as queue_mod, threading
+    heard = queue_mod.Queue()
     def listen(stream):
         try:
             for line in stream:
@@ -269,7 +271,7 @@ def _run(video, detector, pose_model, checkpoint, out, max_shots=LOOK['max_shots
         while covered(frame) is None:
             try:
                 line = heard.get(block=wait)
-            except queue.Empty:
+            except queue_mod.Empty:
                 return None
             if not line:
                 heard.put('')  # the end stays heard for later calls
