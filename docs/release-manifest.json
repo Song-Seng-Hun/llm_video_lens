@@ -20,7 +20,7 @@
   ],
   "manifest_self_excluded": true,
   "file_count": 138,
-  "total_bytes": 1784276,
+  "total_bytes": 1790404,
   "files": [
     {
       "path": ".gitattributes",
@@ -94,8 +94,8 @@
     },
     {
       "path": "docs/look-notes.md",
-      "bytes": 63869,
-      "sha256": "e4807fc885f011cd7e2109cff54decf9ff17aea590af026e7f4fccad794615ad"
+      "bytes": 65200,
+      "sha256": "dbe5944ea47f236bdf837900d25a82229bbbd8705926cab6524da56f366e1fab"
     },
     {
       "path": "docs/provenance.md",
@@ -129,8 +129,8 @@
     },
     {
       "path": "image_lens/body_motion.py",
-      "bytes": 53065,
-      "sha256": "b1ff4780a1254500098475ccb1a7309004301edea2765fa7ac27ada0f679e95b"
+      "bytes": 54664,
+      "sha256": "33b8decc0c5d64cd6befa8448e23fdee36a380dda17d67dd0f81f48dc34e18ed"
     },
     {
       "path": "image_lens/brief.py",
@@ -199,8 +199,8 @@
     },
     {
       "path": "image_lens/motion_report.py",
-      "bytes": 37941,
-      "sha256": "97f274a4eb8f0ad4adcb3c60ce9f73cee123c50e073be3f74e7d879ae48181a0"
+      "bytes": 38321,
+      "sha256": "ef22bc540d5118eb94a54a354f5a3cf40b35c8c289a899ca06a9ab33245433a1"
     },
     {
       "path": "image_lens/motion_view.py",
@@ -639,8 +639,8 @@
     },
     {
       "path": "tests/test_body_motion.py",
-      "bytes": 21202,
-      "sha256": "d2ac3819245540db415d9d5cc8ae1b8f8fad9a07c6714c42c6dae69bf26734e1"
+      "bytes": 24020,
+      "sha256": "32966c4b90c0969c4a54e1340f483f17f94545dd06f3636e3e6bcfa04672e4ec"
     },
     {
       "path": "tests/test_check.py",

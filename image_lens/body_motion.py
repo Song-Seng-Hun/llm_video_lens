@@ -111,6 +111,38 @@ def _median3(path):
     return [path[0]]+[tuple(sorted(c)[1] for c in zip(*path[i-1:i+2])) for i in range(1, len(path)-1)]+[path[-1]] if len(path) > 2 else path
 
 
+def _motion_segments(path, tolerance):
+    """Correct existing median3 corners to supported native apices, never add corners.
+
+    Broad restoration before segmentation creates small new strokes that can evict
+    later ones from the output cap. Keep the detected topology and endpoint policy.
+    """
+    smooth = _median3(path)
+    spans = segments(smooth, tolerance)
+    original = [spans[0][0]]+[hi for _,hi in spans]
+    supported = motion_report.preserve_apices(path, smooth)
+    corrected = [list(p) for p in smooth]; knots = [original[0]]
+    def kind(a,b):
+        dx,dy=b[0]-a[0],b[1]-a[1]
+        return motion_report.direction(dx,dy) if math.hypot(dx,dy)>=tolerance else None
+    for k, turn in enumerate(original[1:-1], 1):
+        lo, hi = knots[-1], original[k+1]
+        a,b,c=corrected[lo],corrected[turn],corrected[hi]
+        before=(kind(a,b),kind(b,c))
+        candidates = [i for i in range(max(lo+1,turn-1), min(hi-1,turn+1)+1)
+                      if supported[i] != list(smooth[i])
+                      and _off_chord(supported[i],a,c)>=_off_chord(b,a,c)
+                      and (kind(a,supported[i]),kind(supported[i],c))==before]
+        # Both emitted/non-emitted states and direction sectors must stay fixed;
+        # otherwise a small new unit could evict later output from the cap.
+        at = max(candidates, key=lambda i: (_off_chord(supported[i],a,c),-i)) if candidates else turn
+        knots.append(at)
+        if candidates:
+            corrected[at] = supported[at]
+    knots.append(original[-1])
+    return corrected, list(zip(knots,knots[1:]))
+
+
 def _off_chord(p, a, b):
     """Distance from p to the segment a-b; a point beyond an end (a reversal along the line) counts too."""
     (ax, ay), (bx, by) = a, b
@@ -326,11 +358,11 @@ def describe(packets, window, pose_frames=None, timing_packets=None):
             continue
         strokes = []; travel = 0.; spread = 0.
         for ri, ns in enumerate(usable):
-            rel = _median3([(track[n][0]-centre[n][0], track[n][1]-centre[n][1]) for n in ns])
+            rel, spans = _motion_segments([(track[n][0]-centre[n][0], track[n][1]-centre[n][1]) for n in ns], limit)
             travel += sum(math.dist(a, b) for a, b in zip(rel, rel[1:]))
             if len(usable) == len(runs) == 1:
                 spread = abs(rel[-1][0])-abs(rel[0][0])
-            for lo, hi in segments(rel, limit):
+            for lo, hi in spans:
                 dx, dy = rel[hi][0]-rel[lo][0], rel[hi][1]-rel[lo][1]
                 if math.hypot(dx, dy) >= limit:
                     ease, speeds, timing_status = timing(pid, ns[lo:hi+1], rel[lo:hi+1])

@@ -74,6 +74,16 @@ def _smooth(xy):
     """
     half=STROKE['median_samples']//2
     smooth=[[statistics.median(p[a] for p in xy[max(0,i-half):i+half+1]) for a in (0,1)] for i in range(len(xy))]
+    return preserve_apices(xy,smooth)
+
+
+def preserve_apices(xy,smooth):
+    """Restore supported observed reversals after a caller's median; leave inputs unchanged.
+
+    Callers provide one contiguous observation run. The screen and body filters keep
+    their own width/endpoints, sharing only the already-selected apex support rule.
+    """
+    smooth=[list(p) for p in smooth]
     for i in range(2,len(xy)-2):
         for axis in (0,1):
             d=[xy[j+1][axis]-xy[j][axis] for j in range(i-2,i+2)]
