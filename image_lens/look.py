@@ -8,7 +8,7 @@ import time
 from pathlib import Path
 from image_lens import paths, joint_tracking
 
-LOOK = dict(max_shots=16, window_frames=160, min_frames=12, seed_shift=3, track_seconds=300, strips=6, groups=('head', 'arms', 'hands', 'legs', 'move'))
+LOOK = dict(max_shots=16, window_frames=160, min_frames=12, seed_shift=3, seed_retry_frames=12, track_seconds=300, strips=6, groups=('head', 'arms', 'hands', 'legs', 'move'))
 NAMES = dict(head='머리', arms='팔', hands='손끝', legs='다리', move='많이 움직인 곳', marked='찍은 점')
 STEP_ERRORS = (ValueError, OSError, KeyError, TypeError, ImportError, TimeoutError, OverflowError)
 
@@ -76,10 +76,11 @@ def _stop_pose():
         poser.communicate()
 
 
-def next_window(segment, start, pose_frames, flagged, length=LOOK['window_frames'], min_frames=LOOK['min_frames']):
+def next_window(segment, start, pose_frames, flagged, length=LOOK['window_frames'], min_frames=LOOK['min_frames'], frame_size=None):
     """The next tracking window at or after `start`, seeded on the first frame with a pose track that is not pose-flagged."""
     skipped = []; end = segment['end_frame']
     while start <= end:
+        preserved_stop = None
         seed = next((n for n in range(start, end+1) if pose_frames.get(n) and n not in flagged), None)
         if seed is None:
             skipped.append(dict(frames=[start, end], reason='no unflagged pose track'))
@@ -88,9 +89,29 @@ def next_window(segment, start, pose_frames, flagged, length=LOOK['window_frames
         # shoulder-width arm, f369 fine): seed on the next frame that passes when one is this close.
         from image_lens import body_motion
         if not body_motion.skeleton_check(body_motion.largest(pose_frames[seed]))[0]:
+            original = seed
             seed = next((n for n in range(seed+1, min(end, seed+LOOK['seed_shift'])+1) if pose_frames.get(n) and n not in flagged
                          and body_motion.skeleton_check(body_motion.largest(pose_frames[n]))[0]), seed)
-        stop = min(end, seed+length-1)
+            # A later reliable observation can seed names forward, never backfill the weak prefix.
+            # Keep the old close-frame retry first; the extended search is solo/full-body only.
+            first = body_motion.largest(pose_frames[original])
+            if seed == original and frame_size is not None and len(pose_frames[original]) == 1 and body_motion.framing(first, *frame_size) == 'full':
+                identity = first['track_id']
+                context = [p for n in range(original, min(end,original+length-1)+1)
+                           for p in pose_frames.get(n,[]) if p['track_id'] == identity]
+                if not body_motion.chibi(context):
+                    old_stop = min(end,original+length-1)
+                    for n in range(original+1, min(old_stop-2,old_stop-min_frames+1,original+LOOK['seed_retry_frames'])+1):
+                        prefix = [pose_frames.get(f,[]) for f in range(original,n+3)]
+                        if any(len(ps) != 1 or ps[0]['track_id'] != identity or f in flagged
+                               for f,ps in zip(range(original,n+3),prefix)):
+                            break
+                        if all(body_motion.skeleton_check(pose_frames[f][0])[0]
+                               and body_motion.framing(pose_frames[f][0],*frame_size) == 'full' for f in (n,n+1,n+2)):
+                            seed = n; preserved_stop = old_stop
+                            skipped.append(dict(frames=[original,n-1],reason='untrusted body seed before stable same-ID full-body pose'))
+                            break
+        stop = preserved_stop if preserved_stop is not None else min(end, seed+length-1)
         if stop-seed+1 >= min_frames:
             return dict(seed=seed, end=stop), skipped
         skipped.append(dict(frames=[seed, stop], reason=f'fewer than {min_frames} frames after the seed'))
@@ -98,11 +119,11 @@ def next_window(segment, start, pose_frames, flagged, length=LOOK['window_frames
     return None, skipped
 
 
-def windows(segment, pose_frames, flagged, length=LOOK['window_frames'], min_frames=LOOK['min_frames']):
+def windows(segment, pose_frames, flagged, length=LOOK['window_frames'], min_frames=LOOK['min_frames'], frame_size=None):
     """Consecutive tracking windows inside one shot when nothing cuts them short."""
     result = []; skipped = []; start = segment['start_frame']
     while True:
-        window, more = next_window(segment, start, pose_frames, flagged, length, min_frames)
+        window, more = next_window(segment, start, pose_frames, flagged, length, min_frames, frame_size)
         skipped += more
         if window is None:
             return result, skipped
@@ -463,7 +484,7 @@ def _run(video, detector, pose_model, checkpoint, out, max_shots=LOOK['max_shots
             continue
         start = s0; i = 0
         while start <= s1:
-            w, skipped = next_window(segment, start, pose_frames, flagged)
+            w, skipped = next_window(segment, start, pose_frames, flagged, frame_size=(scan['width'],scan['height']))
             entry['skipped'] += skipped
             lines += [f"- 건너뜀 f{k['frames'][0]}..{k['frames'][1]}: {k['reason']}" + ('' if entry['windows'] else still(k)) for k in skipped]
             if w is None:
@@ -498,7 +519,7 @@ def _run(video, detector, pose_model, checkpoint, out, max_shots=LOOK['max_shots
             # a cut in this shot is queued behind them; the worker keeps their replies until they are taken.
             after = shown[order+1] if order+1 < len(shown) else None
             if not ahead and after and after['end_frame'] > after['start_frame'] and pose_for(after['end_frame'], wait=False) and remaining() >= 60:
-                first, _ = next_window(after, after['start_frame'], pose_frames, flagged)
+                first, _ = next_window(after, after['start_frame'], pose_frames, flagged, frame_size=(scan['width'],scan['height']))
                 if first:
                     try:
                         receipt_ahead = seed(after['segment_id'], first, 0)

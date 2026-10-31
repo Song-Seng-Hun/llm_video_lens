@@ -20,7 +20,7 @@
   ],
   "manifest_self_excluded": true,
   "file_count": 136,
-  "total_bytes": 1546163,
+  "total_bytes": 1552310,
   "files": [
     {
       "path": ".gitattributes",
@@ -84,8 +84,8 @@
     },
     {
       "path": "docs/look-notes.md",
-      "bytes": 49680,
-      "sha256": "db7834739457728e0b9899ebb9d31bfe809b2ae6b879dcd67e764efafd1375e1"
+      "bytes": 51449,
+      "sha256": "3e192742fd185b82d3e16b6696009cf4ad1bd8a53970e94c2713e82be73796f2"
     },
     {
       "path": "docs/provenance.md",
@@ -174,8 +174,8 @@
     },
     {
       "path": "image_lens/look.py",
-      "bytes": 37594,
-      "sha256": "fb4f57c34d8d1d7b68976ae459175d482ecda75ceb35e132ef4711779f7cd075"
+      "bytes": 39439,
+      "sha256": "97caa862215baa89eb9ec1839e46f734904b1edddceebb0aafe320900121e91c"
     },
     {
       "path": "image_lens/mark.py",
@@ -659,8 +659,8 @@
     },
     {
       "path": "tests/test_look.py",
-      "bytes": 12199,
-      "sha256": "2c448afa3e7ed95722fbb0c7c977ff360eeec847dddbc2791caafebca83a521c"
+      "bytes": 14732,
+      "sha256": "6fd75c92b35e01f198b69ebcbeb81c2236e5eaaabf0819a0c4471a0d107a068d"
     },
     {
       "path": "tests/test_mark.py",

@@ -46,6 +46,52 @@ class Windows(unittest.TestCase):
         self.assertEqual(look.windows(dict(start_frame=0, end_frame=99), poses, set())[0], [dict(seed=0, end=99)])
 
 
+    def retry(self, poses, flagged=None, end=99, frame_size=(1440,1200)):
+        return look.next_window(dict(start_frame=0,end_frame=end),0,poses,flagged or set(),frame_size=frame_size)
+
+    def test_delayed_solo_body_retry_uses_strict_pose_and_reports_prefix(self):
+        poses=self.frames(0,99)
+        for n in range(8):poses[n]=self.sleeve()
+        window,skipped=self.retry(poses)
+        self.assertEqual(window,dict(seed=8,end=99));self.assertEqual(skipped[0]['frames'],[0,7])
+
+    def test_extended_retry_preserves_next_valid_window_and_minimum_suffix(self):
+        poses=self.frames(0,319)
+        for n in list(range(8))+list(range(168,320)):poses[n]=self.sleeve()
+        windows,skipped=look.windows(dict(start_frame=0,end_frame=319),poses,set(),frame_size=(1440,1200))
+        self.assertEqual(windows,[dict(seed=8,end=159),dict(seed=160,end=319)])
+        self.assertEqual(skipped[0]['frames'],[0,7])
+        first,_=look.next_window(dict(start_frame=0,end_frame=319),0,poses,set(),length=12,frame_size=(1440,1200))
+        self.assertEqual(first,dict(seed=0,end=11))
+
+    def test_extended_retry_requires_full_single_id_native_support(self):
+        for case in ('foreign','crowd','gap','flag','onegood','weak','upper','chibi','late','short_tail','no_dimensions'):
+            poses=self.frames(0,99)
+            for n in range(8):poses[n]=self.sleeve()
+            flagged=set();end=99;size=(1440,1200)
+            if case=='foreign':
+                for n in range(8,100):poses[n][0]['track_id']='other'
+            elif case=='crowd':poses[4].append(track('other'))
+            elif case=='gap':poses.pop(4)
+            elif case=='flag':flagged.add(4)
+            elif case=='onegood':
+                for n in range(9,100):poses[n]=self.sleeve()
+            elif case=='weak':
+                for n in range(8,100):poses[n][0]['scores'][pose.BODY['wrist_l']]=.29
+            elif case=='upper':
+                for rows in poses.values():
+                    rows[0]['scores'][15]=rows[0]['scores'][16]=.1
+            elif case=='chibi':
+                for rows in poses.values():
+                    rows[0]['keypoints'][1][0]=480.;rows[0]['keypoints'][2][0]=120.
+            elif case=='late':
+                for n in range(13):poses[n]=self.sleeve()
+            elif case=='short_tail':end=18
+            elif case=='no_dimensions':size=None
+            with self.subTest(case=case):
+                self.assertEqual(self.retry(poses,flagged,end,size)[0],dict(seed=0,end=end))
+
+
 
 class Summary(unittest.TestCase):
     def test_no_observation_is_unknown_not_still(self):
@@ -142,7 +188,7 @@ class Ahead(unittest.TestCase):
                     track.append(('seed', arguments[arguments.index('--frame')+1]))
             out = Path(arguments[arguments.index('--out')+1]) if '--out' in arguments else None
             if command == 'scan':
-                out.write_text(json.dumps(dict(fps=10, source_frame_count=60, source_sha256='0', analysis_segments=segments)))
+                out.write_text(json.dumps(dict(fps=10, width=640, height=360, source_frame_count=60, source_sha256='0', analysis_segments=segments)))
             elif command == 'seed' and arguments[arguments.index('--frame')+1] == 40:
                 raise ValueError('no seed')
             if command == 'seed' and track is not None:
