@@ -70,22 +70,30 @@ It also makes pictures:
 
 ### Reading one line
 
-One line from the `look.md` of a live-action solo dance video (shortened with `…`). The output text is Korean.
+One line from the `look.md` of a live-action solo dance video, the span where the dancer lifts a knee (shortened with `…`). The output text is Korean.
 
 ```text
-- 2.16–3.40s f54..84 | 전신 | 정면(사람 왼쪽=화면 오른쪽) | 팔 자세: 왼팔 가슴 높이·오른팔 어깨 높이, 오른팔 몸 가운데 넘어감 → 왼팔 허리 아래·오른팔 가슴 높이, 오른팔 몸 가운데 넘어감 | 전체: 카메라 모름(3%만 맞춤), 몸 관측 끊김·기준점 변경, 전체 이동 모름 | 몸 기준: 왼다리(화면 오른쪽: 발목·무릎·허벅지) 오른쪽 65px → 오른쪽 위 44px → 위 27px, 몸 바깥으로; … | 손-몸: 두 손 모음 2.24–3.16s, 떨어짐; 오른손(화면 왼쪽)이 왼어깨(화면 오른쪽) 가까이 옴 2.40–3.08s, 떨어짐 | …
+- 15.44–16.32s f386..407 | 전신 | 정면(사람 왼쪽=화면 오른쪽) | 팔 자세: 왼팔 가슴 높이·오른팔 허리 아래 그대로 | 전체: 카메라 모름(5%만 맞춤), 몸 왼쪽 아래 33px(속도 2.5→2.2→1.6→1.4→0.8 px/f) | 몸 기준: 오른다리(화면 왼쪽: 발목·무릎·허벅지) 오른쪽 위 147px(속도 13.3→13.3→12.2→10.4→10.2 px/f, 앞선 동작은 모름) → 오른쪽 51px(속도 9.2→7.3→5.8→6 px/f), 몸 바깥으로; 왼다리(화면 오른쪽: 허벅지·발목·무릎) 위 74px(…), 몸 쪽으로; … | 높이별: 왼쪽 아래 33 / ? / 왼쪽 위 25 / 오른쪽 위 45 / 오른쪽 아래 14 (…) | 몸 돌림 후보(어깨 폭 크게 변함, 포즈가 튄 것일 수도; 그동안 어깨 높이는 안 씀): 15.44–15.88s | …
 ```
 
-- `2.16–3.40s f54..84`: time and source frame numbers, to trace back to the video.
+- `15.44–16.32s f386..407`: time and source frame numbers, to trace back to the video.
 - `전신` (full body), `정면(사람 왼쪽=화면 오른쪽)` (facing the camera, person's left = screen right): framing and facing. Left and right after this are the person's own; the brackets give the screen side.
-- `팔 자세` (arm posture): wrist height at the start and end of the span, and whether a wrist crossed the body's midline.
-- `전체` (whole): camera and body-centre movement. This video has a plain background, so the camera cannot be measured and is written as unknown (`모름`).
-- `몸 기준` (relative to the body): limb movement with the body centre removed, arrows in time order. Here the left leg goes out to the right, then up.
-- `손-몸` (hand-body): a hand near the other shoulder, or the two hands together. It is a distance on the screen, so read it as a touch candidate.
+- `팔 자세` (arm posture): wrist height at the start and end of the span; here it stays the same (`그대로`).
+- `전체` (whole): camera and body-centre movement. The background is plain, so the camera is unknown (`모름`); the body centre went 33 px down-left. Speeds that get smaller mean it slowed down.
+- `몸 기준` (relative to the body): limb movement with the body centre removed, arrows in time order. The right leg went 147 px up-right, then 51 px further right: the knee lift.
+- `높이별` (by height): movement of the person's box cut into 5 bands from top to bottom; `?` means that band could not be measured.
+- `몸 돌림 후보` (turn candidate): a place the tool itself marks as doubtful.
 
-<p align="center"><img src="../assets/example-onion.svg" width="560" alt="Illustration: a person facing the viewer, start pose in cyan and end pose in red overlaid; a yellow dotted trail from the left ankle goes out to the side and up, and a blue dotted trail from the right wrist goes to the left shoulder and down to chest height."></p>
+<p align="center"><img src="../assets/example-onion.jpg" width="420" alt="An onion picture made by look. On the left the start frame (cyan) and end frame (red) are overlaid; a yellow dotted trail follows the right leg from low up to knee height, and green arrows show movement by height. On the right is the middle frame f403 with the knee raised."></p>
 
-The picture is drawn to explain this line; it is not a video frame. Real onion pictures are drawn the same way on top of the video frames: cyan is the start, red the end, and the dotted trails are the parts in the order `몸 기준` lists them, yellow, magenta, blue… (one dot per frame, circle at the start, square at the end).
+The onion picture of the same span. The left side overlays the start (cyan) and the end (red). The dotted trails are the parts in the order `몸 기준` lists them: yellow (right leg), magenta (left leg), blue (left arm)… One dot is one frame, a circle the start, a square the end. Green arrows are the `높이별` movement. The right side is the middle frame most different from the start (f403).
+
+Video: Antoni Shkraba, ["Video of a Man Dancing"](https://www.pexels.com/video/video-of-a-man-dancing-7571381/), Pexels ([Pexels License](https://www.pexels.com/license/)). Seconds 0–20, scaled to 1280×674, then run through `look`.
+
+**Parts of it are still wrong.**
+- Even this line has an error. The frames of this span show no turn, yet it lists a turn candidate (the shoulder width probably changed as the leg came up). The left arm's speed is unknown.
+- Elsewhere in the same video, the right hand touching the cheek at 7–9 s is reported from 5.4 s. At 16.32–19.12 s skeleton trust is low, so the line gives only screen movement without limb names. Whether the camera is fixed cannot be told.
+- So read the text together with the pictures and "먼저 확인할 곳". Measurements are in the [look notes](look-notes.md).
 
 ### Ask about one span
 
