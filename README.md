@@ -109,6 +109,8 @@ python -m image_lens --workspace W at --look W/look-clip --span 18-22 --out W/at
 
 `grid`로 좌표 눈금을 그린 프레임을 보고, `mark`로 점을 찍어 추적합니다. 점은 최대 8개까지 찍을 수 있고, 이름은 ASCII로 붙입니다.
 
+점은 두 선이 만나는 모서리나 작은 무늬(눈, 단추)에 찍습니다. 곧은 선의 가운데나 단색 면에 찍으면 선을 따라가는 움직임을 놓칩니다. 결과 그림(`mark-onion.jpg`)에서 어니언의 진한 윤곽선은 많이 벌어졌는데 궤적이 짧으면 추적이 미끄러진 것이니, 그 점을 모서리에 다시 찍어 봅니다.
+
 ```bash
 python -m image_lens --workspace W grid --video V --frame 572 --box 100,250,1000,1000 --out W/grid-f572.jpg
 python -m image_lens --workspace W mark --video V --shots W/look/shots.json --frame 572 --end 599 --point hammer-stripe=430,680 --point eye=322,738 --checkpoint C --out W/mark-s19

@@ -109,6 +109,8 @@ python -m image_lens --workspace W at --look W/look-clip --span 18-22 --out W/at
 
 `grid` で座標の目盛りを描いたフレームを見て、`mark` で点を置いて追跡します。点は最大 8 個まで置け、名前は ASCII で付けます。
 
+点は 2 本の線が交わる角か、小さな模様（目、ボタン）に置きます。まっすぐな線の途中や単色の面に置くと、線に沿った動きを見落とします。結果の図（`mark-onion.jpg`）でオニオンの濃い輪郭線は大きく動いたのに軌跡が短ければ、追跡がずれています。その点を角に置き直して試します。
+
 ```bash
 python -m image_lens --workspace W grid --video V --frame 572 --box 100,250,1000,1000 --out W/grid-f572.jpg
 python -m image_lens --workspace W mark --video V --shots W/look/shots.json --frame 572 --end 599 --point hammer-stripe=430,680 --point eye=322,738 --checkpoint C --out W/mark-s19

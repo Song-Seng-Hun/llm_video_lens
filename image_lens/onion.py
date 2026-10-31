@@ -47,7 +47,8 @@ def trails(packets, points, seed, end, camera=None, limit=None):
 def bands(video, start, end, bbox, camera=None, image=None, trails=(), colors=None, named=False):
     """[{band, y, dx, dy, features}] of the median feature shift start->end per band, minus the camera shift.
     A band with too few surviving features gets dx=dy=None. Writes the onion image when `image` is a path, with
-    `trails` (see `trails`) drawn on it."""
+    `trails` (see `trails`) drawn on it and the end frame moved back by the camera shift, so the overlay and the
+    trails both leave the camera out."""
     import cv2
     import numpy as np
     from image_lens import frames
@@ -84,6 +85,8 @@ def bands(video, start, end, bbox, camera=None, image=None, trails=(), colors=No
         mx, my = np.median(d, 0)
         result.append(dict(band=name, y=[top, bottom], dx=round(float(mx)-cam[0], 1), dy=round(float(my)-cam[1], 1), features=int(len(d))))
     if image:
+        if camera:  # trails have the camera taken out; without this the overlay showed a pan as motion (anime clip f180..209)
+            last = cv2.warpAffine(last, np.float32([[1, 0, -cam[0]], [0, 1, -cam[1]]]), (w, h), borderMode=cv2.BORDER_REPLICATE)
         _image(cv2, np, first, last, (x0, y0, x1, y1), result, image, trails, colors, named)
     return result
 
@@ -145,10 +148,19 @@ def _image(cv2, np, first, last, box, result, path, trails=(), colors=None, name
                 cv2.circle(picture, p, start, color, line)
             if i == len(at)-1 or frames[i+1] != frames[i]+1:
                 cv2.rectangle(picture, (p[0]-end, p[1]-end), (p[0]+end, p[1]+end), color, line)
-        if named and at:  # mark: the agent's names, since its points have no fixed order to read colours by
-            size, t = .6*k, max(1, round(k)); (tw, th), _ = cv2.getTextSize(trail['point'], cv2.FONT_HERSHEY_SIMPLEX, size, t+3)
-            x = at[0][0]+start+2 if at[0][0]+start+2+tw <= picture.shape[1] else max(0, at[0][0]-start-2-tw)
-            outlined(cv2, picture, trail['point'], (x, max(th+2, at[0][1]-start)), size, t)
+    if named:  # mark: the agent's names, since its points have no fixed order to read colours by
+        firsts = [(t['point'], (int(round(t['xy'][0][1]-x0)), int(round(t['xy'][0][2]-y0))), c) for t, c in zip(trails, colors or TRAILS['colors']) if t['xy']]
+        taken = [(p[0]-start, p[1]-start, p[0]+start, p[1]+start) for _, p, _ in firsts]  # labels keep off every start mark
+        size, t = .6*k, max(1, round(k))
+        for name, p, color in firsts:
+            (tw, th), _ = cv2.getTextSize(name, cv2.FONT_HERSHEY_SIMPLEX, size, t+3)
+            x = p[0]+start+2 if p[0]+start+2+tw <= picture.shape[1] else max(0, p[0]-start-2-tw)
+            y = y_first = max(th+2, p[1]-start)
+            while any(x < r[2] and r[0] < x+tw and y-th < r[3] and r[1] < y for r in taken) and y < picture.shape[0]:
+                y += th+4  # two corners of one foot: stack the names
+            if y != y_first:  # moved away: a leader in the trail colour back to its point
+                cv2.line(picture, (min(max(p[0], x), x+tw), y-th//2), p, (0, 0, 0), t+3); cv2.line(picture, (min(max(p[0], x), x+tw), y-th//2), p, color, t+1)
+            taken.append((x, y-th, x+tw, y)); outlined(cv2, picture, name, (x, y), size, t)
     cv2.imwrite(str(path), picture)
 
 
@@ -347,7 +359,7 @@ def lines(result, image_name=None):
         return []
     out = ['- 높이별 흐름 (사람 상자 5등분, 카메라 뺌): ' + ' · '.join(parts)]
     if image_name:
-        out.append(f"  - 어니언 그림: {image_name} (청록=시작, 빨강=끝, 초록 화살표=띠별 이동 ×{ONION['arrow_scale']}(그림 밖으로 나가면 줄임, 머리보다 짧으면 생략); 오른쪽 회색=시작과 가장 다른 가운데 프레임; "
+        out.append(f"  - 어니언 그림: {image_name} (청록=시작, 빨강=끝(진한 윤곽선 기준; 배경보다 밝은 면은 띠 색이 반대(청록 띠=간 쪽); 카메라가 움직였으면 끝 프레임을 카메라만큼 되돌려 겹침), 초록 화살표=띠별 이동 ×{ONION['arrow_scale']}(그림 밖으로 나가면 줄임, 머리보다 짧으면 생략); 오른쪽 회색=시작과 가장 다른 가운데 프레임; "
                    f"색 점선=부위별 대표 점(몸 기준이 없으면 '화면'에 적힌 점)의 프레임마다 위치({'·'.join(TRAILS['names'])} 순, 카메라 뺌), 큰 원·네모=각 연속 관측의 시작·끝, 선 끊김=관측 누락, 이어진 점 간격이 좁으면 느림·넓으면 빠름)")
     return out
 

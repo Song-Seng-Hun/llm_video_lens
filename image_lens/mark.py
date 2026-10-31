@@ -6,7 +6,9 @@ import math
 import re
 from image_lens.frames import label as outlined
 
-MARK = dict(grid_px=100, zoom_grid_px=50, snap_radius_px=15, max_points=8, uncertainty_px=10., onion_margin_px=60)
+MARK = dict(grid_px=100, zoom_grid_px=50, snap_radius_px=15, max_points=8, uncertainty_px=10., onion_margin_px=60,
+            placing='Place each point on a corner where two outlines meet, or on a small spot (eye, button, pattern dot). '
+                    'Not mid-edge on a straight line or inside a flat fill, where a tracker cannot see motion along the edge.')
 
 
 def _frame(video, frame):
@@ -33,15 +35,21 @@ def grid(video, frame, out, box=None):
     crop = bgr[y0:y1, x0:x1].copy(); step = MARK['zoom_grid_px'] if box else MARK['grid_px']
     scale = max(1, round(900/max(x1-x0, y1-y0))) if box else 1
     crop = cv2.resize(crop, None, fx=scale, fy=scale, interpolation=cv2.INTER_NEAREST)
-    for x in range((x0//step+1)*step, x1, step):
-        cv2.line(crop, ((x-x0)*scale, 0), ((x-x0)*scale, crop.shape[0]), (0, 200, 255), 1)
-        outlined(cv2, crop, str(x), ((x-x0)*scale+2, 18), .5, 1)
-    for y in range((y0//step+1)*step, y1, step):
-        cv2.line(crop, (0, (y-y0)*scale), (crop.shape[1], (y-y0)*scale), (0, 200, 255), 1)
-        outlined(cv2, crop, str(y), (2, (y-y0)*scale-3), .5, 1)
+    # Lines every half step, numbers every step: 100 px cells were too coarse to put a point on a corner by eye, and
+    # numbers on every line would overlap.
+    half = step//2
+    for x in range((x0//half+1)*half, x1, half):
+        cv2.line(crop, ((x-x0)*scale, 0), ((x-x0)*scale, crop.shape[0]), (0, 200, 255), 1 if x % step else 2)
+        if x % step == 0:
+            outlined(cv2, crop, str(x), ((x-x0)*scale+2, 18), .5, 1)
+    for y in range((y0//half+1)*half, y1, half):
+        cv2.line(crop, (0, (y-y0)*scale), (crop.shape[1], (y-y0)*scale), (0, 200, 255), 1 if y % step else 2)
+        if y % step == 0:
+            outlined(cv2, crop, str(y), (2, (y-y0)*scale-3), .5, 1)
     target = paths.confined(out, new=True)
     cv2.imwrite(str(target), crop)
-    return dict(status='written', output=str(target), frame=frame, box=[x0, y0, x1, y1], grid_px=step, zoom=scale)
+    return dict(status='written', output=str(target), frame=frame, box=[x0, y0, x1, y1], grid_px=half, label_px=step, zoom=scale,
+                note=MARK['placing'])
 
 
 def parse_point(text):
@@ -124,8 +132,9 @@ def run(video, shots, frame, points, checkpoint, out, end=None, snap_points=True
     moving = cam if cam and math.hypot(*cam) >= motion_report.STROKE['major_min_px'] else None
     onion_image = _onion(source, frame, stop, [n for n, _ in parsed], tracks, moving, frame_motion if moving else None, root/'mark-onion.jpg')
     if onion_image:
-        text.append(f"- 어니언 그림: {onion_image} (청록=f{frame}, 빨강=f{stop}, 색 점선=찍은 점의 프레임마다 위치(이름표=점 이름, 카메라 뺌), "
+        text.append(f"- 어니언 그림: {onion_image} (청록=f{frame}, 빨강=f{stop}(진한 윤곽선 기준; 배경보다 밝은 면은 띠 색이 반대(청록 띠=간 쪽); 카메라가 움직였으면 끝 프레임을 카메라만큼 되돌려 겹침), 색 점선=찍은 점의 프레임마다 위치(이름표=점 이름, 카메라 뺌), "
                     '큰 원·네모=각 연속 관측의 시작·끝, 선 끊김=관측 누락, 이어진 점 간격이 좁으면 느림·넓으면 빠름; 오른쪽 회색=시작과 가장 다른 가운데 프레임)')
+        text.append(f"  - {SLIP}")
     lines, summary = look._summary(report, dict(seed=frame, end=stop), 'marked', 'mark.report.md', 'mark-traj/trajectory.png', frame_motion)
     text += lines or ['- 찍은 점: 큰 이동 없음']
     text += ['', '## 점별 전체 움직임 (멈춤 제외, 완급 포함)'] + _all_moves(report)
@@ -133,6 +142,10 @@ def run(video, shots, frame, points, checkpoint, out, end=None, snap_points=True
     paths.write_json(root/'mark.json', dict(schema='image-lens.mark/1', source_video=str(source), frames=[frame, stop], points=placed,
                                             camera=cam, summary=summary))
     return dict(status='written', output=str(output), points=len(placed), frames=[frame, stop])
+
+
+SLIP = ('궤적 의심: 어니언에서 그 부위의 청록·빨강 윤곽선이 벌어진 만큼 궤적이 따라가지 않으면(짧거나 다른 방향) 추적이 미끄러진 것으로 본다'
+        '(어니언과 궤적 모두 카메라를 뺐다). 그 점은 가까운 모서리에 다시 찍어 본다.')
 
 
 # Two more colours than look's six, for mark's eight points: brown and light blue (BGR), still not cyan, red or green.
