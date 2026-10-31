@@ -9,9 +9,9 @@
   <array>
     <string>/usr/bin/python3</string>
     <string>-I</string>
-    <string>/Users/songseunghun/tools/image-lens/api/server.py</string>
+    <string>/Users/YOU/tools/image-lens/api/server.py</string>
     <string>--config</string>
-    <string>/Users/songseunghun/.image-lens/api.json</string>
+    <string>/Users/YOU/.image-lens/api.json</string>
   </array>
   <key>RunAtLoad</key>
   <true/>
@@ -25,8 +25,8 @@
   <key>WorkingDirectory</key>
   <string>/</string>
   <key>StandardOutPath</key>
-  <string>/Users/songseunghun/AI-Look/launchd.out</string>
+  <string>/Users/YOU/AI-Look/launchd.out</string>
   <key>StandardErrorPath</key>
-  <string>/Users/songseunghun/AI-Look/launchd.err</string>
+  <string>/Users/YOU/AI-Look/launchd.err</string>
 </dict>
 </plist>

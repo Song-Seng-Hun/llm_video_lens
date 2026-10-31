@@ -54,12 +54,12 @@ Do these only after approving an always-on listener (RunAtLoad + KeepAlive, en0/
    ```
 2. Write the config: `mkdir -p ~/.image-lens ~/AI-Look && chmod 700 ~/.image-lens ~/AI-Look` (launchd writes its
    output files into `~/AI-Look`), copy `api.example.json` to
-   `~/.image-lens/api.json`, `chmod 600` it, and fill in `python` and the three model paths (the values in the
+   `~/.image-lens/api.json`, `chmod 600` it, replace `/Users/YOU` with your home folder, and fill in `python` and the three model paths (the values in the
    workspace `models.json`). It points at the Music Lens certificate and client keys; nothing new is created.
 3. Firewall: `/usr/bin/python3` is already allowed for Music Lens; nothing to add.
 4. Load the LaunchAgent:
    ```sh
-   cp ~/dev/llm_image_lens/lan/com.image-lens.lan-api.plist.template ~/Library/LaunchAgents/com.image-lens.lan-api.plist
+   sed "s|/Users/YOU|$HOME|g" ~/dev/llm_image_lens/lan/com.image-lens.lan-api.plist.template > ~/Library/LaunchAgents/com.image-lens.lan-api.plist
    launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/com.image-lens.lan-api.plist
    ```
    Unload: `launchctl bootout gui/$(id -u)/com.image-lens.lan-api`.

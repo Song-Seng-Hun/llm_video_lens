@@ -3,14 +3,14 @@
   "port": 8766,
   "allow": "192.0.2.0/24",
   "clients": {
-    "claude-window": "/Users/songseunghun/.music-lens/keys/claude-window.key",
-    "codex-window": "/Users/songseunghun/.music-lens/keys/codex-window.key"
+    "claude-window": "/Users/YOU/.music-lens/keys/claude-window.key",
+    "codex-window": "/Users/YOU/.music-lens/keys/codex-window.key"
   },
-  "cert": "/Users/songseunghun/.music-lens/tls/server.pem",
-  "key": "/Users/songseunghun/.music-lens/tls/server.key",
-  "root": "/Users/songseunghun/AI-Look",
+  "cert": "/Users/YOU/.music-lens/tls/server.pem",
+  "key": "/Users/YOU/.music-lens/tls/server.key",
+  "root": "/Users/YOU/AI-Look",
   "python": "/path/to/runtime/bin/python",
-  "repo": "/Users/songseunghun/tools/image-lens/app",
+  "repo": "/Users/YOU/tools/image-lens/app",
   "detector": "/path/to/yolox_humanart.onnx",
   "pose_model": "/path/to/rtmw133.onnx",
   "checkpoint": "/path/to/scaled_offline.pth"
