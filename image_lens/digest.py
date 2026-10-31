@@ -36,6 +36,26 @@ def _named(item, noun, facing=None):
     return f"{word}{noun}" + (f"({screen})" if screen else '')
 
 
+def arm_words(pose):
+    """'왼팔 어깨 위·오른팔 허리 아래, 오른팔 몸 가운데 넘어감' for one body_motion.arm_poses entry; sides are the
+    dancer's own (the window line says which way the dancer faces). '' when neither wrist was seen."""
+    if not pose:
+        return ''
+    l, r = pose.get('l'), pose.get('r')
+    if l and l == r:
+        out = '양팔 ' + body_motion.ARM_KO[l]
+    else:
+        out = '·'.join(f"{word}팔 {body_motion.ARM_KO[h]}" for word, h in (('왼', l), ('오른', r)) if h)
+    if not out:
+        return ''
+    cross = pose.get('cross') or []
+    if len(cross) == 2:
+        out += ', 두 팔 엇갈림'
+    elif cross:
+        out += f", {'왼' if cross[0] == 'l' else '오른'}팔 몸 가운데 넘어감"
+    return out
+
+
 def _speed(stroke):
     """Per-frame speed of a stroke; from the window's first frame its start is cut off (the window begins where the
     drawing changes, clip A f47: 40 px in two frames), so that is said too."""
@@ -181,6 +201,12 @@ def window_line(done, fps, first=None):
     if done.get('facing'):
         # Also where the text names no limbs (low skeleton trust): a reader looking at the pictures mirrored the dancer.
         fields.append('정면(사람 왼쪽=화면 오른쪽)' if done['facing'] == 'front' else '뒤돎(사람 왼쪽=화면 왼쪽)')
+    # Arm posture at the start, and at the end unless the step lines below say it.
+    words = [arm_words(a) or '모름' for a in done.get('arms') or []]
+    if done.get('phases') or len(words) == 1:
+        words = words[:1]
+    if words and set(words) != {'모름'}:
+        fields.append('팔 자세: ' + (f"{words[0]} 그대로" if len(words) == 2 and words[0] == words[1] else ' → '.join(words)))
     camera_text = camera(done.get('camera'), fps)
     if first is not None:
         fw = first['window']
@@ -277,11 +303,14 @@ def phase_lines(done, fps):
     """Indented lines under a window: its 1-2 s steps (body_motion.phases), so a reader sees the moves the window's
     first-to-last line and onion lose."""
     out = []; steps = done.get('phases') or []
+    ends = {e['frame']: e for e in (done.get('arms') or [])[1:]}
     for p in steps:
         a, b = p['frames']; b += p is steps[-1]  # the last step ends after its frame, like the window
         said = [f"{_named(m, body_motion.PHASE_KO[m['part']], done.get('facing'))} {_dir(m['direction'])} {m['amount']:.1f}"
                 + (f"(최대 {m['back']:.1f} 갔다 돌아옴)" if m['back'] else '') for m in p['moved'][:body_motion.PHASES['parts']]]
-        out.append(f"  - {a/fps:.2f}–{b/fps:.2f}s: " + ('; '.join(said) if said else '팔다리 거의 그대로'))
+        pose = arm_words(ends.get(p['frames'][1]))
+        out.append(f"  - {a/fps:.2f}–{b/fps:.2f}s: " + ('; '.join(said) if said else '팔다리 거의 그대로')
+                   + (f" | 끝 팔: {pose}" if pose else ''))
     return out
 
 def events(found, fps, facing=None):
@@ -295,6 +324,12 @@ def events(found, fps, facing=None):
             + f" {e['frames'][0]/fps:.2f}–{(e['frames'][1]+1)/fps:.2f}s" + (', 떨어짐' if e.get('exits', True) else ', 끝까지') for e in found['hand_face']]
     if near:
         out.append('손-얼굴: ' + '; '.join(near[:DIGEST['parts']]) + (f" (+{len(near)-DIGEST['parts']})" if len(near) > DIGEST['parts'] else ''))
+    touch = [(f"{_named(e, '손', facing)}이 {_named(dict(body='r' if e['body'] == 'l' else 'l', side=e['to_side']), '어깨', facing)}"
+              if e['to'] == 'shoulder' else '두 손') + (' 가까이 옴' if e['to'] == 'shoulder' else ' 모음')
+             + ('' if e.get('enters', True) else '(처음부터)') + f" {e['frames'][0]/fps:.2f}–{(e['frames'][1]+1)/fps:.2f}s"
+             + (', 떨어짐' if e.get('exits', True) else ', 끝까지') for e in found.get('hand_body', [])]
+    if touch:
+        out.append('손-몸: ' + '; '.join(touch[:DIGEST['parts']]) + (f" (+{len(touch)-DIGEST['parts']})" if len(touch) > DIGEST['parts'] else ''))
     moves = {}
     for e in found['shoulders']:
         moves.setdefault(_named(e, '어깨', facing), []).append(('올라감' if e['rise'] else '내려감') + f" {e['amount']:.2f}({e['frames'][0]/fps:.2f}s)")
@@ -374,7 +409,9 @@ def markdown(record, scan, full_name):
            '"카메라 모름"이면 화면 이동에 카메라 움직임이 섞였을 수 있다. '
            '어깨는 엉덩이(없으면 눈) 기준 높이 변화, 숫자는 어깨 폭 단위. 어깨 폭은 눈 사이 거리 기준: 넓어짐=가슴 폄·카메라 쪽으로 돎, 좁아짐=웅크림·옆으로 돎. 시간 다음 칸은 구도(전신/무릎 위/상반신/얼굴 클로즈업, 포즈 관절이 화면 안에 있는지로 판단): 상반신·클로즈업이면 사람 상자가 화면 아래에서 잘려서 '
            '높이별 아래 칸은 다리가 아니라 가슴·손이나 얼굴 아래쪽이고, "(팔만)"은 엉덩이 없이 어깨로 팔만 이름 붙였다는 뜻. '
-           '들여 쓴 "- 1.20–2.80s:" 줄은 2초 넘는 구간을 가장 멈춘 프레임에서 1~2초 단계로 나눈 것: 단계 처음→끝 팔다리 끝점의 몸 기준 이동(어깨 가운데 기준, 숫자는 몸통 길이 단위: 어깨~엉덩이), "갔다 돌아옴"은 단계 안에서 멀리 갔다가 돌아온 점(괄호 안이 가장 멀리 간 거리).',
+           '들여 쓴 "- 1.20–2.80s:" 줄은 2초 넘는 구간을 가장 멈춘 프레임에서 1~2초 단계로 나눈 것: 단계 처음→끝 팔다리 끝점의 몸 기준 이동(어깨 가운데 기준, 숫자는 몸통 길이 단위: 어깨~엉덩이), "갔다 돌아옴"은 단계 안에서 멀리 갔다가 돌아온 점(괄호 안이 가장 멀리 간 거리). '
+           '"팔 자세"(구간 처음→끝)·"끝 팔"(단계 끝)은 그 순간 손목 높이(어깨 위/어깨 높이/가슴 높이/허리 아래)와 손목이 몸 가운데선을 넘었는지. '
+           '"손-몸"은 손이 반대 어깨 가까이 오거나 두 손이 모인 구간(화면 위 거리라 닿음 후보).',
            f"자세히: `image_lens focus --look <이 폴더> --shot <shot-id>` (또는 {full_name}). 점 이름·부위는 미검증, 수치는 원본 비교 전 후보.", '']
     if record.get('joint_tracking'):
         out.insert(3, '몸 관절 좌표는 pose·추적 혼합 추정(보임·관절 정답 미검증). 속도·완급은 연속된 원시 점 추적에서만 계산. *.raw-tracks.json은 원시 결과, *.tracks.json은 선택된 좌표. SD·골격 불명은 이름 없는 표면점 경로.')

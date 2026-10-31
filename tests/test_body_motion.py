@@ -253,6 +253,30 @@ class Phases(unittest.TestCase):
         turned = {**self.BODY, 11: self.BODY[12], 12: self.BODY[11]}
         self.assertNotEqual(body_motion.facing(self.frames(lambda f: turned, 60), dict(seed=0, end=59)), straight)
 
+    def test_hand_on_the_other_shoulder_and_hands_together(self):
+        def joints(f):
+            j = dict(self.BODY)
+            if 20 <= f <= 40:
+                j[10] = (570, 410)  # right wrist on the left shoulder (5)
+            if 50 <= f <= 60:
+                j[9], j[10] = (630, 500), (650, 500)
+            return j
+        found = body_motion.pose_events(self.frames(joints, 80), dict(seed=0, end=79), 25)
+        self.assertEqual([(e['to'], e.get('body'), e['frames']) for e in found['hand_body']],
+                         [('shoulder', 'r', [20, 40]), ('hands', None, [50, 60])])
+
+    def test_arm_poses_say_height_and_crossing(self):
+        raised = {**self.BODY, 9: (540, 280), 10: (600, 620)}  # left wrist above the shoulders; right past the midline
+        frames = {**self.frames(lambda f: self.BODY, 30), 20: self.frames(lambda f: raised, 1)[0]}
+        start, end = body_motion.arm_poses(frames, dict(seed=0, end=29), [0, 20])
+        self.assertEqual((start['l'], start['r'], start['cross']), ('down', 'down', []))
+        self.assertEqual((end['l'], end['r'], end['cross']), ('up', 'down', ['r']))
+        from image_lens import digest
+        self.assertEqual(digest.arm_words(end), '왼팔 어깨 위·오른팔 허리 아래, 오른팔 몸 가운데 넘어감')
+        self.assertEqual(digest.arm_words(start), '양팔 허리 아래')
+        level, = body_motion.arm_poses(self.frames(lambda f: {**self.BODY, 9: (540, 410)}, 5), dict(seed=0, end=4), [0])
+        self.assertEqual(level['l'], 'level')  # a wrist at the shoulder line is a raised arm, not chest height
+
 if __name__ == '__main__': unittest.main()
 
 
