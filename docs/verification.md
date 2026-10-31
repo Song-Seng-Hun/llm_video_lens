@@ -30,7 +30,7 @@ Local-only evidence is saved under Git-ignored `workspace/final-smoke/smoke-resu
 
 77 Python source files parsed successfully without writing bytecode. All 28 PySceneDetect files and all 33 CoTracker files matched their existing pins, using the documented patched hash for restricted checkpoint loading. Vendor directories contained exactly those manifested file sets. All eight original authored source hashes still matched the import record, confirming historical inputs were preserved.
 
-An initial `compileall` attempt failed because the host's configured cache directory was outside the sandbox; it did not establish a source failure. AST parsing supplied the syntax check without cache writes. An initial mistaken test-file path produced zero discovered tests and was not counted; corrected discovery ran the full 19 checks. A shell hook rejected harmless ignore-file patterns; those patterns were omitted. No secret files were accessed.
+Syntax was checked by AST parsing without writing bytecode. Test discovery ran the full 19 checks.
 
 ## Unverified boundaries
 

@@ -427,7 +427,7 @@ SKELETON = dict(min_score=.30, mean_min=.45, torso=(1., 2.6), hip_width=(.45, 1.
 # both ankles are confident. Pose models trained on human proportions miss even the shoulders and hips there (chibi
 # 3D clip, 15 hand-clicked frames: trunk 6-7 of 26 within a quarter of the body scale, left/right flipped on one;
 # cutting or squashing the head in the input did not help). Window medians: chibi clip .45-.50 on 9 of 10 windows;
-# 3D, live-action, kaguya and seedance clips <= .08; clip B (flat graphic, big heads) <= .32.
+# 3D, live-action, anime and AI-generated clips <= .08; clip B (flat graphic, big heads) <= .32.
 CHIBI = dict(min_score=.5, min_frames=3, ratio=.38)
 
 
