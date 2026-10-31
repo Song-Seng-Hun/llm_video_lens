@@ -279,3 +279,9 @@ Pose confidence is uncalibrated. A pose-selected coordinate agreeing with that s
 - `grid` draws lines every 50 px (25 px in a zoom box), numbers every other line, so a corner can be read by eye. Its output and the guide say to place points on corners or small spots, not mid-edge or on flat fills.
 - In `mark-onion.jpg`, names keep off every start mark and each other; a name moved away gets a line in its trail colour to the point.
 - Not changed: numbers, windows, seeds, look.md text other than the legend and reading lines.
+
+## Step lines say their threshold (2026-11-01)
+
+- Live2D wave clip (4 s, upper-body framing, three elbow waves): the window line gave the left arm 88 → 141 → 134 px back and forth, while all three 1-2 s step lines said "팔다리 거의 그대로". The step lines only report a limb that moved at least 0.35 torso lengths (`PHASES['move']`); with a 458 px torso the wave was 0.31 (tracked) or about 0.2 (pose wrist on the drawn hand).
+- Tried, not kept: steps from the tracked joints instead of the pose joints. The wave stayed under the threshold, and on the dancer clip 5.5–6.8 s the pose wrist moved 1.5 torso lengths where the tracker lost the wrist, so a real move turned into "still" (dancer step lines with no move: 0 → 1 of 8).
+- The empty step now reads "팔다리 큰 이동 없음(몸통 길이 0.35배 미만)", so it no longer contradicts the window line's smaller moves. Threshold and numbers unchanged.

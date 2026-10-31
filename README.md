@@ -30,7 +30,7 @@ LLM Video Lens는 이를 돕는 보조 도구입니다. 프레임 사이의 움�
 
 ## 빠른 시작
 
-1. Python 3.11 이상에서 의존성을 설치합니다. `look`은 자세 추정과 점 추적을 함께 쓰므로 두 묶음이 모두 필요합니다.
+1. macOS(Apple Silicon)의 Python 3.12에서 만들고 검증했습니다. Windows에서는 검증하지 않았습니다. Python 3.11 이상에서 의존성을 설치합니다. `look`은 자세 추정과 점 추적을 함께 쓰므로 두 묶음이 모두 필요합니다.
 
    ```sh
    pip install -r requirements/pose.txt -r requirements/tracking.txt
