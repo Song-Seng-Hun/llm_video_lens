@@ -372,6 +372,8 @@ def _run(video, detector, pose_model, checkpoint, out, max_shots=LOOK['max_shots
                                                timing_packets=raw_packets)
             slot += ['  '+l for l in body_motion.lines(done['body'])]
         done['events'] = body_motion.pose_events(pose_frames, dict(w, end=end), fps)
+        done['phases'] = body_motion.phases(pose_frames, dict(w, end=end), fps)
+        done['facing'] = body_motion.facing(pose_frames, dict(w, end=end))
         done['people'] = body_motion.people(pose_frames, dict(w, end=end), fps, cam)
         if len(done['people']['people']) > 1:
             from image_lens import onion

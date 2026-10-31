@@ -19,6 +19,23 @@ def _side(side):
     return '왼' if side == '화면 왼쪽' else '오른'
 
 
+def _who(item, facing=None):
+    """(word, screen) for a sided item: the dancer's own side from the pose model's joint name ('왼'/'오른') and the
+    screen side it is on, from the window's facing (body_motion.facing) or, when that is unknown, where it was measured.
+    Items without a model side (unnamed points, older records) keep the screen side alone. Screen-side names made a
+    fresh reader of a front-facing dancer swap left and right in about half its limb statements."""
+    body = item.get('body')
+    if body not in ('l', 'r'):
+        return _side(item['side']), None
+    screen = item['side'] if facing is None else '화면 오른쪽' if (body == 'l') == (facing == 'front') else '화면 왼쪽'
+    return ('왼' if body == 'l' else '오른'), screen
+
+
+def _named(item, noun, facing=None):
+    word, screen = _who(item, facing)
+    return f"{word}{noun}" + (f"({screen})" if screen else '')
+
+
 def _speed(stroke):
     """Per-frame speed of a stroke; from the window's first frame its start is cut off (the window begins where the
     drawing changes, clip A f47: 40 px in two frames), so that is said too."""
@@ -31,7 +48,7 @@ def _speed(stroke):
     return f"({text}" + (', 앞선 동작은 모름)' if stroke.get('from_start') else ')')
 
 
-def limbs(body):
+def limbs(body, facing=None):
     """Body-relative limb points merged into one statement per part: one screen-side arm or leg, or one unnamed move
     point. The lead is the point that travelled farthest (back-and-forth included), and only its strokes and timing are
     written: in the ease check a small-motion point set the label. Largest first."""
@@ -39,8 +56,9 @@ def limbs(body):
     for limb in body.get('limbs', []):
         part = limb['part']
         kind = '팔' if part in ARM else '다리' if part in LEG else None
-        key = (_side(limb['side']) + kind) if kind else part.replace('많이 움직인 곳', '움직인 점')
-        groups.setdefault(key, dict(key=key, kind=kind, parts=[], limbs=[]))
+        word, screen = _who(limb, facing)
+        key = (word + kind) if kind else part.replace('많이 움직인 곳', '움직인 점')
+        groups.setdefault(key, dict(key=key, kind=kind, screen=screen, parts=[], limbs=[]))
         groups[key]['parts'].append(part); groups[key]['limbs'].append(limb)
     out = []
     for g in groups.values():
@@ -49,7 +67,7 @@ def limbs(body):
         path = ''.join(('' if not i else ' → ' if s.get('run') == lead['strokes'][i-1].get('run') else ' / 관측 끊김 / ')
                        + f"{_dir(s['direction'])} {s['distance_px']:.0f}px{_speed(s)}" for i, s in enumerate(lead['strokes']))
         names = '·'.join(dict.fromkeys(p.replace(' 끝', '') for p in [lead['part']]+g['parts']))
-        label = f"{g['key']}({names})" if g['kind'] else g['key']
+        label = f"{g['key']}({g['screen']+': ' if g['screen'] else ''}{names})" if g['kind'] else g['key']
         axis = '' if not lead['axis_px'] else f", 몸 {'바깥' if lead['axis_px'] > 0 else '쪽'}으로"
         out.append(dict(key=g['key'], direction=first['direction'], distance=first['distance_px'], label=label,
                         point=lead['point_id'], text=f"{label} {path}{axis}"))
@@ -160,6 +178,9 @@ def window_line(done, fps, first=None):
     fields = [f"{w['seed']/fps:.2f}–{(end+1)/fps:.2f}s f{w['seed']}..{end}"]
     if done.get('framing'):
         fields.append(body_motion.FRAMING_KO[done['framing']] + (' (팔만)' if done.get('scope') == 'upper' else ''))
+    if done.get('facing'):
+        # Also where the text names no limbs (low skeleton trust): a reader looking at the pictures mirrored the dancer.
+        fields.append('정면(사람 왼쪽=화면 오른쪽)' if done['facing'] == 'front' else '뒤돎(사람 왼쪽=화면 왼쪽)')
     camera_text = camera(done.get('camera'), fps)
     if first is not None:
         fw = first['window']
@@ -180,7 +201,7 @@ def window_line(done, fps, first=None):
         if whole:
             fields.append('전체: ' + ', '.join(whole))
         if body:
-            found = limbs(body)
+            found = limbs(body, done.get('facing'))
             if found:
                 shown = [f['text'] for f in found[:DIGEST['parts']]]
                 fields.append('몸 기준: ' + '; '.join(shown) + (f" (+{len(found)-DIGEST['parts']})" if len(found) > DIGEST['parts'] else ''))
@@ -208,7 +229,7 @@ def window_line(done, fps, first=None):
         flow = _bands(done.get('bands'))
         if flow:
             fields.append('높이별: ' + flow)
-    fields += events(done.get('events'), fps)
+    fields += events(done.get('events'), fps, done.get('facing'))
     fields += people(done.get('people'), fps)
     notes = []
     geometry = done.get('body_geometry')
@@ -227,14 +248,16 @@ def window_line(done, fps, first=None):
         notes.append('일부 관측 끊김·짧은 관측: 그 사이 동작 모름')
     if first is not None and body and body.get('centre_shift') is None:
         notes.append('몸 전체 이동 모름')
+    if done.get('facing') == 'back':
+        notes.append('뒤돈 자세(엉덩이로 판단): 팔다리 왼/오른은 모델 추정, 틀리기 쉬움')
     if done.get('chibi'):
         notes.append('SD 체형: 팔다리 이름 안 붙임')
     elif not done.get('skeleton', True):
         notes.append('골격 신뢰 낮음')
-    hidden = [f"{_side(u['side'])}{u['kind']}" for u in (done.get('body') or {}).get('unknown', [])]
+    hidden = [_named(u, u['kind'], done.get('facing')) for u in (done.get('body') or {}).get('unknown', [])]
     if hidden:
         notes.append('·'.join(hidden) + ' 대부분 가려져 모름')
-    unsure = [f"{_side(u['side'])}{u['part']}" for u in (done.get('body') or {}).get('uncertain', [])]
+    unsure = [_named(u, u['part'], done.get('facing')) for u in (done.get('body') or {}).get('uncertain', [])]
     if unsure:
         notes.append('·'.join(unsure) + ' 불확실(자세·추적 어긋남)')
     lost = [g for g in done.get('groups', []) if g.get('lost')]
@@ -250,22 +273,33 @@ def window_line(done, fps, first=None):
     return '- ' + ' | '.join(fields)
 
 
-def events(found, fps):
+def phase_lines(done, fps):
+    """Indented lines under a window: its 1-2 s steps (body_motion.phases), so a reader sees the moves the window's
+    first-to-last line and onion lose."""
+    out = []; steps = done.get('phases') or []
+    for p in steps:
+        a, b = p['frames']; b += p is steps[-1]  # the last step ends after its frame, like the window
+        said = [f"{_named(m, body_motion.PHASE_KO[m['part']], done.get('facing'))} {_dir(m['direction'])} {m['amount']:.1f}"
+                + (f"(최대 {m['back']:.1f} 갔다 돌아옴)" if m['back'] else '') for m in p['moved'][:body_motion.PHASES['parts']]]
+        out.append(f"  - {a/fps:.2f}–{b/fps:.2f}s: " + ('; '.join(said) if said else '팔다리 거의 그대로'))
+    return out
+
+def events(found, fps, facing=None):
     """Fields from the per-frame pose: hand near the face, each shoulder's rises and falls, shoulder-width changes, and
     hands mostly unseen. A limb below the stroke threshold is not still when its hand was out of view (clip B 13 s:
     hands spreading off the bottom edge read as "정지")."""
     if not found:
         return []
     out = []
-    near = [f"{_side(e['side'])}손이 얼굴({e['region']}) " + ('가까이 옴' if e.get('enters', True) else '처음부터 가까이')
+    near = [f"{_named(e, '손', facing)}이 얼굴({e['region']}) " + ('가까이 옴' if e.get('enters', True) else '처음부터 가까이')
             + f" {e['frames'][0]/fps:.2f}–{(e['frames'][1]+1)/fps:.2f}s" + (', 떨어짐' if e.get('exits', True) else ', 끝까지') for e in found['hand_face']]
     if near:
         out.append('손-얼굴: ' + '; '.join(near[:DIGEST['parts']]) + (f" (+{len(near)-DIGEST['parts']})" if len(near) > DIGEST['parts'] else ''))
     moves = {}
     for e in found['shoulders']:
-        moves.setdefault(e['side'], []).append(('올라감' if e['rise'] else '내려감') + f" {e['amount']:.2f}({e['frames'][0]/fps:.2f}s)")
+        moves.setdefault(_named(e, '어깨', facing), []).append(('올라감' if e['rise'] else '내려감') + f" {e['amount']:.2f}({e['frames'][0]/fps:.2f}s)")
     if moves:
-        out.append('어깨: ' + '; '.join(f"{_side(side)}어깨 " + ' → '.join(m[:DIGEST['parts']]) for side, m in sorted(moves.items())))
+        out.append('어깨: ' + '; '.join(f"{name} " + ' → '.join(m[:DIGEST['parts']]) for name, m in sorted(moves.items())))
     if found.get('turns'):
         out.append('몸 돌림 후보(어깨 폭 크게 변함, 포즈가 튄 것일 수도; 그동안 어깨 높이는 안 씀): '
                    + ', '.join(f"{a/fps:.2f}–{(b+1)/fps:.2f}s" for a, b in found['turns'][:DIGEST['parts']]))
@@ -274,9 +308,13 @@ def events(found, fps):
                                            for e in found['width'][:DIGEST['parts']]))
     if found.get('lost_frames', 0) >= max(3, round(.1*fps)):
         out.append(f"처음 사람의 포즈 추적이 {found['lost_frames']}프레임 끊김: 그동안 모름")
-    hidden = [_side(side) for side, share in sorted(found['hands_seen'].items()) if share < body_motion.EVENTS['hands_seen']]
+    if 'hands_body' in found:
+        hidden = [_named(dict(body=b), '손', facing) if facing else ('왼' if b == 'l' else '오른')+'손'
+                  for b, share in sorted(found['hands_body'].items()) if share < body_motion.EVENTS['hands_seen']]
+    else:
+        hidden = [_side(side)+'손' for side, share in sorted(found['hands_seen'].items()) if share < body_motion.EVENTS['hands_seen']]
     if hidden:
-        out.append(f"{'·'.join(hidden)}손 대부분 안 보임: 멈춤 아님, 모름")
+        out.append(f"{'·'.join(hidden)} 대부분 안 보임: 멈춤 아님, 모름")
     return out
 
 
@@ -305,7 +343,7 @@ def people(found, fps):
     return out
 
 
-def bridge_line(bridge):
+def bridge_line(bridge, facing=None):
     if not bridge or not bridge['limbs']:
         return None
     a, b = bridge['frames']
@@ -316,7 +354,7 @@ def bridge_line(bridge):
         largest.setdefault(l['side'], l)
     shown = sorted(largest.values(), key=lambda l: -l['distance_px'])
     return (f"- 전환 f{a}→f{b} (앞뒤 자세 차이, 사이 경로 모름): "
-            + '; '.join(f"{_side(l['side'])}{l['part']} {_dir(l['direction'])} {l['distance_px']:.0f}px" for l in shown))
+            + '; '.join(f"{_named(l, l['part'], facing)} {_dir(l['direction'])} {l['distance_px']:.0f}px" for l in shown))
 
 
 def markdown(record, scan, full_name):
@@ -327,19 +365,24 @@ def markdown(record, scan, full_name):
     out = ['# 영상 움직임 요약', '',
            f"영상 {record['source_video'].rsplit('/', 1)[-1]}: {total}프레임, {fps:g}fps, 장면 {len(record['shots'])}개. "
            f"추적된 구간 {covered}/{total}프레임, 건너뜀 {len(skipped)}곳.",
-           '읽는 법: 한 줄 = 추적 구간 하나. 방향·좌우는 화면 기준. "전체"는 카메라와 몸 중심(어깨 가운데, 없으면 얼굴)의 이동이고, '
+           '읽는 법: 한 줄 = 추적 구간 하나. 방향은 화면 기준. 팔·다리·손·어깨의 왼/오른은 사람 자신의 몸 기준(포즈 모델의 관절 이름; 앞을 보면 왼팔이 화면 오른쪽), '
+           '괄호 안은 그 구간에서 화면 어느 쪽인지(엉덩이 방향으로 앞·뒤를 판단). 이름 없는 점(move-a…)과 높이별·사람 순서(P1…)는 화면 기준. "전체"는 카메라와 몸 중심(어깨 가운데, 없으면 얼굴)의 이동이고, '
            '"몸 기준"은 그 위에 팔다리가 더 한 움직임(몸 중심 기준, 같은 쪽 팔·다리에서 같이 움직인 점은 한 줄). '
            '"(속도 9→5→1 px/f)"는 그 이동을 시간 순서로 나눈 프레임당 속도(앞이 크면 느려짐, 뒤가 크면 빨라짐; 몸 기준은 몸 중심을 뺀 속도). '
            '"높이별"은 사람 상자를 위→아래 5칸으로 나눈 이동(px, 0=8px 미만). 골격 신뢰가 낮으면 팔다리 이름 없이 "화면" 이동만. '
            '"자세 A"는 처음과 끝 그림이 같은 구간이 다시 나온 것: 반복은 처음과 다른 점만 쓴다. '
            '"카메라 모름"이면 화면 이동에 카메라 움직임이 섞였을 수 있다. '
            '어깨는 엉덩이(없으면 눈) 기준 높이 변화, 숫자는 어깨 폭 단위. 어깨 폭은 눈 사이 거리 기준: 넓어짐=가슴 폄·카메라 쪽으로 돎, 좁아짐=웅크림·옆으로 돎. 시간 다음 칸은 구도(전신/무릎 위/상반신/얼굴 클로즈업, 포즈 관절이 화면 안에 있는지로 판단): 상반신·클로즈업이면 사람 상자가 화면 아래에서 잘려서 '
-           '높이별 아래 칸은 다리가 아니라 가슴·손이나 얼굴 아래쪽이고, "(팔만)"은 엉덩이 없이 어깨로 팔만 이름 붙였다는 뜻.',
+           '높이별 아래 칸은 다리가 아니라 가슴·손이나 얼굴 아래쪽이고, "(팔만)"은 엉덩이 없이 어깨로 팔만 이름 붙였다는 뜻. '
+           '들여 쓴 "- 1.20–2.80s:" 줄은 2초 넘는 구간을 가장 멈춘 프레임에서 1~2초 단계로 나눈 것: 단계 처음→끝 팔다리 끝점의 몸 기준 이동(어깨 가운데 기준, 숫자는 몸통 길이 단위: 어깨~엉덩이), "갔다 돌아옴"은 단계 안에서 멀리 갔다가 돌아온 점(괄호 안이 가장 멀리 간 거리).',
            f"자세히: `image_lens focus --look <이 폴더> --shot <shot-id>` (또는 {full_name}). 점 이름·부위는 미검증, 수치는 원본 비교 전 후보.", '']
     if record.get('joint_tracking'):
         out.insert(3, '몸 관절 좌표는 pose·추적 혼합 추정(보임·관절 정답 미검증). 속도·완급은 연속된 원시 점 추적에서만 계산. *.raw-tracks.json은 원시 결과, *.tracks.json은 선택된 좌표. SD·골격 불명은 이름 없는 표면점 경로.')
     if record.get('scaled'):
         out.insert(3, f"원본 {record['scaled']['from'][0]}×{record['scaled']['from'][1]}을 {record['scaled']['to'][0]}×{record['scaled']['to'][1]}로 줄여서 봄: px는 줄인 영상 기준.")
+    if record.get('onion_sheets') or record.get('frame_sheets'):
+        # Same 30 facts of a solo dance, fresh reader: frames only 6, this text with onion sheets 8, with every sheet 12.5.
+        out.insert(-1, '그림과 같이 읽기: 글만으로는 중간 동작·손 모양·닿음이 빠진다. 아래 그림을 모두 열어 글과 같이 본다: 어니언 모음(구간 처음·끝과 궤적, strip), 전체 화면 모음(시간 순서).')
     if record.get('onion_sheets'):
         out.insert(-1, f"어니언 모음 그림: {', '.join(record['onion_sheets'])} (구간마다 청록=시작, 빨강=끝, 초록 화살표=높이별 이동, 오른쪽 회색=시작과 가장 다른 가운데 프레임: 돌거나 갔다 돌아오는 동작은 여기서 보임; "
                        f"색 점선=각 줄 \"몸 기준\"의 부위 대표 점 궤적({'·'.join(onion.TRAILS['names'])} = 몸 기준에 적힌 순서, 점 하나가 한 프레임, 카메라 뺌, 큰 원=시작·큰 네모=끝, 점 간격이 좁으면 느림); "
@@ -368,13 +411,14 @@ def markdown(record, scan, full_name):
                 a, b = bridge['frames']; was = switches[pair]
                 out.append(f"- 전환 f{a}→f{b}: 자세 {pair[0]}→{pair[1]}, f{was[0]}→f{was[1]}과 같은 자세 변화")
             else:
-                line = bridge_line(bridge)
+                line = bridge_line(bridge, done.get('facing'))
                 if line:
                     out.append(line)
                 if bridge and bridge['limbs'] and all(pair):
                     switches[pair] = bridge['frames']
             label = done.get('motif')
             out.append(window_line(done, fps, first.get(label)))
+            out += phase_lines(done, fps)
             if label:
                 first.setdefault(label, done)
             prev = done
