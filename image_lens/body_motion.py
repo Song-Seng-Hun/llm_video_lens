@@ -127,7 +127,7 @@ def disagreement(points, kind, centre, size, pose_frames):
 def geometry_policy(packets, window, raw_packets=None):
     """Choose one source per point for this window. A changing point uses raw geometry;
     other points retain selected estimates. Neither source switches nor anchors are motion."""
-    previous = {}; switches = {}; selected = set()
+    previous = {}; switches = {}; selected = set(); excluded = {}
     for packet in packets:
         for frame in packet['frames']:
             n = frame['frame']
@@ -136,7 +136,11 @@ def geometry_policy(packets, window, raw_packets=None):
             for point in frame['points']:
                 if not point['visible']:
                     continue
-                pid = point['point_id']; source = point.get('coordinate_source', 'point_tracker')
+                pid = point['point_id']
+                if point.get('motion_geometry_usable') is False:
+                    excluded.setdefault(pid, []).append(n)
+                    continue
+                source = point.get('coordinate_source', 'point_tracker')
                 selected.add((n, pid))
                 if pid in previous and previous[pid] != source:
                     switches.setdefault(pid, []).append(n)
@@ -150,7 +154,8 @@ def geometry_policy(packets, window, raw_packets=None):
                 lost[pid] = lost.get(pid, 0)+1
     return dict(source='per_joint_source_stable' if switches else 'selected_estimates',
                 source_switches={pid: switches[pid] for pid in sorted(switches)},
-                lost_observations={pid: lost[pid] for pid in sorted(lost)})
+                lost_observations={pid: lost[pid] for pid in sorted(lost)},
+                excluded_motion_frames={pid: excluded[pid] for pid in sorted(excluded)})
 
 
 def geometry_packets(packets, window, raw_packets, policy=None):
@@ -158,6 +163,10 @@ def geometry_packets(packets, window, raw_packets, policy=None):
     Raw observations can be missing; never fill them with a selected observation."""
     policy = policy or geometry_policy(packets, window, raw_packets)
     switched = policy['source_switches']
+    if policy.get('excluded_motion_frames'):
+        # A corrected position is available for inspection, but its native frame is a motion gap.
+        packets = [dict(packet, frames=[dict(f, points=[dict(p, visible=False) if p.get('motion_geometry_usable') is False else p
+                                                       for p in f['points']]) for f in packet['frames']]) for packet in packets]
     if not switched:
         return packets
     if raw_packets is None:
@@ -193,15 +202,20 @@ def motion_runs(frames, signatures):
 
 def geometry_note(policy):
     """Short provenance shared by detailed and repeat-window summaries."""
+    excluded = (policy or {}).get('excluded_motion_frames', {})
+    exclusion_note = None
+    if excluded:
+        ids = list(excluded); points = ', '.join(ids[:2]) + (f" 외 {len(ids)-2}점" if len(ids)>2 else '')
+        exclusion_note = f"관절 좌표 돌출 교정({points}): 해당 프레임 동작·속도 모름"
     if not policy or policy['source'] not in ('raw_tracker_source_switch', 'per_joint_source_stable'):
-        return None
+        return exclusion_note
     ids = list(policy['source_switches'])
     points = ', '.join(ids[:2]) + (f" 외 {len(ids)-2}점" if len(ids) > 2 else '')
     text = f"좌표 출처 전환({points}): " + ('해당 점만 원시 추적으로 계산' if policy['source'] == 'per_joint_source_stable'
                                               else '이 구간 몸 동작은 원시 추적으로 계산')
     if policy['lost_observations']:
         text += f"; 원시 관절 관측 {len(policy['lost_observations'])}점 누락, 그 움직임 모름"
-    return text
+    return text + ('; '+exclusion_note if exclusion_note else '')
 
 
 def describe(packets, window, pose_frames=None, timing_packets=None):

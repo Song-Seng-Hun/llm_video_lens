@@ -121,6 +121,91 @@ class JointTracking(unittest.TestCase):
         self.assertEqual(body_motion.geometry_policy([out],window,[raw])['source_switches'],{})
 
 
+class PoseExcursion(unittest.TestCase):
+    setUp=JointTracking.setUp
+    tearDown=JointTracking.tearDown
+
+    def fixture(self):
+        raw=packet();raw['frames']=[];poses={}
+        for n in range(17):
+            p=person();p['keypoints'][7]=[400. if n==8 else 120.+4*n,150.]
+            p['keypoints'][9]=[180.+6*n,180.];p['scores'][9]=.8;poses[n]=[p]
+            points=[]
+            for pid,xy in [('shoulder-l',[100.,100.]),('shoulder-r',[300.,100.]),
+                           ('elbow-l',[120.+4*n,150.]),('wrist-l',[180.+6*n,180.])]:
+                q=copy.deepcopy(packet(xy=xy,anchor=n==0)['frames'][0]['points'][0]);q['point_id']=pid
+                if pid=='elbow-l' and n==2:q['visible']=q['model_visible']=False
+                points.append(q)
+            raw['frames'].append(dict(frame=n,points=points))
+        return raw,poses,dict(seed=0,end=16)
+
+    def fused(self,raw,poses,window):
+        return jt.reconcile(raw,poses,'shot-0/1',window,self.raw,self.pose)
+
+    # Named regression: a false single-frame pose peak must use actual raw xy with truthful provenance/counts.
+    def test_excursion_position_is_raw_and_provenance_is_exact(self):
+        raw,poses,w=self.fixture();before=copy.deepcopy(raw);out=self.fused(raw,poses,w)
+        q=next(q for q in out['frames'][8]['points'] if q['point_id']=='elbow-l')
+        self.assertEqual(q['xy'],[152.,150.]);self.assertEqual(q['coordinate_source'],'point_tracker')
+        self.assertEqual(q['claim_scope'],'visible_surface_2d');self.assertTrue(q['model_visible'])
+        self.assertFalse(q['motion_geometry_usable']);self.assertFalse(q['motion_pair_usable'])
+        self.assertEqual(q['pose_excursion']['rejected_xy'],[400.,150.])
+        self.assertEqual(out['joint_tracking']['counts'].get('pose_excursion_corrections',0),1)
+        visible_pose=sum(q.get('coordinate_source')=='pose' and q['visible'] for f in out['frames'][1:] for q in f['points'])
+        self.assertEqual(out['joint_tracking']['counts']['pose_coordinates'],visible_pose)
+        self.assertEqual(raw,before)
+
+    # R2 regression: removing one bad motion frame must not revert the whole joint or lose recovered f2.
+    def test_only_corrected_motion_frame_is_withheld(self):
+        from image_lens import body_motion,digest
+        raw,poses,w=self.fixture();out=self.fused(raw,poses,w)
+        policy=body_motion.geometry_policy([out],w,[raw]);effective=body_motion.geometry_packets([out],w,[raw],policy)
+        self.assertEqual(policy['source_switches'],{});self.assertEqual(policy['lost_observations'],{})
+        self.assertEqual(policy.get('excluded_motion_frames',{}),{'elbow-l':[8]})
+        seen=body_motion.series(effective,w)['elbow-l'];self.assertIn(2,seen);self.assertNotIn(8,seen)
+        self.assertEqual(set(seen),set(range(1,17))-{8})
+        self.assertEqual(seen[2],(128.,150.))
+        self.assertTrue(next(q for q in out['frames'][8]['points'] if q['point_id']=='elbow-l')['visible'])
+        result=body_motion.describe([out],w,timing_packets=[raw])
+        elbow=next(l for l in result['limbs'] if l['point_id']=='elbow-l')
+        self.assertTrue(elbow['strokes']);self.assertTrue(all(not (s['frames'][0]<=8<=s['frames'][1]) for s in elbow['strokes']))
+        original=copy.deepcopy(out);q=next(q for q in original['frames'][8]['points'] if q['point_id']=='elbow-l')
+        q.update(xy=[400.,150.],coordinate_source='pose');q.pop('motion_geometry_usable')
+        previous=body_motion.describe([original],w,timing_packets=[raw])
+        wrist=lambda r:next(l for l in r['limbs'] if l['point_id']=='wrist-l')
+        self.assertEqual(wrist(result),wrist(previous))
+        done=dict(window=w,body=result,body_geometry=policy,groups=[],motif='A')
+        for first in (None,done):self.assertIn('교정',digest.window_line(done,30,first))
+        none=dict(done,body=None)
+        self.assertIn('모름',digest.window_line(none,30));self.assertNotIn('24px 이상 이동 없음',digest.window_line(none,30))
+
+    # Named control: an actual raw+pose fast pulse must retain its observed coordinate.
+    def test_actual_fast_pulse_and_sustained_motion_are_not_repaired(self):
+        from image_lens import body_motion
+        raw,poses,w=self.fixture()
+        q=next(q for q in raw['frames'][8]['points'] if q['point_id']=='elbow-l');q['xy']=[400.,150.]
+        out=self.fused(raw,poses,w);q=next(q for q in out['frames'][8]['points'] if q['point_id']=='elbow-l')
+        self.assertEqual(q['xy'],[400.,150.]);self.assertNotIn('motion_geometry_usable',q)
+        self.assertEqual(out['joint_tracking']['counts'].get('pose_excursion_corrections',0),0)
+        self.assertEqual(body_motion.geometry_policy([out],w,[raw]).get('excluded_motion_frames',{}),{})
+
+    # New-feature safety boundary: no support across raw/pose gaps,other people,weak joints,cuts or an existing mixed source.
+    def test_unreliable_or_nonisolated_support_stays_unchanged(self):
+        for case in ('hidden_raw','missing_raw','foreign_id','weak','mixed','sustained','seed','cut'):
+            raw,poses,w=self.fixture()
+            if case=='hidden_raw':next(q for q in raw['frames'][7]['points'] if q['point_id']=='elbow-l')['visible']=False
+            elif case=='missing_raw':raw['frames'][9]['points']=[q for q in raw['frames'][9]['points'] if q['point_id']!='elbow-l']
+            elif case=='foreign_id':poses[9][0]['track_id']='shot-0/2'
+            elif case=='weak':poses[9][0]['scores'][7]=.49
+            elif case=='mixed':poses[3][0]['scores'][7]=.49
+            elif case=='sustained':poses[9][0]['keypoints'][7]=[400.,150.]
+            elif case=='seed':w['seed']=7
+            elif case=='cut':w['end']=8
+            with self.subTest(case=case):
+                out=self.fused(raw,poses,w)
+                self.assertEqual(out['joint_tracking']['counts'].get('pose_excursion_corrections',0),0)
+
+
 class Timing(unittest.TestCase):
     def test_fused_positions_do_not_manufacture_raw_ease(self):
         from image_lens import body_motion
