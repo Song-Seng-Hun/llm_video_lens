@@ -29,7 +29,7 @@ Give it one video with people or characters in it, and for each shot (cut) it wr
 
 ## Quick start
 
-1. It was built and checked on macOS (Apple Silicon) with Python 3.12; Windows is unverified. With Python 3.11 or later, install the dependencies. `look` uses both pose estimation and point tracking, so it needs both sets.
+1. With Python 3.11 or later, install the dependencies (checked on macOS Apple Silicon with Python 3.12). `look` uses both pose estimation and point tracking, so it needs both sets.
 
    ```sh
    pip install -r requirements/pose.txt -r requirements/tracking.txt
@@ -89,7 +89,7 @@ One line from the `look.md` of a live-action solo dance video, the span where th
 
 The onion skin of the same span. The left side overlays the start (cyan) and the end (red). The dotted trails are the parts in the order `몸 기준` lists them: yellow (right leg), magenta (left leg), blue (left arm)… One dot is one frame, a circle the start, a square the end. Green arrows are the `높이별` movement. The right side is the middle frame most different from the start (f403).
 
-This example has an error too: the shoulder width changed as the leg came up, so a turn candidate was marked although the body did not turn. The left arm's speed also came out unknown.
+The tool was also confused in this example: the shoulder width changed as the leg came up, so a turn candidate was marked although the body did not turn. The left arm's speed also came out unknown.
 
 Video: Antoni Shkraba, ["Video of a Man Dancing"](https://www.pexels.com/video/video-of-a-man-dancing-7571381/), Pexels ([Pexels License](https://www.pexels.com/license/)). Seconds 0–20, scaled to 1280×674, then run through `look`.
 
@@ -133,7 +133,7 @@ python -m image_lens --workspace W mark --video V --shots W/look/shots.json --fr
 
 ## Built with AI
 
-A person set the direction and AI agents built this project together. What to build, which accuracy to aim for and what to adopt were human decisions; implementation, measurement and code review were split between Claude (Anthropic) and Codex (OpenAI) agents. The banner shows the same idea: Claude reads the film strip and writes one line at a time into BRIEF. The [look notes](look-notes.md) are the agents' measurement log.
+A person set the direction and AI agents built this project together. What to build, which accuracy to aim for and what to adopt were human decisions; implementation, measurement and code review were split between Claude (Anthropic) and Codex (OpenAI) agents. The [look notes](look-notes.md) are the agents' measurement log.
 
 ## License
 

@@ -9,7 +9,7 @@
 
 # LLM Video Lens
 
-영상을 AI(LLM)가 읽을 수 있는 짧은 글과 확인용 그림으로 바꿔 주는 명령줄 도구입니다. 샷을 나누고, 샷마다 몸과 카메라가 어떻게 움직였는지 적으며, 모든 내용을 원본 프레임 번호로 되짚을 수 있게 남깁니다.
+영상을 AI(LLM)가 읽을 수 있는 움직임 요약과 확인용 그림으로 바꿔 주는 CLI 도구입니다. 샷을 나누고, 샷마다 몸과 카메라가 어떻게 움직였는지 적으며, 모든 내용을 원본 프레임 번호로 되짚을 수 있게 남깁니다.
 
 ## 왜 만들었나요
 
@@ -25,12 +25,12 @@ LLM Video Lens는 이를 돕는 보조 도구입니다. 프레임 사이의 움�
 - **구간 질문 (`at`)**: "18~22초에 무슨 일이 있었지?"처럼 4초 이내 구간의 근거만 모아 줍니다.
 - **샷 나누기와 목록 (`scan`, `brief`, `catalog`)**: 컷 경계를 찾고, 샷마다 원본 프레임 범위와 빠진 구간을 담은 목록을 만듭니다.
 - **프레임 비교 (`compare`, `zoom`)**: 두 프레임의 차이를 그림으로 보거나, 짧은 구간을 촘촘한 프레임으로 봅니다.
-- **직접 점 찍기 (`grid`, `mark`)**: 소품이나 자세 모델이 모르는 부분에 직접 점을 찍고 이름을 붙여 추적합니다.
+- **직접 점 찍기 (`grid`, `mark`)**: 소품이나 옷자락처럼 자세 모델이 잡지 못하는 곳에 직접 점을 찍고 이름을 붙여 추적합니다.
 - **작업 폴더 밖은 건드리지 않음**: 영상을 읽고 결과를 쓰는 곳은 지정한 작업 폴더뿐입니다.
 
 ## 빠른 시작
 
-1. macOS(Apple Silicon)의 Python 3.12에서 만들고 검증했습니다. Windows에서는 검증하지 않았습니다. Python 3.11 이상에서 의존성을 설치합니다. `look`은 자세 추정과 점 추적을 함께 쓰므로 두 묶음이 모두 필요합니다.
+1. Python 3.11 이상에서 필요한 패키지를 설치합니다(macOS Apple Silicon, Python 3.12에서 검증). `look`은 자세 추정과 점 추적을 함께 쓰므로 두 패키지 목록을 모두 설치해야 합니다.
 
    ```sh
    pip install -r requirements/pose.txt -r requirements/tracking.txt
@@ -43,7 +43,7 @@ LLM Video Lens는 이를 돕는 보조 도구입니다. 프레임 사이의 움�
    {"detector": "/models/yolox_humanart.onnx", "pose_model": "/models/rtmw133.onnx", "checkpoint": "/models/scaled_offline.pth"}
    ```
 
-4. 저장소 폴더에서 실행합니다. 아래의 `W`는 작업 공간 폴더 경로입니다. 패키지와 명령 이름은 처음 이름을 그대로 써서 `image_lens`입니다.
+4. 저장소 폴더에서 실행합니다. 아래의 `W`는 작업 공간 폴더 경로입니다. 초기 프로젝트 이름을 그대로 유지하고 있어, 패키지명과 실행 명령은 `image_lens`입니다.
 
    ```sh
    python -m image_lens --workspace W look --video clip.mp4 --out look-clip
@@ -59,7 +59,7 @@ LLM Video Lens는 이를 돕는 보조 도구입니다. 프레임 사이의 움�
 
 - 샷 구도: 전신, 무릎 위, 상반신, 얼굴 클로즈업
 - 화면 전체(카메라)와 몸 중심의 움직임
-- 팔·다리 같은 부위가 몸을 기준으로 한 움직임과 속도. 예: "속도 9→5→3→1 px/f"
+- 몸 중심을 기준으로 본 팔·다리의 움직임과 속도. 예: "속도 9→5→3→1 px/f"
 - 점을 놓친 곳, 작화가 갑자기 바뀐 곳, 같은 자세가 반복되는 곳 같은 주의 표시
 
 함께 만들어지는 그림도 있습니다.
@@ -90,7 +90,7 @@ LLM Video Lens는 이를 돕는 보조 도구입니다. 프레임 사이의 움�
 
 같은 구간의 어니언 스킨입니다. 왼쪽은 시작(청록)과 끝(빨강)을 겹친 것입니다. 점선은 `몸 기준`에 적힌 순서대로 노랑(오른다리), 자홍(왼다리), 파랑(왼팔)… 부위의 궤적입니다. 점 하나가 한 프레임이고, 원은 시작, 네모는 끝입니다. 초록 화살표는 `높이별` 이동입니다. 오른쪽은 시작과 가장 다른 중간 프레임(f403)입니다.
 
-참고로 이 예시에도 틀린 곳이 있습니다. 다리를 들 때 어깨 폭이 변해서, 실제로는 몸을 돌리지 않았는데 "몸 돌림 후보"가 표시되었습니다. 왼팔의 속도도 "모름"으로 나왔습니다.
+참고로 이 예시에서도 도구가 헷갈린 부분이 있습니다. 다리를 들 때 어깨 폭이 변해서, 실제로는 몸을 돌리지 않았는데 "몸 돌림 후보"로 표시되었습니다. 왼팔의 속도도 "모름"으로 나왔습니다.
 
 영상 출처: Antoni Shkraba, [「Video of a Man Dancing」](https://www.pexels.com/video/video-of-a-man-dancing-7571381/), Pexels([Pexels 라이선스](https://www.pexels.com/license/)). 0~20초를 잘라 1280×674로 줄인 뒤 `look`으로 만든 그림입니다.
 
@@ -113,9 +113,9 @@ python -m image_lens --workspace W at --look W/look-clip --span 18-22 --out W/at
 
 `at.md`에 그 구간에 걸친 줄과 표시, 열어 볼 그림 이름이 모이고, `at-frames-1.jpg`에 촘촘한 프레임 12장이 담깁니다.
 
-### 자세 모델이 모르는 부분 추적하기
+### 소품이나 세부 부위 직접 추적하기
 
-`grid`로 좌표 눈금을 그린 프레임을 보고, `mark`로 점을 찍어 추적합니다. 점은 최대 8개까지 찍을 수 있고, 이름은 ASCII로 붙입니다.
+소품이나 옷자락처럼 자세 모델이 잡지 못하는 곳은 `grid`로 좌표 눈금을 그린 프레임을 보고, `mark`로 점을 찍어 추적합니다. 점은 최대 8개까지 찍을 수 있고, 이름은 ASCII로 붙입니다.
 
 점은 두 선이 만나는 모서리나 작은 무늬(눈, 단추)에 찍습니다. 곧은 선의 가운데나 단색 면에 찍으면 선을 따라가는 움직임을 놓칩니다. 결과 그림(`mark-onion.jpg`)에서 시작과 끝의 윤곽선은 크게 벌어졌는데 점선 궤적만 짧다면, 중간에 추적이 미끄러진 것입니다. 이럴 때는 그 점을 뚜렷한 모서리로 옮겨 다시 찍어 보세요.
 
@@ -134,7 +134,7 @@ python -m image_lens --workspace W mark --video V --shots W/look/shots.json --fr
 
 ## AI와 함께 만든 프로젝트
 
-이 프로젝트는 사람이 방향을 정하고 AI 에이전트들이 함께 만든 결과물입니다. 무엇을 만들지, 어떤 정확도를 목표로 할지, 무엇을 채택할지는 사람이 정했고, 구현·측정·코드 리뷰는 Claude(Anthropic)와 Codex(OpenAI) 에이전트가 나눠 맡았습니다. 위 배너도 그 모습을 그린 것으로, Claude가 영상을 읽으며 BRIEF에 한 줄씩 적어 나갑니다. [look 노트](docs/look-notes.md)는 이 과정에서 에이전트가 남긴 측정 기록입니다.
+이 프로젝트는 사람이 방향을 정하고 AI 에이전트들이 함께 만든 결과물입니다. 무엇을 만들지, 어떤 정확도를 목표로 할지, 무엇을 채택할지는 사람이 정했고, 구현·측정·코드 리뷰는 Claude(Anthropic)와 Codex(OpenAI) 에이전트가 나눠 맡았습니다. [look 노트](docs/look-notes.md)는 이 과정에서 에이전트가 남긴 측정 기록입니다.
 
 ## 라이선스
 
@@ -142,10 +142,10 @@ python -m image_lens --workspace W mark --video V --shots W/look/shots.json --fr
 
 ## 더 보기
 
-자세한 문서는 영어입니다.
+상세 문서는 영어로 작성되어 있습니다.
 
-- [전체 안내](docs/guide.md): 모든 명령과 옵션, `look.md` 읽는 법 전체, 결과 파일 목록, brief 형식, 작업(job)과 추적, 자세 시드
-- [LAN API](lan/README.md): 집 안의 다른 PC(Windows 등)에서 이 Mac의 `look`과 `at`을 쓰게 해 주는 서버와 클라이언트
+- [전체 안내](docs/guide.md): 모든 명령과 옵션, `look.md` 읽는 법 전체, 결과 파일 목록, brief 형식, 작업(job)과 추적, 자세 초기값(seed)
+- [LAN API](lan/README.md): 같은 네트워크의 다른 PC(Windows 등)에서 이 Mac의 `look`과 `at`을 쓰게 해 주는 서버와 클라이언트
 - [look 노트](docs/look-notes.md): `look`의 기준값과 그 근거가 된 확인 기록
-- [한계](docs/limitations.md) · [검증](docs/verification.md) · [출처와 라이선스](docs/provenance.md) · [작업 계약](docs/jobs.md)
+- [한계](docs/limitations.md) · [검증](docs/verification.md) · [출처와 라이선스](docs/provenance.md) · [작업 명세](docs/jobs.md)
 - 테스트 실행: `python -B -m unittest discover -s tests -v`
