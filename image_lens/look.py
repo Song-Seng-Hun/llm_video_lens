@@ -335,6 +335,7 @@ def _run(video, detector, pose_model, checkpoint, out, max_shots=LOOK['max_shots
         elif not skeleton['plausible']:
             slot.append(f"  - 골격 신뢰 낮음({skeleton['reason']}): 팔·다리 이름 없이 얼굴과 많이 움직인 곳(move-a…)만 봄")
         from image_lens import camera, motion_report
+        main = None
         try:
             main = body_motion.largest(pose_frames.get(w['seed']))
             frame_motion = camera.path(source, w['seed'], end, main['bbox'] if main else None)
@@ -342,6 +343,11 @@ def _run(video, detector, pose_model, checkpoint, out, max_shots=LOOK['max_shots
             frame_motion = None; errors.append(dict(window=w, step='camera', error=str(error)[:300]))
         cam = camera.between(frame_motion, w['seed'], end)
         done['camera'] = camera.describe(frame_motion, w['seed'], end, motion_report.STROKE['major_min_px'])
+        if done['camera'].get('unknown'):
+            try:
+                done['camera']['plain'] = camera.plain(source, w['seed'], main['bbox'] if main else None)
+            except Exception as error:
+                errors.append(dict(window=w, step='camera', error=str(error)[:300]))
         from image_lens import digest
         camera_text = digest.camera(done['camera'], fps)
         if camera_text:

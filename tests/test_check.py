@@ -105,6 +105,33 @@ class Describe(unittest.TestCase):
         self.assertTrue(found['unknown'])
         self.assertTrue(digest.camera(found, 10).startswith('카메라 모름(5%만 맞춤)'))
 
+    def test_a_plain_wall_is_told_from_a_textured_room(self):
+        import cv2
+        import numpy as np
+        with tempfile.TemporaryDirectory(dir=REPO/'workspace') as d:
+            # A pale wall with a textured figure in the middle: only the figure has points.
+            rng = np.random.default_rng(7)
+            wall = np.full((360, 640, 3), 210, np.uint8); wall[80:300, 260:380] = rng.integers(0, 255, (220, 120, 3), dtype=np.uint8)
+            video = Path(d)/'wall.avi'; out = cv2.VideoWriter(str(video), cv2.VideoWriter_fourcc(*'MJPG'), 10, (640, 360))
+            out.write(wall); out.release()
+            self.assertTrue(camera.plain(video, 0, [260, 80, 380, 300]))
+            room = Path(d)/'pan.avi'; pan_video(room, frames=2)
+            self.assertFalse(camera.plain(room, 0, [260, 80, 380, 300]))
+
+    def test_unknown_everywhere_gets_a_reason_in_the_header(self):
+        def shot(cams):
+            return dict(segment_id='shot-0000', frames=[0, 99], seconds=[0, 4.], skipped=[], errors=[],
+                        windows=[window(20*k, 20*k+19, camera=c) for k, c in enumerate(cams)])
+        plain = [dict(net=None, frames=1, known=.05, unknown=True, plain=True), dict(net=None, frames=1, known=.01, unknown=True, plain=True)]
+        record = dict(source_video='v.mp4', shots=[shot(plain)])
+        self.assertIn('카메라: 모든 구간에서 모름(배경이 거의 민무늬라 맞출 점이 없음, 구간마다 1–5% 프레임만 맞춤)', digest.clip_camera(record))
+        text = digest.markdown(dict(record, check=[]), dict(fps=25, source_frame_count=100), 'look-full.md')
+        self.assertEqual(text.splitlines()[3], digest.clip_camera(record))
+        self.assertIn('카메라 모름(5%만 맞춤)', text)  # the windows keep their own
+        # One window placed: no header line, and the plain reason needs every window plain.
+        self.assertIsNone(digest.clip_camera(dict(source_video='v.mp4', shots=[shot([plain[0], dict(net=[0., 0.], frames=20, known=1.)])])))
+        self.assertIn('배경이 프레임끼리 맞지 않음', digest.clip_camera(dict(source_video='v.mp4', shots=[shot([plain[0], dict(plain[1], plain=False)])])))
+
     def test_old_look_json_reads_the_net_shift(self):
         self.assertEqual(digest.camera(dict(net=[0., 30.], frames=12), 10), '카메라 아래 30px')
         self.assertIsNone(digest.camera(dict(net=[2., 0.], frames=12), 10))
