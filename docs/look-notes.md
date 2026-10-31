@@ -239,3 +239,11 @@ Pose confidence is uncalibrated. A pose-selected coordinate agreeing with that s
 - Also tried: dropping the per-window and check-list wording once the header says it. On the solo dance clip that cut "카메라 모름" from 18 to 1 and left the rest of the text unchanged, but the reading test scored lower: 12.3 against 14.1, six runs each (single runs 10.5–15.5 vs 12–16; permutation p about .07). The facts that dropped were not camera facts, so this is likely noise. The repeated wording is kept anyway, since dropping it showed no gain.
 - The "one shot, camera fixed" fact was missed in all 32 graded runs before this change and in these 12. The readers never mention the camera, because the reader task asks for a limb timeline. The tool cannot tell a fixed camera from a plain wall either.
 - Not changed: camera matching, numbers, windows, seeds, pictures.
+
+## Reading look.md: trails on every onion (2026-10-31)
+
+- On the anime music video, 20 of 41 onion pictures had no trail. 17 of them were windows with no trusted body, so no "몸 기준" parts to follow, though the text listed "화면" moves for most. Those windows now draw the "화면" points, in the order that line lists them (one trail per point). The legends say so.
+- Trail dots, lines and start/end marks grow with the person box: the sheet fits each onion in a 360 px tile, so a large box shrinks more. Median shrink: solo dance clip 0.41, 1440 px anime clip 0.21, anime music video 0.19; a 3 px dot came out under 1 px on the last two. Sizes stay as before up to the solo dance clip's box (440×680) and grow in proportion past it, about 2× on both anime clips.
+- Scaling by frame width (first try) changed the 1440 px clip by only 1.1× and looked the same on the sheet.
+- Windows with no trail: anime music video 20 → 9, solo dance 2 → 0, 1440 px anime clip 0 → 0. Of the 9 left, 6 have neither body nor screen moves (the text lists none either), 3 have a body with no limb move or dropped camera frames.
+- Not changed: numbers, windows, seeds, text other than the two legends.

@@ -419,7 +419,9 @@ def _run(video, detector, pose_model, checkpoint, out, max_shots=LOOK['max_shots
             try:
                 moving = cam if cam and math.hypot(*cam) >= motion_report.STROKE['major_min_px'] else None
                 from image_lens import digest
-                leads = [f['point'] for f in digest.limbs(done['body'])] if done.get('body') else []
+                # No trusted body: the "화면" moves stand in, in the order that line lists them (one trail per point).
+                leads = ([f['point'] for f in digest.limbs(done['body'])] if done.get('body')
+                         else list(dict.fromkeys(m['point'] for m in digest._screen(done.get('groups', [])))))
                 done['trails'] = onion.trails(raw_packets, leads, w['seed'], end, frame_motion if moving else None)
                 done['bands'] = onion.bands(source, w['seed'], end, person['bbox'], moving, picture, done['trails'])
                 done['onion'] = picture.name
