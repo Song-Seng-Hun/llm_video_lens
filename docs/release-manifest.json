@@ -19,8 +19,8 @@
     "historical experiment outputs"
   ],
   "manifest_self_excluded": true,
-  "file_count": 139,
-  "total_bytes": 1776724,
+  "file_count": 137,
+  "total_bytes": 1665048,
   "files": [
     {
       "path": ".gitattributes",
@@ -89,18 +89,8 @@
     },
     {
       "path": "docs/look-notes.md",
-      "bytes": 57867,
-      "sha256": "6d0537a8ffeacccf2e421640d2220f1e7daacc9fdf749b1863a40415793465c4"
-    },
-    {
-      "path": "docs/look-notes.md",
-      "bytes": 57867,
-      "sha256": "6d0537a8ffeacccf2e421640d2220f1e7daacc9fdf749b1863a40415793465c4"
-    },
-    {
-      "path": "docs/look-notes.md",
-      "bytes": 57867,
-      "sha256": "6d0537a8ffeacccf2e421640d2220f1e7daacc9fdf749b1863a40415793465c4"
+      "bytes": 58652,
+      "sha256": "55dc9803303cb4224b2f272c4f20b2e654a9db4e99697d6625ea66e902cb5b01"
     },
     {
       "path": "docs/provenance.md",
@@ -194,8 +184,8 @@
     },
     {
       "path": "image_lens/mark.py",
-      "bytes": 9333,
-      "sha256": "53255b4124227e4e69f99008ad4678f418aa0e228f755bb4342a7dc6198e1cb8"
+      "bytes": 11103,
+      "sha256": "9e7b4802aee318778472c2500c91cb311ba533c914b8babe3f3a242ba0458887"
     },
     {
       "path": "image_lens/motif.py",
@@ -219,8 +209,8 @@
     },
     {
       "path": "image_lens/onion.py",
-      "bytes": 23606,
-      "sha256": "cbda9f03ed7a10ec9fd37ef7f7023270557aa635b2f7dbf1ca4a5cbcad4e2d8e"
+      "bytes": 24143,
+      "sha256": "f6a53d23639a9a94e1fc502c525e74a5f915fb4b44a9a41a207fe0f0f643b2f0"
     },
     {
       "path": "image_lens/part_regions.py",
@@ -694,8 +684,8 @@
     },
     {
       "path": "tests/test_onion.py",
-      "bytes": 9310,
-      "sha256": "7433c738fa85f3f099fc110cb431d952884efd788ad49cef86b0a4f2ae943f7c"
+      "bytes": 10276,
+      "sha256": "5f91a093d469f0333fad255dcc1e2899ee34a67d3cde7905d4df45b477b507a5"
     },
     {
       "path": "tests/test_pose.py",

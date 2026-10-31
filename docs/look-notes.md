@@ -262,3 +262,10 @@ Pose confidence is uncalibrated. A pose-selected coordinate agreeing with that s
 - Frame numbers on the onion panel and strips grow with the person box, the same factor as the trail marks.
 - Sheet and overview label bands are 24 px (from 20 and 22) for the larger text.
 - Not changed: text, numbers, picture content.
+
+## Pictures: mark gets a named onion (2026-10-31)
+
+- `mark` drew only the old trajectory picture: no onion, colour for time, no names, frame numbers overlapping ("f1f195"). Which dot was the knee and which the apple could not be told.
+- It now also writes `mark-onion.jpg`: look's onion view over the box the marked points cover (60 px margin), one colour trail per point with its name beside the start, and the grey panel of the frame most unlike the start. Names near the right edge go to the left of the point. Two more colours (brown, light blue) cover mark's eight points; look's six are unchanged. mark.md lists the picture with its legend.
+- Anime music video, f180..209, six points named by eye: all six names readable, each trail stays on its part.
+- trajectory.png is kept.
