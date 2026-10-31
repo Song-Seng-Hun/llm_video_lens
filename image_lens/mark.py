@@ -6,7 +6,7 @@ import math
 import re
 from image_lens.frames import label as outlined
 
-MARK = dict(grid_px=100, zoom_grid_px=50, snap_radius_px=15, max_points=8, uncertainty_px=10.)
+MARK = dict(grid_px=100, zoom_grid_px=50, snap_radius_px=15, max_points=8, uncertainty_px=10., onion_margin_px=60)
 
 
 def _frame(video, frame):
@@ -121,6 +121,11 @@ def run(video, shots, frame, points, checkpoint, out, end=None, snap_points=True
              + (f" ({p['snapped_px']:.0f}px 옮김)" if p['snapped_px'] else '') for p in placed]
     if cam and math.hypot(*cam) >= motion_report.STROKE['major_min_px']:
         text.append(f"- 화면 전체: {motion_report.KO[motion_report.direction(*cam)]} {math.hypot(*cam):.0f}px (카메라·배경 이동 추정; 이것만 따라간 이동은 뺌)")
+    moving = cam if cam and math.hypot(*cam) >= motion_report.STROKE['major_min_px'] else None
+    onion_image = _onion(source, frame, stop, [n for n, _ in parsed], tracks, moving, frame_motion if moving else None, root/'mark-onion.jpg')
+    if onion_image:
+        text.append(f"- 어니언 그림: {onion_image} (청록=f{frame}, 빨강=f{stop}, 색 점선=찍은 점의 프레임마다 위치(이름표=점 이름, 카메라 뺌), "
+                    '큰 원·네모=각 연속 관측의 시작·끝, 선 끊김=관측 누락, 이어진 점 간격이 좁으면 느림·넓으면 빠름; 오른쪽 회색=시작과 가장 다른 가운데 프레임)')
     lines, summary = look._summary(report, dict(seed=frame, end=stop), 'marked', 'mark.report.md', 'mark-traj/trajectory.png', frame_motion)
     text += lines or ['- 찍은 점: 큰 이동 없음']
     text += ['', '## 점별 전체 움직임 (멈춤 제외, 완급 포함)'] + _all_moves(report)
@@ -128,6 +133,26 @@ def run(video, shots, frame, points, checkpoint, out, end=None, snap_points=True
     paths.write_json(root/'mark.json', dict(schema='image-lens.mark/1', source_video=str(source), frames=[frame, stop], points=placed,
                                             camera=cam, summary=summary))
     return dict(status='written', output=str(output), points=len(placed), frames=[frame, stop])
+
+
+# Two more colours than look's six, for mark's eight points: brown and light blue (BGR), still not cyan, red or green.
+MARK_COLORS = ((40, 90, 150), (255, 190, 110))
+
+
+def _onion(video, frame, stop, names, tracks, moving, camera, image):
+    """look's onion view for the marked points (`moving` = net camera shift or None, `camera` = camera.path), each trail named, over the box the tracked points cover plus a margin.
+    None when no point stays visible after the seed."""
+    from image_lens import onion, paths
+    packet, _ = paths.load(tracks)
+    trails = onion.trails([packet], names, frame, stop, camera, limit=MARK['max_points'])
+    if not trails:
+        return None
+    xs = [x for t in trails for _, x, _ in t['xy']]; ys = [y for t in trails for _, _, y in t['xy']]
+    m = MARK['onion_margin_px']
+    onion.bands(video, frame, stop, (min(xs)-m, min(ys)-m, max(xs)+m, max(ys)+m), moving, image, trails,
+                onion.TRAILS['colors']+MARK_COLORS, named=True)
+    onion.peak(video, frame, stop, (min(xs)-m, min(ys)-m, max(xs)+m, max(ys)+m), image)
+    return image.name
 
 
 def _all_moves(report):

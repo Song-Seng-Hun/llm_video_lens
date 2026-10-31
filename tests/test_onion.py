@@ -145,6 +145,20 @@ class Trails(unittest.TestCase):
         pixels = image.reshape(-1, 3).astype(int)
         self.assertTrue((pixels.max(1) < 30).any()); self.assertTrue((pixels.min(1) > 240).any())  # edges are anti-aliased
 
+    # mark's points have no fixed colour order: each trail carries its name, kept inside the picture at the right edge.
+    def test_named_trails_label_inside_the_picture(self):
+        import tempfile
+        import cv2
+        import numpy as np
+        with tempfile.TemporaryDirectory() as d:
+            image=np.full((200,320,3),128,np.uint8);out=Path(d)/'o.png'
+            onion._image(cv2,np,image,cv2.cvtColor(image,cv2.COLOR_BGR2GRAY),(0,0,320,200),[],out,
+                         [dict(point='knee-bent',xy=[(1,310,100),(2,312,100)])],named=True)
+            white=(cv2.imread(str(out)).min(2) > 240)
+            self.assertGreater(white[:, :300].sum(), 30)  # the name went left of the point, not off the edge
+        self.assertEqual(len(onion.trails([dict(frames=[dict(frame=1, points=[dict(point_id=f'p{i}', xy=[i, i], visible=True) for i in range(8)])])],
+                                          [f'p{i}' for i in range(8)], 0, 1, limit=8)), 8)
+
 
 class Peak(unittest.TestCase):
     def test_out_and_back_shows_the_far_frame(self):

@@ -23,12 +23,12 @@ TRAILS = dict(parts=6, dot=3, start=9, end=8, line=2, box=(440, 680),
               names=('노랑', '자홍', '파랑', '주황', '흰색', '보라'))  # BGR; not cyan, red or green, which the onion already uses
 
 
-def trails(packets, points, seed, end, camera=None):
+def trails(packets, points, seed, end, camera=None, limit=None):
     """[{point, xy: [(frame, x, y)]}] for up to TRAILS['parts'] point ids, visible frames after the seed, in screen
     coordinates minus the camera shift since the seed (`camera` is camera.path; None = no camera move). With a camera
     move, frames whose camera shift is unknown are left out rather than drawn in the wrong place."""
     out = []
-    for pid in points[:TRAILS['parts']]:
+    for pid in points[:limit or TRAILS['parts']]:
         xy = []
         for packet in packets:
             for frame in packet['frames']:
@@ -44,7 +44,7 @@ def trails(packets, points, seed, end, camera=None):
     return out
 
 
-def bands(video, start, end, bbox, camera=None, image=None, trails=()):
+def bands(video, start, end, bbox, camera=None, image=None, trails=(), colors=None, named=False):
     """[{band, y, dx, dy, features}] of the median feature shift start->end per band, minus the camera shift.
     A band with too few surviving features gets dx=dy=None. Writes the onion image when `image` is a path, with
     `trails` (see `trails`) drawn on it."""
@@ -84,7 +84,7 @@ def bands(video, start, end, bbox, camera=None, image=None, trails=()):
         mx, my = np.median(d, 0)
         result.append(dict(band=name, y=[top, bottom], dx=round(float(mx)-cam[0], 1), dy=round(float(my)-cam[1], 1), features=int(len(d))))
     if image:
-        _image(cv2, np, first, last, (x0, y0, x1, y1), result, image, trails)
+        _image(cv2, np, first, last, (x0, y0, x1, y1), result, image, trails, colors, named)
     return result
 
 
@@ -117,7 +117,7 @@ def _frame_label(cv2, panel, n):
     outlined(cv2, panel, f'f{n}', (round(6*k), round(28*k)), .9*k, round(2*k))
 
 
-def _image(cv2, np, first, last, box, result, path, trails=()):
+def _image(cv2, np, first, last, box, result, path, trails=(), colors=None, named=False):
     x0, y0, x1, y1 = box
     a = cv2.cvtColor(first, cv2.COLOR_BGR2GRAY)[y0:y1, x0:x1]; b = last[y0:y1, x0:x1]
     picture = np.dstack([b, b, a])  # dark only at the start -> cyan, dark only at the end -> red
@@ -132,7 +132,7 @@ def _image(cv2, np, first, last, box, result, path, trails=()):
     # 1 px there. Sizes are for the solo dance clip's box (marks about 1.2 px on the sheet) and grow with larger boxes.
     k = _grow(y1-y0, x1-x0)
     dot, start, end, line = (max(1, round(TRAILS[n]*k)) for n in ('dot', 'start', 'end', 'line'))
-    for trail, color in zip(trails, TRAILS['colors']):
+    for trail, color in zip(trails, colors or TRAILS['colors']):
         at = [(int(round(x-x0)), int(round(y-y0))) for _, x, y in trail['xy']]
         frames = [n for n, _, _ in trail['xy']]
         for i, (a, b) in enumerate(zip(at, at[1:])):
@@ -145,6 +145,10 @@ def _image(cv2, np, first, last, box, result, path, trails=()):
                 cv2.circle(picture, p, start, color, line)
             if i == len(at)-1 or frames[i+1] != frames[i]+1:
                 cv2.rectangle(picture, (p[0]-end, p[1]-end), (p[0]+end, p[1]+end), color, line)
+        if named and at:  # mark: the agent's names, since its points have no fixed order to read colours by
+            size, t = .6*k, max(1, round(k)); (tw, th), _ = cv2.getTextSize(trail['point'], cv2.FONT_HERSHEY_SIMPLEX, size, t+3)
+            x = at[0][0]+start+2 if at[0][0]+start+2+tw <= picture.shape[1] else max(0, at[0][0]-start-2-tw)
+            outlined(cv2, picture, trail['point'], (x, max(th+2, at[0][1]-start)), size, t)
     cv2.imwrite(str(path), picture)
 
 
