@@ -230,3 +230,12 @@ Pose confidence is uncalibrated. A pose-selected coordinate agreeing with that s
 - The "both arms raised" fact at 19-20 s was wrong in every run. The clip ends at 20.04 s with the arms still down (frames and pose); the hands rise to the shoulders just after it (checked with the human timeline's author). That fact is now out of the rubric (29 facts). Since every run missed it, the scores above are unchanged out of 29.
 - Time unchanged (85 s, one run). No numbers, windows, seeds or tracker code changed.
 
+
+## Reading look.md: why the camera is unknown (2026-10-31)
+
+- On a plain studio wall the camera match finds nothing to hold. With the dancer masked, the background has 0 ORB points; the dancer has 224, and five of the seven sample clips give 2000. Every window said "카메라 모름(1–8%만 맞춤)", with no reason.
+- `camera.plain` checks the start frame of each window whose camera is unknown. Fewer than `background_features` points around the main person means a plain background. look.json records it as `camera.plain`.
+- When the camera is unknown in every window, a header line under the scene count gives the reason (plain background, or matches that do not agree) and the matched share, and says a fixed camera cannot be told apart. The windows and the check list keep their own "카메라 모름".
+- Also tried: dropping the per-window and check-list wording once the header says it. On the solo dance clip that cut "카메라 모름" from 18 to 1 and left the rest of the text unchanged, but the reading test scored lower: 12.3 against 14.1, six runs each (single runs 10.5–15.5 vs 12–16; permutation p about .07). The facts that dropped were not camera facts, so this is likely noise. The repeated wording is kept anyway, since dropping it showed no gain.
+- The "one shot, camera fixed" fact was missed in all 32 graded runs before this change and in these 12. The readers never mention the camera, because the reader task asks for a limb timeline. The tool cannot tell a fixed camera from a plain wall either.
+- Not changed: camera matching, numbers, windows, seeds, pictures.

@@ -192,6 +192,19 @@ def camera(cam, fps):
     return ', '.join(parts) or None
 
 
+def clip_camera(record):
+    """One header sentence on why the camera is unknown when no window placed it, else None. The windows keep their own
+    "카메라 모름": leaving it out there scored 12.3 against 14.1 in six reading runs each (solo dance clip; p about .07)."""
+    cams = [d['camera'] for s in record['shots'] for d in s['windows'] if d.get('camera')]
+    if not cams or not all(c.get('unknown') for c in cams):
+        return None
+    lo, hi = min(c['known'] for c in cams), max(c['known'] for c in cams)
+    share = f"{100*lo:.0f}%" if lo == hi else f"{100*lo:.0f}–{100*hi:.0f}%"
+    why = '배경이 거의 민무늬라 맞출 점이 없음' if all(c.get('plain') for c in cams) else '배경이 프레임끼리 맞지 않음'
+    return (f"카메라: 모든 구간에서 모름({why}, 구간마다 {share} 프레임만 맞춤). 고정인지 움직였는지는 이 도구로 알 수 없고, "
+            '화면 이동 px에 카메라 움직임이 섞였을 수 있다.')
+
+
 def window_line(done, fps, first=None):
     """One window. With `first` (the first window of the same repeated pose) only the differences are written."""
     w = done['window']; end = done.get('cut_after', w['end'])
@@ -428,6 +441,9 @@ def markdown(record, scan, full_name):
     if record.get('frame_sheets'):
         out.insert(-1, f"전체 화면 모음: {', '.join(record['frame_sheets'])} (전 구간 균등 추출, 최대 {zoom.ZOOM['max_overview']}장, 장마다 시간 표시; 사이에 빠진 빠른 동작은 여기 안 나옴: "
                        '사람끼리 하는 동작(당기기·기대기·찌르기)과 넘어짐은 포즈 상자가 합쳐지면 글에 안 나오거나 엉뚱한 사람에게 붙으니 여기서 본다.)')
+    whole_camera = clip_camera(record)
+    if whole_camera:
+        out.insert(3, whole_camera)
     from image_lens import check
     out += check.lines(record.get('check'))
     windows = [d for s in record['shots'] for d in s['windows']]

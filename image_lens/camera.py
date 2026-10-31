@@ -109,6 +109,25 @@ def _path(video, start, end, person=None):
     return result
 
 
+def plain(video, frame, person=None):
+    """True when the background on `frame` (around `person`, or the whole frame) has too few ORB points to place the
+    camera: a plain studio wall says nothing about a pan, so unknown there means "cannot see", not "matches failed"
+    (solo dance clip on a white cyclorama: 0 background points with the dancer masked, 224 on the dancer; five of the seven
+    sample clips 2000)."""
+    import cv2
+    import numpy as np
+    from image_lens import frames
+    bgr = next(iter(frames.window(video, frame, frame)))
+    gray = cv2.cvtColor(cv2.resize(bgr, None, fx=CAMERA['scale'], fy=CAMERA['scale']), cv2.COLOR_BGR2GRAY)
+    mask = None
+    if person is not None:
+        h, w = gray.shape; x0, y0, x1, y1 = person; px, py = CAMERA['person_pad']*(x1-x0), CAMERA['person_pad']*(y1-y0)
+        mask = np.full((h, w), 255, np.uint8)
+        mask[max(0, int((y0-py)*CAMERA['scale'])):max(0, int((y1+py)*CAMERA['scale'])),
+             max(0, int((x0-px)*CAMERA['scale'])):max(0, int((x1+px)*CAMERA['scale']))] = 0
+    return len(cv2.ORB_create(CAMERA['features']).detect(gray, mask)) < CAMERA['background_features']
+
+
 def between(camera, a, b):
     """Camera displacement from frame a to b, or None when either end is unknown."""
     if not camera or a not in camera or b not in camera:
