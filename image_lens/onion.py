@@ -100,12 +100,17 @@ def _image(cv2, np, first, last, box, result, path, trails=()):
             cv2.arrowedLine(picture, (centre, mid), (int(centre+s*band['dx']), int(mid+s*band['dy'])), (0, 140, 0), 4, tipLength=.3)
     for trail, color in zip(trails, TRAILS['colors']):
         at = [(int(round(x-x0)), int(round(y-y0))) for _, x, y in trail['xy']]
-        for a, b in zip(at, at[1:]):
-            cv2.line(picture, a, b, color, TRAILS['line'])
+        frames = [n for n, _, _ in trail['xy']]
+        for i, (a, b) in enumerate(zip(at, at[1:])):
+            if frames[i+1] == frames[i]+1:
+                cv2.line(picture, a, b, color, TRAILS['line'])
         for p in at:  # white rim: middle dots on a busy drawing were hard to find
             cv2.circle(picture, p, TRAILS['dot']+1, (255, 255, 255), -1); cv2.circle(picture, p, TRAILS['dot'], color, -1)
-        cv2.circle(picture, at[0], TRAILS['start'], color, 2)
-        e = TRAILS['end']; cv2.rectangle(picture, (at[-1][0]-e, at[-1][1]-e), (at[-1][0]+e, at[-1][1]+e), color, 2)
+        for i, p in enumerate(at):
+            if i == 0 or frames[i] != frames[i-1]+1:
+                cv2.circle(picture, p, TRAILS['start'], color, 2)
+            if i == len(at)-1 or frames[i+1] != frames[i]+1:
+                e = TRAILS['end']; cv2.rectangle(picture, (p[0]-e, p[1]-e), (p[0]+e, p[1]+e), color, 2)
     cv2.imwrite(str(path), picture)
 
 
@@ -305,7 +310,7 @@ def lines(result, image_name=None):
     out = ['- 높이별 흐름 (사람 상자 5등분, 카메라 뺌): ' + ' · '.join(parts)]
     if image_name:
         out.append(f"  - 어니언 그림: {image_name} (청록=시작, 빨강=끝, 초록 화살표=띠별 이동 ×{ONION['arrow_scale']}; 오른쪽 회색=시작과 가장 다른 가운데 프레임; "
-                   f"색 점선=부위별 대표 점의 프레임마다 위치({'·'.join(TRAILS['names'])} 순, 카메라 뺌), 큰 원=시작, 큰 네모=끝, 점 간격이 좁으면 느림·넓으면 빠름)")
+                   f"색 점선=부위별 대표 점의 프레임마다 위치({'·'.join(TRAILS['names'])} 순, 카메라 뺌), 큰 원·네모=각 연속 관측의 시작·끝, 선 끊김=관측 누락, 이어진 점 간격이 좁으면 느림·넓으면 빠름)")
     return out
 
 

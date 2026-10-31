@@ -113,6 +113,73 @@ class Timing(unittest.TestCase):
         self.assertTrue(any(s['speeds'] is not None for l in result['limbs'] for s in l['strokes']))
 
 
+class TimingAgreement(unittest.TestCase):
+    # Wrong raw timing must not qualify selected movement; matching constant offsets are a retained control.
+    def result(self, raw_x):
+        from tests.test_body_motion import packet
+        from image_lens import body_motion
+        p=packet({name:{n:(x+ (4*n if name=='wrist-l' else 0),y) for n in range(31)} for name,x,y in
+                  [('shoulder-l',300.,300.),('shoulder-r',100.,300.),('wrist-l',350.,400.)]})
+        raw=copy.deepcopy(p)
+        for f in p['frames']:
+            for q in f['points']:
+                if q['point_id']=='wrist-l':q['coordinate_source']='pose'
+        for f in raw['frames']:
+            for q in f['points']:
+                if q['point_id']=='wrist-l':q['xy'][0]=raw_x(f['frame'])
+        return body_motion.describe([p],dict(seed=0,end=30),timing_packets=[raw])
+
+    def test_disagreeing_raw_timing_is_unknown_in_json_and_text(self):
+        import math
+        from image_lens import body_motion,digest
+        for name,fn in [('stationary',lambda n:350.),('opposite',lambda n:350.-4*n),
+                        ('different_curve',lambda n:350.+4*n+100*math.sin(math.pi*(n-1)/29))]:
+            with self.subTest(name=name):
+                r=self.result(fn);t=r['limbs'][0]['strokes'][0]
+                self.assertEqual(t['direction'],'right');self.assertGreater(t['distance_px'],100.)
+                self.assertIsNone(t['ease']);self.assertIsNone(t['speeds'])
+                self.assertEqual(t['timing_status'],'unknown_geometry_disagreement')
+                self.assertIn('속도 모름',digest.limbs(r)[0]['text'])
+                self.assertIn('속도 모름','\n'.join(body_motion.lines(r)))
+
+    def test_matching_and_constant_offset_raw_paths_keep_timing(self):
+        for offset in (0.,200.):
+            with self.subTest(offset=offset):
+                r=self.result(lambda n:350.+4*n+offset);t=r['limbs'][0]['strokes'][0]
+                self.assertEqual(t['timing_status'],'raw_consistent')
+                self.assertEqual(t['speeds'],[4.]*5);self.assertEqual(t['ease'],'even')
+
+    def test_matching_sharp_turn_uses_same_filter_context(self):
+        from tests.test_body_motion import packet
+        from image_lens import body_motion
+        xs=[350,350,380,410,395,370,340,350,380]
+        p=packet({name:{n:(xs[n] if name=='wrist-l' else x,y) for n in range(9)} for name,x,y in
+                  [('shoulder-l',300.,300.),('shoulder-r',100.,300.),('wrist-l',350.,400.)]})
+        for offset in (0.,200.):
+            raw=copy.deepcopy(p)
+            for f in raw['frames']:
+                for q in f['points']:
+                    if q['point_id']=='wrist-l':q['xy'][0]+=offset
+            r=body_motion.describe([p],dict(seed=0,end=8),timing_packets=[raw])
+            selected=[t for t in r['limbs'][0]['strokes'] if t['frames'] in ([1,3],[3,6])]
+            self.assertEqual(len(selected),2)
+            self.assertTrue(all(t['timing_status']=='raw_consistent' for t in selected))
+            self.assertEqual([t['speeds'] for t in selected],[[30.],[23.3]])
+
+    def test_centre_mismatch_reason_reaches_full_and_brief_text(self):
+        from tests.test_body_motion import packet
+        from image_lens import body_motion,digest
+        p=packet({name:{n:(x,y+5*n) for n in range(31)} for name,x,y in
+                  [('shoulder-l',300.,300.),('shoulder-r',100.,300.),('wrist-l',350.,400.)]})
+        raw=copy.deepcopy(p)
+        for f in raw['frames']:
+            for q in f['points']:q['xy'][1]-=5*f['frame']
+        r=body_motion.describe([p],dict(seed=0,end=30),timing_packets=[raw])
+        self.assertEqual(r['centre_shift']['timing_status'],'unknown_geometry_disagreement')
+        self.assertIn('속도 모름','\n'.join(body_motion.lines(r)))
+        self.assertIn('속도 모름',digest.window_line(dict(window=dict(seed=0,end=30),body=r,groups=[]),30))
+
+
 class GeometrySources(unittest.TestCase):
     def packets(self, switch='wrist-l'):
         from tests.test_body_motion import packet

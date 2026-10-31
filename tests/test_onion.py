@@ -88,6 +88,20 @@ class Trails(unittest.TestCase):
             self.assertGreater(yellow.sum(), 100)
 
 
+    # Row-preservation tests above miss the renderer reconnecting f1 to f3.
+    def test_rendered_trail_breaks_at_missing_native_frame(self):
+        import tempfile
+        import cv2
+        import numpy as np
+        with tempfile.TemporaryDirectory() as d:
+            image=np.full((200,320,3),128,np.uint8);out=Path(d)/'gapped.png'
+            onion._image(cv2,np,image,cv2.cvtColor(image,cv2.COLOR_BGR2GRAY),(0,0,320,200),[],out,
+                         [dict(point='wrist-l',xy=[(1,40,100),(3,260,100),(4,280,100)])])
+            rendered=cv2.imread(str(out))
+            self.assertEqual(rendered[100,160].tolist(),[128]*3)  # no inferred f1->f3 path
+            self.assertEqual(rendered[100,270].tolist(),list(onion.TRAILS['colors'][0]))  # real f3->f4 remains
+
+
 class Peak(unittest.TestCase):
     def test_out_and_back_shows_the_far_frame(self):
         import tempfile

@@ -65,7 +65,7 @@ def speeds(fs,path):
     return [round(statistics.mean(steps[i*len(steps)//k:(i+1)*len(steps)//k]),1) for i in range(k)]
 
 def speed_text(values):
-    return '속도 '+'→'.join(f'{v:.0f}' for v in values)+' px/f' if values else ''
+    return '속도 '+'→'.join(f'{v:.1f}'.rstrip('0').rstrip('.') for v in values)+' px/f' if values else ''
 
 def strokes(fs,ts,xy):
     """Coarse readable movement units over one continuous run; summary only, raw coordinates are untouched."""

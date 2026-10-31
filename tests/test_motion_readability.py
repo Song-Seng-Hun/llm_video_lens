@@ -57,7 +57,10 @@ class Speeds(unittest.TestCase):
     def test_drawings_held_on_twos_read_as_steady(self):
         fs = list(range(11)); path = [(20.*(n//2), 0.) for n in fs]  # 0, 0, 20, 20, 40 ...: 10 px/f on average
         self.assertEqual(motion_report.speeds(fs, path), [10.]*5)
-        self.assertEqual(motion_report.speed_text([12.4, 3.]), '속도 12→3 px/f')
+        self.assertEqual(motion_report.speed_text([12.4, 3.]), '속도 12.4→3 px/f')
+
+    def test_positive_subpixel_speeds_do_not_format_as_stillness(self):
+        self.assertEqual(motion_report.speed_text([.3,.5,.4,0.]), '속도 0.3→0.5→0.4→0 px/f')
 
     def test_missing_frames_count_by_frame_gap(self):
         self.assertEqual(motion_report.speeds([0, 2, 3], [(0., 0.), (8., 0.), (12., 0.)]), [4.])
