@@ -129,8 +129,8 @@ def cut_frame(track_packets, window, min_frames=LOOK['min_frames']):
 
 def changed_after(video, frame):
     """Largest downscaled grey difference over the two frame steps after `frame`, on motion_view's change scale. Points
-    lost together over a still picture were hidden or moved too fast (3D clip, clip B: <=7); a new drawing jumps (kaguya
-    f73, on twos: 22)."""
+    lost together over a still picture were hidden or moved too fast (3D clip, clip B: <=7); a new drawing jumps (anime
+    clip on twos, f73: 22)."""
     import cv2
     import numpy as np
     from image_lens import frames, motion_view

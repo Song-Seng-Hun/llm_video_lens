@@ -95,6 +95,14 @@ python -m image_lens --workspace W mark --video V --shots W/look/shots.json --fr
 - 모델 파일은 직접 준비해야 합니다. CoTracker 소스와 체크포인트에는 비상업적 이용 조건이 있고, 자세 모델 가중치의 라이선스는 확인되지 않았습니다.
 - 1920×1080보다 큰 영상은 줄여서 처리합니다. 이때 보고서의 px 값은 줄인 영상 기준입니다.
 
+## AI와 함께 만든 프로젝트
+
+이 프로젝트는 사람이 방향을 정하고 AI 에이전트들이 함께 만든 결과물입니다. 무엇을 만들지, 어떤 정확도를 목표로 할지, 무엇을 채택할지는 사람이 정했고, 구현·측정·코드 리뷰는 Claude(Anthropic)와 Codex(OpenAI) 에이전트가 나눠 맡았습니다. 최근 개선안은 만든 쪽이 볼 수 없게 따로 보관한 정답 프레임으로 다른 에이전트가 채점한 뒤에 받아들였습니다. 위 배너도 그 모습을 그린 것으로, Claude가 영상을 읽으며 BRIEF에 한 줄씩 적어 나갑니다. [look 노트](docs/look-notes.md)는 이 과정에서 에이전트가 남긴 측정 기록입니다.
+
+## 라이선스
+
+이 프로젝트의 코드와 문서는 [MIT](LICENSE)입니다. 함께 들어 있는 외부 코드는 각자의 조건을 따릅니다: `image_lens/vendor/shot-detector`(PySceneDetect)는 BSD 3-Clause, `image_lens/vendor/source`(CoTracker)는 CC-BY-NC 4.0으로 비상업적 이용만 허용됩니다. 모델 가중치는 들어 있지 않습니다.
+
 ## 더 보기
 
 자세한 문서는 영어입니다.

@@ -2,7 +2,7 @@
   "schema": "image-lens.source-release/1",
   "date_kst": "2026-10-31",
   "source_only": true,
-  "authored_code_license": "not granted by this extraction; preserve owner decision",
+  "authored_code_license": "MIT (LICENSE); vendored code keeps its own terms",
   "vendor_licenses": {
     "PySceneDetect": "BSD-3-Clause plus embedded MIT notice",
     "CoTracker": "CC-BY-NC-4.0",
@@ -19,8 +19,8 @@
     "historical experiment outputs"
   ],
   "manifest_self_excluded": true,
-  "file_count": 135,
-  "total_bytes": 1514737,
+  "file_count": 136,
+  "total_bytes": 1518927,
   "files": [
     {
       "path": ".gitattributes",
@@ -33,19 +33,24 @@
       "sha256": "0e19822010301a9f3a5880d71ce22f16a6461f6bf086242da94645fb26be8af0"
     },
     {
+      "path": "LICENSE",
+      "bytes": 1453,
+      "sha256": "f188924c9b14212df097bbeb982d2bfe2f738c9be2b486cdb72708e6ee439b46"
+    },
+    {
       "path": "README.en.md",
-      "bytes": 5875,
-      "sha256": "4d8a98f40812e0d5e12b24247936f75bd66658bea54fbfd34b1b78329e6b6e8a"
+      "bytes": 6737,
+      "sha256": "7448ce419357938d2aaa2125a635de2c58580dde2c2dfd60ba37be7f9155651a"
     },
     {
       "path": "README.ja.md",
-      "bytes": 7392,
-      "sha256": "5c8f737a88deba85f81b2adf4eaeaa226b493accc8cb7184352289f922259178"
+      "bytes": 8524,
+      "sha256": "bcb867e83ff27de6a4d92968e0e76b558554e6776ffa910fea56569d0d20d817"
     },
     {
       "path": "README.md",
-      "bytes": 7410,
-      "sha256": "bca18855deb8088f89a5d3310c10dfe8fc102b3e0d055c49604d24f0ea9a2b24"
+      "bytes": 8507,
+      "sha256": "f0abffebe5dfc07026cd106cb0f164e3e1db9af054ed6fddf830edc3b1b198da"
     },
     {
       "path": "assets/banner-dark.svg",
@@ -79,8 +84,8 @@
     },
     {
       "path": "docs/look-notes.md",
-      "bytes": 45584,
-      "sha256": "a70c4d7b067f2e3874b2f23d32f06ec1b9ed9bf222ecf66202df51ecbe82b8d0"
+      "bytes": 45597,
+      "sha256": "c50a142847b102a9ce20163f344ab1f26e1e9e455568ea686c3b3f814d2a866a"
     },
     {
       "path": "docs/provenance.md",
@@ -89,8 +94,8 @@
     },
     {
       "path": "docs/verification.md",
-      "bytes": 5375,
-      "sha256": "62e1b89b213f5190b9bc8c8bb073815a5bd5a3de476f18bbf24ff207fb8bba09"
+      "bytes": 5021,
+      "sha256": "fe2f1cd780e1f379f5ace1d92a89942ffd98ed5ed6cb95b3e90731af057da446"
     },
     {
       "path": "image_lens/__init__.py",
@@ -114,8 +119,8 @@
     },
     {
       "path": "image_lens/body_motion.py",
-      "bytes": 43459,
-      "sha256": "18d7a6d75dd566bef1330a3a57f8b52382d70cf08c77f41d7a0ba71b926c21d1"
+      "bytes": 43462,
+      "sha256": "b6e163af2faa82cfdf8802be1be4ae3dd9743f0388de155c93cbd10589932f9b"
     },
     {
       "path": "image_lens/brief.py",
@@ -169,8 +174,8 @@
     },
     {
       "path": "image_lens/look.py",
-      "bytes": 37427,
-      "sha256": "1712a57e972c54c26d230b51a2b12de252ee699442e23e100300605ef2e84a80"
+      "bytes": 37431,
+      "sha256": "d9bcbcdf0abeb1b883162b73c54cbdc15ad3a83b021f75fc3c0663aed31d26b0"
     },
     {
       "path": "image_lens/mark.py",
@@ -569,18 +574,18 @@
     },
     {
       "path": "lan/README.md",
-      "bytes": 5603,
-      "sha256": "6d251ab9679eff80dd46c0499113815540774a36132f43ea1572d5d5f07d655d"
+      "bytes": 5673,
+      "sha256": "7a7ea30ab8a0add187df6d4c2ab5b0c73b5b5d75a84a6e7c117f4c7cc8bd5875"
     },
     {
       "path": "lan/api.example.json",
-      "bytes": 638,
-      "sha256": "cecebae8c694744e58dc88795c75268ec66358b92a87e928da9d4c8a86d8bc56"
+      "bytes": 584,
+      "sha256": "466a4c6238ce64bc8faaf2a9a2244752c3aa0274e5cb932efbe2225ad17bb95d"
     },
     {
       "path": "lan/com.image-lens.lan-api.plist.template",
-      "bytes": 1156,
-      "sha256": "67f64faff1104d45e8eb8ef0df5d82fd232df9be411f16e697ba124cb1ae7f71"
+      "bytes": 1120,
+      "sha256": "83352fbd231c2195996fb5e49a511ca2cd10b358af93b62aaddbd7887a170a41"
     },
     {
       "path": "lan/image-lens-client.mjs",

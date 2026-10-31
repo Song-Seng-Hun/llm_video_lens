@@ -92,6 +92,14 @@ python -m image_lens --workspace W mark --video V --shots W/look/shots.json --fr
 - You supply the model files. The CoTracker source and checkpoint carry noncommercial terms, and the pose model weights' licenses are unchecked.
 - Videos larger than 1920×1080 are scaled down first; px values in the reports are then for the scaled video.
 
+## Built with AI
+
+A person set the direction and AI agents built this project together. What to build, which accuracy to aim for and what to adopt were human decisions; implementation, measurement and code review were split between Claude (Anthropic) and Codex (OpenAI) agents. Recent changes were accepted only after a different agent scored them on held-out labelled frames the author could not see. The banner shows the same idea: Claude reads the film strip and writes one line at a time into BRIEF. The [look notes](docs/look-notes.md) are the agents' measurement log.
+
+## License
+
+The project's own code and documents are [MIT](LICENSE). Vendored code keeps its own terms: `image_lens/vendor/shot-detector` (PySceneDetect) is BSD 3-Clause, and `image_lens/vendor/source` (CoTracker) is CC-BY-NC 4.0, noncommercial use only. No model weights are included.
+
 ## More
 
 - [Full guide](docs/guide.md): every command and option, the full way to read `look.md`, output files, the brief format, jobs and tracking, pose seeds
