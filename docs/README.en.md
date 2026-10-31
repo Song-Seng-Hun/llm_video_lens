@@ -95,6 +95,15 @@ Video: Antoni Shkraba, ["Video of a Man Dancing"](https://www.pexels.com/video/v
 - Elsewhere in the same video, the right hand touching the cheek at 7–9 s is reported from 5.4 s. At 16.32–19.12 s skeleton trust is low, so the line gives only screen movement without limb names. Whether the camera is fixed cannot be told.
 - So read the text together with the pictures and "먼저 확인할 곳". Measurements are in the [look notes](look-notes.md).
 
+### Reading an animated character
+
+<p align="center"><img src="../assets/example-live2d-onion.jpg" width="560" alt="An onion picture of a 2D animated character. On the left the start (cyan) and end (red) are overlaid; magenta and yellow dotted trails run side by side from the fingertips at the hat brim outward, and a blue trail follows the elbow a short way down. The cyan and red outlines of the hat and face split apart where the head tilted. On the right is frame f35, near the end."></p>
+
+A drawn character reads the same way. In this 1.5 s move the hand at the hat brim sweeps outward while the head tilts. The two fingertip points (magenta, yellow) draw side-by-side arcs, and the hat and face outlines split as far as the head tilted. `몸 기준` says the left arm went right 124 px fast, then 68 px more while slowing. The background is plain, so the camera is "모름" (unknown).
+
+Model: Live2D Inc. sample model "Mao", used under the [Live2D Free Material License Agreement](https://www.live2d.com/eula/live2d-free-material-license-agreement_en.html). The picture is `look` run on a 1.5 s clip animated with the Live2D Cubism SDK for Web; the model files and the clip are not in the repository.
+This content uses sample data owned and copyrighted by Live2D Inc.
+
 ### Ask about one span
 
 Instead of rereading the whole summary, ask about that span. Spans are 4 s at most.
