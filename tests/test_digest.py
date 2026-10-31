@@ -149,8 +149,8 @@ class Posture(unittest.TestCase):
     def test_steps_end_with_the_arm_posture(self):
         done = dict(window=dict(seed=0, end=99), phases=[dict(frames=[0, 45], moved=[]), dict(frames=[45, 99], moved=[])],
                     arms=[dict(frame=0, l='down', r='down', cross=[]), dict(frame=45, l='up', r='up', cross=[]), dict(frame=99, l='mid', r=None, cross=[])])
-        self.assertEqual(digest.phase_lines(done, 25.), ['  - 0.00–1.80s: 팔다리 거의 그대로 | 끝 팔: 양팔 어깨 위',
-                                                         '  - 1.80–4.00s: 팔다리 거의 그대로 | 끝 팔: 왼팔 가슴 높이'])
+        self.assertEqual(digest.phase_lines(done, 25.), ['  - 0.00–1.80s: 팔다리 큰 이동 없음(몸통 길이 0.35배 미만) | 끝 팔: 양팔 어깨 위',
+                                                         '  - 1.80–4.00s: 팔다리 큰 이동 없음(몸통 길이 0.35배 미만) | 끝 팔: 왼팔 가슴 높이'])
         self.assertIn('팔 자세: 양팔 허리 아래', digest.window_line(dict(done, groups=[]), 25.))
 
 

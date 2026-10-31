@@ -29,7 +29,7 @@ LLM Video Lens はそれを助ける補助ツールです。フレーム間の�
 
 ## クイックスタート
 
-1. Python 3.11 以上で依存パッケージをインストールします。`look` は姿勢推定と点の追跡を両方使うので、2 つのセットがどちらも必要です。
+1. macOS（Apple Silicon）の Python 3.12 で作成・検証しました。Windows では検証していません。Python 3.11 以上で依存パッケージをインストールします。`look` は姿勢推定と点の追跡を両方使うので、2 つのセットがどちらも必要です。
 
    ```sh
    pip install -r requirements/pose.txt -r requirements/tracking.txt

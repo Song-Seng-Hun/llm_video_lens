@@ -322,7 +322,7 @@ def phase_lines(done, fps):
         said = [f"{_named(m, body_motion.PHASE_KO[m['part']], done.get('facing'))} {_dir(m['direction'])} {m['amount']:.1f}"
                 + (f"(최대 {m['back']:.1f} 갔다 돌아옴)" if m['back'] else '') for m in p['moved'][:body_motion.PHASES['parts']]]
         pose = arm_words(ends.get(p['frames'][1]))
-        out.append(f"  - {a/fps:.2f}–{b/fps:.2f}s: " + ('; '.join(said) if said else '팔다리 거의 그대로')
+        out.append(f"  - {a/fps:.2f}–{b/fps:.2f}s: " + ('; '.join(said) if said else f"팔다리 큰 이동 없음(몸통 길이 {body_motion.PHASES['move']:g}배 미만)")
                    + (f" | 끝 팔: {pose}" if pose else ''))
     return out
 

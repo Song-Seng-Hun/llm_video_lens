@@ -20,7 +20,7 @@
   ],
   "manifest_self_excluded": true,
   "file_count": 138,
-  "total_bytes": 1769453,
+  "total_bytes": 1770824,
   "files": [
     {
       "path": ".gitattributes",
@@ -39,8 +39,8 @@
     },
     {
       "path": "README.md",
-      "bytes": 13943,
-      "sha256": "0268ba08eb2c12b7a3af9bd2d2ae3ee58b0cbabf33d02454c78db90d612b308a"
+      "bytes": 14062,
+      "sha256": "d2cc6bf9dca0ba84ae7989da1ab6fdf7213f554b570fd2a14e76321f0f1d1edf"
     },
     {
       "path": "assets/banner-dark.svg",
@@ -64,13 +64,13 @@
     },
     {
       "path": "docs/README.en.md",
-      "bytes": 12392,
-      "sha256": "f0b9e3b08bf528f909c55cf4dc84bda055a83653b3a1dfbce24f9a421ca24b7f"
+      "bytes": 12483,
+      "sha256": "082bed1122124dbe68c7ecf1860b8c2b5b0717e8e625cd3192bfa0e6cdbe18b5"
     },
     {
       "path": "docs/README.ja.md",
-      "bytes": 15077,
-      "sha256": "c796662678f75cb8c70c9134dd049e4e9761efefccd7dee5dfce068e26d4c8d8"
+      "bytes": 15191,
+      "sha256": "4eedbf4a2b61060b44064e863b97f5e17bf07ac598061fb289ed472d26c62ed6"
     },
     {
       "path": "docs/guide.md",
@@ -94,8 +94,8 @@
     },
     {
       "path": "docs/look-notes.md",
-      "bytes": 60369,
-      "sha256": "7fbf3022233716a7e5172025248cf826f8227649973e4d6270a245a789fcdcbe"
+      "bytes": 61296,
+      "sha256": "abfac7b55186ee03c4e70c6e03be5d4751df2120b9643d972a06aa490dad44fa"
     },
     {
       "path": "docs/provenance.md",
@@ -159,8 +159,8 @@
     },
     {
       "path": "image_lens/digest.py",
-      "bytes": 34115,
-      "sha256": "f3aeaf2c25761e3e2be76b81777ccfc9e7de0c5e98a5d27fbae78a0334ed3ae4"
+      "bytes": 34173,
+      "sha256": "3721c59da42ab5235dad30ae58ecc1a21238dafda0cf9238eec1c87369addef4"
     },
     {
       "path": "image_lens/foreground_regions.py",
@@ -654,8 +654,8 @@
     },
     {
       "path": "tests/test_digest.py",
-      "bytes": 11613,
-      "sha256": "a56371831e9e0fba194c49b8f9e03103e3152862003b90708f0bc2599217b567"
+      "bytes": 11675,
+      "sha256": "2b9050fa1b6c28496091624996f989826faf0b13585636c78edd9a98a5097838"
     },
     {
       "path": "tests/test_joint_tracking.py",
