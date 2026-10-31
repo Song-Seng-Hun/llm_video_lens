@@ -248,6 +248,13 @@ Pose confidence is uncalibrated. A pose-selected coordinate agreeing with that s
 - Windows with no trail: anime music video 20 → 9, solo dance 2 → 0, 1440 px anime clip 0 → 0. Of the 9 left, 6 have neither body nor screen moves (the text lists none either), 3 have a body with no limb move or dropped camera frames.
 - Not changed: numbers, windows, seeds, text other than the two legends.
 
+## Reading look.md: naming unnamed points with mark (2026-10-31)
+
+- Windows with no trusted body follow unnamed "화면" points (move-a…, head-top). A reader that can tell the part from the onion picture had no pointer to `mark`, which tracks agent-named points.
+- look-full.md now has an "이름 붙이기" line for each such window: the `mark` command for its seed frame and end, and the seed-frame px of its trail points. look.md gets one line saying how many windows have it and where to find it. look.json keeps it as `mark_hint`.
+- Anime music video: 11 windows got the line; the rest of look.md is unchanged. The command from the f180 window ran as written with six points named by eye (raised foot, bent knee, lower leg, apple, eye, hand); `mark` placed them within 10 px and tracked f180..209.
+- Untested: whether readers use it, or whether named points improve the reading. That needs a ground-truth timeline for this clip.
+
 ## Pictures: readable labels (2026-10-31)
 
 - Grid numbers were red on the frame, nearly invisible on a pink anime frame; frame numbers on the onion's grey panel came out a few px tall in the onion sheet.
