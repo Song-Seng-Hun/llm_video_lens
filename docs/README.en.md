@@ -68,6 +68,25 @@ It also makes pictures:
 - `frame-sheet-N.jpg`: frames picked evenly from the whole video
 - `check-sheet-N.jpg`: dense frames of each "먼저 확인할 곳" span
 
+### Reading one line
+
+One line from the `look.md` of a live-action solo dance video (shortened with `…`). The output text is Korean.
+
+```text
+- 2.16–3.40s f54..84 | 전신 | 정면(사람 왼쪽=화면 오른쪽) | 팔 자세: 왼팔 가슴 높이·오른팔 어깨 높이, 오른팔 몸 가운데 넘어감 → 왼팔 허리 아래·오른팔 가슴 높이, 오른팔 몸 가운데 넘어감 | 전체: 카메라 모름(3%만 맞춤), 몸 관측 끊김·기준점 변경, 전체 이동 모름 | 몸 기준: 왼다리(화면 오른쪽: 발목·무릎·허벅지) 오른쪽 65px → 오른쪽 위 44px → 위 27px, 몸 바깥으로; … | 손-몸: 두 손 모음 2.24–3.16s, 떨어짐; 오른손(화면 왼쪽)이 왼어깨(화면 오른쪽) 가까이 옴 2.40–3.08s, 떨어짐 | …
+```
+
+- `2.16–3.40s f54..84`: time and source frame numbers, to trace back to the video.
+- `전신` (full body), `정면(사람 왼쪽=화면 오른쪽)` (facing the camera, person's left = screen right): framing and facing. Left and right after this are the person's own; the brackets give the screen side.
+- `팔 자세` (arm posture): wrist height at the start and end of the span, and whether a wrist crossed the body's midline.
+- `전체` (whole): camera and body-centre movement. This video has a plain background, so the camera cannot be measured and is written as unknown (`모름`).
+- `몸 기준` (relative to the body): limb movement with the body centre removed, arrows in time order. Here the left leg goes out to the right, then up.
+- `손-몸` (hand-body): a hand near the other shoulder, or the two hands together. It is a distance on the screen, so read it as a touch candidate.
+
+<p align="center"><img src="../assets/example-onion.svg" width="560" alt="Illustration: a person facing the viewer, start pose in cyan and end pose in red overlaid; a yellow dotted trail from the left ankle goes out to the side and up, and a blue dotted trail from the right wrist goes to the left shoulder and down to chest height."></p>
+
+The picture is drawn to explain this line; it is not a video frame. Real onion pictures are drawn the same way on top of the video frames: cyan is the start, red the end, and the dotted trails are the parts in the order `몸 기준` lists them, yellow, magenta, blue… (one dot per frame, circle at the start, square at the end).
+
 ### Ask about one span
 
 Instead of rereading the whole summary, ask about that span. Spans are 4 s at most.
