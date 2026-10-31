@@ -216,3 +216,17 @@ Pose confidence is uncalibrated. A pose-selected coordinate agreeing with that s
 - Measured with a reading test on a live-action solo dance clip, 20 s. The truth is 30 facts from a human timeline. A fresh Codex reader saw look.md plus every sheet, a Codex grader scored it, and each condition ran 3 times. The mean score did not move beyond run-to-run noise: 12.2 on master, 11.7 on this branch, 12.5 with the seed-retry PR. Single runs ranged from 9 to 14.5. Wrong answers on the 5 left/right facts fell from 13 of 15 on master to 10 on this branch, and to 7 together with the seed-retry PR.
 - The remaining left/right errors sit in low-skeleton-trust windows. There look.md names no limbs, and the reader mirrored the dancer from the pictures. The pose sides themselves were correct on this clip: the hips face the camera in 497 of 497 frames, and the drawn left/right joints match the body. Also on this clip, with the screen text only and no pictures, the reader got 3 of 10 pilot questions right; with the pictures it got 9 of 10.
 - Not changed: no numbers, windows, seeds, onion or camera code. look.json gains `facing`, `phases` and a `body` side on limb, event and bridge items. Older records without them keep the screen-side wording.
+
+## Reading look.md: hand contact and arm posture (2026-10-31)
+
+- New `손-몸` field: a hand within 0.3 torso lengths of the other shoulder, or the two wrists within 0.2, for at least 0.1 s (`pose_events` `hand_body`). Picture-plane distance, so it is a touch candidate.
+- New arm posture: wrist height against the shoulder line (`어깨 위` / `어깨 높이` / `가슴 높이` / `허리 아래`, in torso lengths) and a wrist past the body's midline. It is given at the window's start and end (`팔 자세`), or at each step's end (`끝 팔`) when the window has steps (`arm_poses`).
+- The first cut had no shoulder-level band, so a wrist at the shoulder line read as "가슴 높이"; readers then lost "left arm raised". The band was added before the measured run below.
+- Reading test (same live-action solo clip and rubric as above, three runs each). The baseline is the same look.md with the new fields removed, so nothing else differs:
+  - mean score: baseline 12.0, branch 15.0 (single runs 9-14.5 vs 13.5-16);
+  - the ten posture/contact facts: 2.7 vs 4.5;
+  - hand on the left shoulder: 0/3 vs 3 partial; hand leaves the shoulder: 0/3 vs 2 hits and 1 partial; arms crossed: 1 vs 2 hits.
+- Not helped: the hand at the cheek (readers put it at 5.4 s, where the pose has it; the human timeline says 7-9 s), twisted posture and forward lean (not measured here). The right-leg facts at 13-16 s stay mostly wrong, as in the earlier 20 runs; this change does not touch legs.
+- The "both arms raised" fact at 19-20 s is wrong in every run. In the frames and in the pose, both wrists hang about 1.4 torso lengths below the nose up to 20.0 s, so the raise is probably after the clip; the rubric item needs checking.
+- Time unchanged (85 s, one run). No numbers, windows, seeds or tracker code changed.
+

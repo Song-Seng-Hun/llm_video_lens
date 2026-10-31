@@ -553,6 +553,7 @@ EVENTS = dict(min_score=.30, face_points=10, face_pad=.25, near_seconds=.1, gap_
 FACE = range(23, 91)
 HANDS = dict(l=(9, range(91, 112)), r=(10, range(112, 133)))
 REGION_KO = ('이마·눈', '볼', '입·턱')
+CONTACT = dict(shoulder=.3, hands=.2, seconds=.1)
 
 
 def _person(tracks, track_id):
@@ -605,7 +606,7 @@ def _screen_side(person, i):
 
 
 def pose_events(pose_frames, window, fps):
-    """Hand-near-face runs, per-shoulder rises and falls, shoulder-width changes and the share of frames each wrist
+    """Hand-near-face runs, a hand at the other shoulder and the hands together, per-shoulder rises and falls, shoulder-width changes and the share of frames each wrist
     was seen, for the person posed on the seed frame. Sides are screen sides on the seed frame."""
     seed = largest(pose_frames.get(window['seed']))
     if not seed:
@@ -640,6 +641,28 @@ def pose_events(pose_frames, window, fps):
                 # Held from the seed frame is a pose with an unknown start, not a gesture made here; still worth saying.
                 hand_face.append(dict(side=sides[s], body=s, frames=[a, b], seconds=round((b-a+1)/fps, 2), region=REGION_KO[spots[len(spots)//2]],
                                       enters=a > window['seed'], exits=b < window['end']))
+    # A hand on the other shoulder or the two hands together (live-action dancer: right hand on the left shoulder 2.6 s,
+    # crossed hands 0.6 s; look.md named only moves, and 20 of 20 readers missed the shoulder touch). In torso lengths
+    # (shoulder midpoint to hip midpoint), so it does not depend on the figure's size; picture-plane only.
+    close = dict(shoulder={s: {} for s in HANDS}, hands={})
+    for n, p in people.items():
+        k = p['keypoints']
+        if not all(ok(p, i) for i in (5, 6, 11, 12)):
+            continue
+        torso = math.dist(_mean([k[5], k[6]]), _mean([k[11], k[12]]))
+        if not torso:
+            continue
+        for s, other in (('l', 6), ('r', 5)):
+            wrist = HANDS[s][0]
+            if ok(p, wrist):
+                close['shoulder'][s][n] = math.dist(k[wrist], k[other])/torso <= CONTACT['shoulder']
+        if ok(p, 9) and ok(p, 10):
+            close['hands'][n] = math.dist(k[9], k[10])/torso <= CONTACT['hands']
+    shortest_touch = max(3, round(CONTACT['seconds']*fps))
+    hand_body = [dict(side=sides[s], body=s, to='shoulder', to_side=sides['r' if s == 'l' else 'l'], frames=[a, b], enters=a > window['seed'], exits=b < window['end'])
+                 for s in HANDS for a, b in _runs(close['shoulder'][s], EVENTS['gap_frames']) if b-a+1 >= shortest_touch]
+    hand_body += [dict(to='hands', frames=[a, b], enters=a > window['seed'], exits=b < window['end'])
+                  for a, b in _runs(close['hands'], EVENTS['gap_frames']) if b-a+1 >= shortest_touch]
     shoulders = []; width = []
     both = [n for n, p in people.items() if ok(p, 5) and ok(p, 6)]
     hips = [n for n in both if min(people[n]['scores'][11], people[n]['scores'][12]) >= EVENTS['hip_score']]
@@ -666,7 +689,8 @@ def pose_events(pose_frames, window, fps):
     turns = [e['frames'] for e in width if e['share'] >= EVENTS['turn']]
     shoulders = [e for e in shoulders if not any(e['frames'][0] <= b and a <= e['frames'][1] for a, b in turns)]
     lost = window['end']-window['seed']+1-len(people)
-    return dict(lost_frames=lost, turns=turns, hand_face=sorted(hand_face, key=lambda e: e['frames'][0]), shoulders=sorted(shoulders, key=lambda e: e['frames'][0]),
+    return dict(lost_frames=lost, turns=turns, hand_face=sorted(hand_face, key=lambda e: e['frames'][0]),
+                hand_body=sorted(hand_body, key=lambda e: e['frames'][0]), shoulders=sorted(shoulders, key=lambda e: e['frames'][0]),
                 width=width, hands_seen={sides[s]: round(seen[s]/max(1, len(people)), 2) for s in HANDS},
                 hands_body={s: round(seen[s]/max(1, len(people)), 2) for s in HANDS})
 
@@ -735,6 +759,45 @@ def phases(pose_frames, window, fps):
             limb = (m['body'], m['part'] in ('wrist', 'elbow'))
             best.setdefault(limb, m)
         out.append(dict(frames=[a, b], moved=sorted(best.values(), key=lambda m: -max(m['amount'], m['back'] or 0.))))
+    return out
+
+# Arm posture at a moment (same dancer: "left arm low, right arm high", "both arms up", arms crossed; look.md gave only
+# moves, so readers guessed the poses between them). Wrist height against the shoulder midpoint in torso lengths;
+# crossed = the wrist is past the body's midline on the other shoulder's side.
+ARM_POSE = dict(up=.25, level=-.25, down=-.75, cross=.15, near=2)
+ARM_KO = dict(up='어깨 위', level='어깨 높이', mid='가슴 높이', down='허리 아래')
+
+
+def arm_poses(pose_frames, window, frames):
+    """[{frame, l, r, cross}] for the person posed on the seed frame at each of `frames` (the nearest frame within
+    ARM_POSE['near'] with shoulders, hips and that wrist seen): each arm 'up', 'level', 'mid', 'down' or None, and the pose
+    model's sides ('l', 'r') whose wrist crossed the midline."""
+    seed = largest(pose_frames.get(window['seed']))
+    if not seed:
+        return []
+    ok = lambda p, i: p['scores'][i] >= EVENTS['min_score']
+    out = []
+    for f in frames:
+        for n in sorted(range(f-ARM_POSE['near'], f+ARM_POSE['near']+1), key=lambda n: abs(n-f)):
+            p = _person(pose_frames.get(n), seed.get('track_id')) if window['seed'] <= n <= window['end'] else None
+            if p and all(ok(p, i) for i in (5, 6, 11, 12)):
+                break
+        else:
+            continue
+        k = p['keypoints']; c = _mean([k[5], k[6]]); torso = math.dist(c, _mean([k[11], k[12]]))
+        if not torso:
+            continue
+        pose = dict(frame=f, cross=[])
+        for s, wrist, shoulder in (('l', 9, 5), ('r', 10, 6)):
+            if not ok(p, wrist):
+                pose[s] = None
+                continue
+            up = (c[1]-k[wrist][1])/torso
+            # A wrist at the shoulder line is a raised arm to a reader; calling it chest height lost 'left arm raised'.
+            pose[s] = ('up' if up > ARM_POSE['up'] else 'level' if up >= ARM_POSE['level'] else 'down' if up < ARM_POSE['down'] else 'mid')
+            if (k[wrist][0]-c[0])*(1 if k[shoulder][0] > c[0] else -1)/torso < -ARM_POSE['cross']:
+                pose['cross'].append(s)
+        out.append(pose)
     return out
 
 # Several people (clip D live scene: two or three girls lean on, pull and point at each other; only the largest was

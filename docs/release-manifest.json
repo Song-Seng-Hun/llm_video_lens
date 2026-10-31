@@ -20,7 +20,7 @@
   ],
   "manifest_self_excluded": true,
   "file_count": 136,
-  "total_bytes": 1552310,
+  "total_bytes": 1563781,
   "files": [
     {
       "path": ".gitattributes",
@@ -84,8 +84,8 @@
     },
     {
       "path": "docs/look-notes.md",
-      "bytes": 51449,
-      "sha256": "3e192742fd185b82d3e16b6696009cf4ad1bd8a53970e94c2713e82be73796f2"
+      "bytes": 53253,
+      "sha256": "b975a7d70328e0501c77ef782def8805054fc7c32727f884dd1368986b9707b0"
     },
     {
       "path": "docs/provenance.md",
@@ -119,8 +119,8 @@
     },
     {
       "path": "image_lens/body_motion.py",
-      "bytes": 49205,
-      "sha256": "14d8d51f809a25878d65b2c1499ceb527beaf5cd1a43fc4d257e4de43d4ec451"
+      "bytes": 53065,
+      "sha256": "b1ff4780a1254500098475ccb1a7309004301edea2765fa7ac27ada0f679e95b"
     },
     {
       "path": "image_lens/brief.py",
@@ -149,8 +149,8 @@
     },
     {
       "path": "image_lens/digest.py",
-      "bytes": 29705,
-      "sha256": "642a5ea78dfecb86d77208a0793756139f589637b4602b52b37dfdad0a66ab3c"
+      "bytes": 32052,
+      "sha256": "16e703ef4edaca9c006ccf39e17307da1e5dafb36ed15db7a272559cab54fc1f"
     },
     {
       "path": "image_lens/foreground_regions.py",
@@ -174,8 +174,8 @@
     },
     {
       "path": "image_lens/look.py",
-      "bytes": 39439,
-      "sha256": "97caa862215baa89eb9ec1839e46f734904b1edddceebb0aafe320900121e91c"
+      "bytes": 39645,
+      "sha256": "91c17c701b6dd4885798b344b26e31eae85490cb3d0b2e4896fc827f7bdbf9c6"
     },
     {
       "path": "image_lens/mark.py",
@@ -629,8 +629,8 @@
     },
     {
       "path": "tests/test_body_motion.py",
-      "bytes": 19600,
-      "sha256": "583cb888712367b7d095884919465228f98891acb48690da6d64f3e27cebabad"
+      "bytes": 21202,
+      "sha256": "d2ac3819245540db415d9d5cc8ae1b8f8fad9a07c6714c42c6dae69bf26734e1"
     },
     {
       "path": "tests/test_check.py",
@@ -644,8 +644,8 @@
     },
     {
       "path": "tests/test_digest.py",
-      "bytes": 9961,
-      "sha256": "975190f35e6ec4e5f528c8162ab5bf052a752889d8e73ab000fa3d9ebfad04fc"
+      "bytes": 11613,
+      "sha256": "a56371831e9e0fba194c49b8f9e03103e3152862003b90708f0bc2599217b567"
     },
     {
       "path": "tests/test_joint_tracking.py",

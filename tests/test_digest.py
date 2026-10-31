@@ -135,6 +135,25 @@ class PhaseLines(unittest.TestCase):
         self.assertEqual(digest.phase_lines(done, 25.), ['  - 0.00–1.80s: 왼손목 위 1.0', '  - 1.80–4.00s: 오른무릎 위 0.5(최대 1.2 갔다 돌아옴)'])
 
 
+class Posture(unittest.TestCase):
+    def test_hand_touch_and_arm_posture_are_written(self):
+        found = dict(hand_face=[], shoulders=[], width=[], hands_seen={}, lost_frames=0,
+                     hand_body=[dict(side='화면 왼쪽', body='r', to='shoulder', to_side='화면 오른쪽', frames=[64, 74], enters=True, exits=True),
+                                dict(to='hands', frames=[15, 17], enters=True, exits=True)])
+        line = digest.window_line(dict(window=dict(seed=0, end=99), facing='front', events=found, groups=[],
+                                       arms=[dict(frame=0, l='down', r='down', cross=[]), dict(frame=99, l='down', r='down', cross=[])]), 25.)
+        self.assertIn('오른손(화면 왼쪽)이 왼어깨(화면 오른쪽) 가까이 옴 2.56–3.00s, 떨어짐', line)
+        self.assertIn('두 손 모음 0.60–0.72s', line)
+        self.assertIn('팔 자세: 양팔 허리 아래 그대로', line)
+
+    def test_steps_end_with_the_arm_posture(self):
+        done = dict(window=dict(seed=0, end=99), phases=[dict(frames=[0, 45], moved=[]), dict(frames=[45, 99], moved=[])],
+                    arms=[dict(frame=0, l='down', r='down', cross=[]), dict(frame=45, l='up', r='up', cross=[]), dict(frame=99, l='mid', r=None, cross=[])])
+        self.assertEqual(digest.phase_lines(done, 25.), ['  - 0.00–1.80s: 팔다리 거의 그대로 | 끝 팔: 양팔 어깨 위',
+                                                         '  - 1.80–4.00s: 팔다리 거의 그대로 | 끝 팔: 왼팔 가슴 높이'])
+        self.assertIn('팔 자세: 양팔 허리 아래', digest.window_line(dict(done, groups=[]), 25.))
+
+
 class BodySides(unittest.TestCase):
     def test_model_side_comes_first_and_screen_side_follows_the_facing(self):
         arm = limb('wrist-l', '손목', '화면 왼쪽', 'up', 40.)
