@@ -64,6 +64,63 @@ class JointTracking(unittest.TestCase):
         self.assertEqual(jt.track_path(stem,'head'),stem.with_suffix('.tracks.json'))
 
 
+    # Temporal recovery: previous checks cover one-frame agreement, not missing raw
+    # trajectories, native support, or whole-window source fallback in the motion consumer.
+    def sequence(self, visible=False):
+        raw=packet(visible, [500.,150.]); raw['frames']=[]; poses={}
+        for n in (1,2,3):
+            raw['frames'].append(dict(frame=n,points=copy.deepcopy(packet(visible,[500.,150.])['frames'][0]['points'])))
+            p=person();p['keypoints'][7]=[120.+n,150.];poses[n]=[p]
+        return raw,poses
+
+    def run_sequence(self, raw, poses, window=None):
+        return jt.reconcile(raw,poses,'shot-0/1',window or dict(seed=0,end=3),self.raw,self.pose)
+
+    def test_temporal_recovery_keeps_raw_visibility_and_edges_honest(self):
+        raw,poses=self.sequence();before=copy.deepcopy(raw)
+        out=self.run_sequence(raw,poses);a,b,c=[f['points'][0] for f in out['frames']]
+        self.assertFalse(a['visible']);self.assertFalse(c['visible'])
+        self.assertTrue(b['visible']);self.assertEqual(b['xy'],[122.,150.])
+        self.assertFalse(b['model_visible']);self.assertFalse(b['motion_pair_usable'])
+        self.assertEqual(b['visibility_source'],'pose_temporal_consistency')
+        self.assertEqual(out['joint_tracking']['counts']['temporal_recoveries'],1)
+        self.assertEqual(raw,before)
+
+    def test_temporal_recovery_retains_existing_pose_geometry(self):
+        from image_lens import body_motion
+        raw,poses=self.sequence()
+        for f in (raw['frames'][0],raw['frames'][2]):f['points'][0]['visible']=True
+        out=self.run_sequence(raw,poses);window=dict(seed=0,end=3)
+        policy=body_motion.geometry_policy([out],window,[raw])
+        self.assertEqual(policy['source_switches'],{})
+        effective=body_motion.geometry_packets([out],window,[raw],policy)
+        self.assertEqual([f['frame'] for f in effective[0]['frames'] if f['points'][0]['visible']],[1,2,3])
+        self.assertEqual([f['points'][0]['xy'] for f in effective[0]['frames']],[[121.,150.],[122.,150.],[123.,150.]])
+
+    def test_temporal_recovery_requires_native_id_cut_and_reliable_support(self):
+        for case in ('missing','foreign_id','weak_joint','weak_shoulder','off_image','fast','cut','seed'):
+            raw,poses=self.sequence();window=dict(seed=0,end=3)
+            if case=='missing':del poses[3]
+            elif case=='foreign_id':poses[3][0]['track_id']='shot-0/2'
+            elif case=='weak_joint':poses[3][0]['scores'][7]=.49
+            elif case=='weak_shoulder':poses[1][0]['scores'][5]=.29
+            elif case=='off_image':poses[1][0]['keypoints'][7]=[640.,150.]
+            elif case=='fast':poses[3][0]['keypoints'][7]=[250.,150.]
+            elif case=='cut':window['end']=2
+            elif case=='seed':window['seed']=1
+            with self.subTest(case=case):
+                self.assertFalse(self.run_sequence(raw,poses,window)['frames'][1]['points'][0]['visible'])
+
+    def test_temporal_recovery_does_not_add_raw_window_fallback(self):
+        from image_lens import body_motion
+        raw,poses=self.sequence();last=copy.deepcopy(raw['frames'][-1]);last['frame']=4
+        last['points'][0]['visible']=True;raw['frames'].append(last)
+        p=person();p['scores'][7]=.49;poses[4]=[p];window=dict(seed=0,end=4)
+        out=self.run_sequence(raw,poses,window)
+        self.assertEqual([f['frame'] for f in out['frames'] if f['points'][0]['visible']],[4])
+        self.assertEqual(body_motion.geometry_policy([out],window,[raw])['source_switches'],{})
+
+
 class Timing(unittest.TestCase):
     def test_fused_positions_do_not_manufacture_raw_ease(self):
         from image_lens import body_motion
