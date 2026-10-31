@@ -19,8 +19,8 @@
     "historical experiment outputs"
   ],
   "manifest_self_excluded": true,
-  "file_count": 137,
-  "total_bytes": 1677369,
+  "file_count": 138,
+  "total_bytes": 1769070,
   "files": [
     {
       "path": ".gitattributes",
@@ -29,8 +29,8 @@
     },
     {
       "path": ".gitignore",
-      "bytes": 254,
-      "sha256": "095da944575320a3b668042754a8d233f9d8967123d8b9b53346a68a6649bb2a"
+      "bytes": 287,
+      "sha256": "1194f7a2ee6623428bd3dd3483004cdea7b3197f467b31931a245bcbe1041b3d"
     },
     {
       "path": "LICENSE",
@@ -51,6 +51,11 @@
       "path": "assets/banner-light.svg",
       "bytes": 28467,
       "sha256": "9e79ca3f5a297241b0d9e234c74d879f326a8d3bdf98827a6a02a607b423b56b"
+    },
+    {
+      "path": "assets/example-live2d-onion.jpg",
+      "bytes": 91668,
+      "sha256": "3d2fdfbf7e1d219e5820d9da135f105132d504b05d26a000f70b07e74c78ca0e"
     },
     {
       "path": "assets/example-onion.jpg",

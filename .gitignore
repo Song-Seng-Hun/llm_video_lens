@@ -23,6 +23,7 @@ __pycache__/
 *.png
 *.jpg
 !assets/example-onion.jpg
+!assets/example-live2d-onion.jpg
 *.jpeg
 *.whl
 *.zip
