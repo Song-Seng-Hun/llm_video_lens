@@ -295,3 +295,9 @@ The coordinate label distinguishes camera-translation-relative output from raw s
 Raw `.report.json`, `.report.md`, track packets and trajectory pictures keep screen coordinates for source verification. A `.relative.json` sidecar records the derived numerical report, source track hash, camera translations and unsupported frames; the group summary points to it and labels the raw trajectory's basis. Existing direction field names in that sidecar follow its declared `coordinate_scope`.
 
 Authored controls check opposite camera/point motion, pure and returning pans, native gaps, NumPy camera values, and incomplete-support wording. A generated-video CLI smoke exercises scan, analyze, mark, camera estimation and onion rendering with authored tracks replacing neural inference. These are coordinate-consistency checks, not real-video tracking-accuracy scores.
+
+## Short supported excursions
+
+Stroke summaries retain the five-sample coordinate median used to reject brief errors. An observed per-axis apex is restored at its native frame only when two incoming and two outgoing increments are each at least the existing 0.75px stillness threshold, coherent on each side, and opposite across the apex. This changes the shared stroke path used for direction, distance, speed bins and coarse timing; raw coordinates and continuity guards are untouched.
+
+On nine authored paths, the three brief-excursion amplitude errors fall from 33.3%, 33.3%, 25% to zero and total error over thirteen authored boundaries falls from four frames to zero. A separate eight-case discriminator retains the baseline response to one/two-frame error plateaus. These are mathematical controls, not measured real-video accuracy. A coherent multi-frame tracker error can look like supported motion; endpoint median bias and the coarse ease labels remain limitations.

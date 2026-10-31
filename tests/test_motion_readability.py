@@ -42,6 +42,30 @@ class Strokes(unittest.TestCase):
         units = motion_report.strokes(fs, ts, xy)['units']
         self.assertFalse(any(u['direction'] == 'hold' and u['distance_px'] >= motion_report.STROKE['hold_px'] for u in units))
 
+    def test_supported_brief_excursions_keep_their_apex_and_turn_frame(self):
+        for amplitude,steps,axis in ((60.,3,0),(55.,3,1),(75.,4,0)):
+            with self.subTest(amplitude=amplitude,axis=axis):
+                dx,dy=(amplitude/steps,0.) if axis==0 else (0.,amplitude/steps)
+                fs,ts,xy=path((10,0.,0.),(steps,dx,dy),(steps,-dx,-dy),(10,0.,0.))
+                before=json.dumps(xy)
+                moves=[u for u in motion_report.strokes(fs,ts,xy)['units'] if u['direction']!='hold']
+                self.assertEqual(len(moves),2)
+                self.assertAlmostEqual(moves[0]['distance_px'],amplitude)
+                self.assertAlmostEqual(moves[1]['distance_px'],amplitude)
+                self.assertEqual(moves[0]['end_frame'],10+steps)
+                self.assertEqual(moves[1]['start_frame'],10+steps)
+                self.assertEqual(json.dumps(xy),before)
+
+    def test_one_and_two_frame_error_plateaus_do_not_create_motion(self):
+        for moving in (False,True):
+            for axis in (0,1):
+                for length in (1,2):
+                    with self.subTest(moving=moving,axis=axis,length=length):
+                        fs,ts,xy=path((24,3. if moving else 0.,0.))
+                        for n in range(12,12+length):xy[n][axis]+=80.
+                        moves=[u['direction'] for u in motion_report.strokes(fs,ts,xy)['units'] if u['direction']!='hold']
+                        self.assertEqual(moves,['right'] if moving else [])
+
     def test_raw_coordinates_untouched_and_units_capped(self):
         legs = [(4, 0., 6.) if i % 2 == 0 else (4, 0., -6.) for i in range(14)]
         fs, ts, xy = path(*legs)
