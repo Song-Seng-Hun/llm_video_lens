@@ -39,8 +39,8 @@
     },
     {
       "path": "README.md",
-      "bytes": 14062,
-      "sha256": "d2cc6bf9dca0ba84ae7989da1ab6fdf7213f554b570fd2a14e76321f0f1d1edf"
+      "bytes": 14070,
+      "sha256": "0f572083cf66c8698e24f7d9535a1302d391a002bb16392322aea40afb4569ce"
     },
     {
       "path": "assets/banner-dark.svg",
@@ -64,13 +64,13 @@
     },
     {
       "path": "docs/README.en.md",
-      "bytes": 12483,
-      "sha256": "082bed1122124dbe68c7ecf1860b8c2b5b0717e8e625cd3192bfa0e6cdbe18b5"
+      "bytes": 12353,
+      "sha256": "777802e7c79a862e53113be24d321059900850ba9394fef19688be1de644ecd7"
     },
     {
       "path": "docs/README.ja.md",
-      "bytes": 15191,
-      "sha256": "4eedbf4a2b61060b44064e863b97f5e17bf07ac598061fb289ed472d26c62ed6"
+      "bytes": 15024,
+      "sha256": "9ffc3f1cdf0e0dd3a3d734d61de7aab5e4b94f7235e73ac1cc546c8a60c2ffb3"
     },
     {
       "path": "docs/guide.md",
