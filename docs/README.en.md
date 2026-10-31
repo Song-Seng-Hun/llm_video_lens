@@ -13,6 +13,12 @@ A command-line tool that turns video into short text and check images an AI (LLM
 
 The package, command and LAN service keep the original name, `image_lens` (`image-lens`).
 
+## Why
+
+AI agents see a video as a handful of still frames. They cannot see what moved between one frame and the next, how far or how, so the direction and size of a motion are hard for them to grasp. Easing, such as a fast start that slows to a stop, is especially hard. That makes tasks like "analyse the easing in this reference video and animate with the same feel" very difficult.
+
+LLM Video Lens is a helper for that. It follows the motion between frames with tracked points, writes down direction, distance and change of speed, and draws the trails over the picture, so an agent can read the motion that a few frames miss. The animated example below was itself made by measuring a reference video's easing with this tool and following it.
+
 ## What is it?
 
 It prepares videos with people or characters in them so that an AI agent can work with them. Give it one video, and for each shot (cut) it writes the movement of the body, arms, legs and camera as short text (`look.md`) and makes pictures to check it against. People can open and read the same output files.
@@ -26,7 +32,7 @@ It does not make up what it isn't sure of. Spans where points were lost are writ
 - **Shots and a shot list (`scan`, `brief`, `catalog`)**: finds cut boundaries and lists each shot with its original frame range and any missing coverage.
 - **Compare frames (`compare`, `zoom`)**: shows the difference between two frames as a picture, or a short span as dense frames.
 - **Place your own points (`grid`, `mark`)**: place, name and track points on props or parts the pose model has no name for.
-- **Closed workspace**: inputs and outputs are read and written only inside the workspace folder. Overwrites and paths through symbolic links are refused.
+- **Closed workspace**: inputs and outputs are read and written only inside the workspace folder.
 
 ## Quick start
 
@@ -92,7 +98,6 @@ Video: Antoni Shkraba, ["Video of a Man Dancing"](https://www.pexels.com/video/v
 
 **Parts of it are still wrong.**
 - Even this line has an error. The frames of this span show no turn, yet it lists a turn candidate (the shoulder width probably changed as the leg came up). The left arm's speed is unknown.
-- Elsewhere in the same video, the right hand touching the cheek at 7–9 s is reported from 5.4 s. At 16.32–19.12 s skeleton trust is low, so the line gives only screen movement without limb names. Whether the camera is fixed cannot be told.
 - So read the text together with the pictures and "먼저 확인할 곳". Measurements are in the [look notes](look-notes.md).
 
 ### Reading an animated character
@@ -127,6 +132,7 @@ python -m image_lens --workspace W mark --video V --shots W/look/shots.json --fr
 
 ## Status and limits
 
+- Limb positions are estimated from the pose model and point tracking together; where they are unsure, the line says "모름" (unknown). Comparisons and limits are in the [look notes](look-notes.md).
 - It was checked on macOS arm64 with Python 3.12. Windows and installed wheels are unverified, and point tracking needs a POSIX system.
 - No accuracy is claimed for pose, action, telling people apart, or easing. Spans not under "먼저 확인할 곳" can be wrong too, so read the frame sheets as well.
 - You supply the model files. The CoTracker source and checkpoint carry noncommercial terms, and the pose model weights' licenses are unchecked.
@@ -134,7 +140,7 @@ python -m image_lens --workspace W mark --video V --shots W/look/shots.json --fr
 
 ## Built with AI
 
-A person set the direction and AI agents built this project together. What to build, which accuracy to aim for and what to adopt were human decisions; implementation, measurement and code review were split between Claude (Anthropic) and Codex (OpenAI) agents. Recent changes were accepted only after a different agent scored them on held-out labelled frames the author could not see. The banner shows the same idea: Claude reads the film strip and writes one line at a time into BRIEF. The [look notes](look-notes.md) are the agents' measurement log.
+A person set the direction and AI agents built this project together. What to build, which accuracy to aim for and what to adopt were human decisions; implementation, measurement and code review were split between Claude (Anthropic) and Codex (OpenAI) agents. The banner shows the same idea: Claude reads the film strip and writes one line at a time into BRIEF. The [look notes](look-notes.md) are the agents' measurement log.
 
 ## License
 
