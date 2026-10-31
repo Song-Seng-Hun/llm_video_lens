@@ -20,7 +20,7 @@
   ],
   "manifest_self_excluded": true,
   "file_count": 135,
-  "total_bytes": 1494878,
+  "total_bytes": 1502420,
   "files": [
     {
       "path": ".gitattributes",
@@ -79,8 +79,8 @@
     },
     {
       "path": "docs/look-notes.md",
-      "bytes": 42090,
-      "sha256": "d6baf412d6f7bfe7f08e2fd3575f5224d1c87708a32799fa6f38de0481916906"
+      "bytes": 43780,
+      "sha256": "87b967d46a4bdb92b9e7b94edc60229423f9877362db1e763587e9c921ba048c"
     },
     {
       "path": "docs/provenance.md",
@@ -164,8 +164,8 @@
     },
     {
       "path": "image_lens/joint_tracking.py",
-      "bytes": 4133,
-      "sha256": "5ad9a6bd88cabb1680696ceeddeeda18086282bef90d2edf230b3e76f533c688"
+      "bytes": 6460,
+      "sha256": "2ba7a98c0fe1f01403181e212142db6af9989f96f836e5a51cd8e58182516cee"
     },
     {
       "path": "image_lens/look.py",
@@ -649,8 +649,8 @@
     },
     {
       "path": "tests/test_joint_tracking.py",
-      "bytes": 20896,
-      "sha256": "7d6604430c03e394f48eff04786f7ad13a19bc200cefe2972c7e504db11d3aba"
+      "bytes": 24421,
+      "sha256": "b041abb1e14c0c1e674a360b492c71c2980d76350de88dcc5af44acbde7c518d"
     },
     {
       "path": "tests/test_lan.py",
