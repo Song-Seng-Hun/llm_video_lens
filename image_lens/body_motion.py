@@ -220,18 +220,31 @@ def describe(packets, window, pose_frames=None, timing_packets=None):
     timing_sources = {(f['frame'], p['point_id']): p.get('coordinate_source', 'point_tracker')
                       for packet in (timing_packets if timing_packets is not None else packets)
                       for f in packet['frames'] for p in f['points'] if p['visible']}
-    def timing(pid, ns):
+    def timing(pid, ns, geometry_path):
         if any(any(source != 'point_tracker' for _, source in timing_signatures.get(n, ()))
                or (pid is not None and timing_sources.get((n, pid)) != 'point_tracker') for n in ns):
-            return None, None
+            return None, None, 'unknown_raw_source'
         if timing_kind != reference_kind or any(n not in timing_centre or (pid is not None and n not in timing_points.get(pid, {})) for n in ns):
-            return None, None
+            return None, None, 'unknown_raw_gap_or_reference'
         if len(motion_runs(ns, timing_signatures)) != 1:
-            return None, None
+            return None, None, 'unknown_raw_reference_change'
         path = [timing_centre[n] if pid is None else (timing_points[pid][n][0]-timing_centre[n][0],
                                                     timing_points[pid][n][1]-timing_centre[n][1]) for n in ns]
         path = _median3(path)
-        return motion_report.ease(ns, path), motion_report.speeds(ns, path)
+        # A constant provider offset has no effect on timing. A different relative trajectory does.
+        # Use the same stroke-local filter context on both providers for agreement;
+        # geometry_path itself has the run-local context used to draw the stroke.
+        selected_path = _median3([centre[n] if pid is None else (points[pid][n][0]-centre[n][0],
+                                                                points[pid][n][1]-centre[n][1]) for n in ns])
+        errors = [math.dist((p[0]-path[0][0], p[1]-path[0][1]),
+                            (g[0]-selected_path[0][0], g[1]-selected_path[0][1])) for p, g in zip(path, selected_path)]
+        raw_delta = (path[-1][0]-path[0][0], path[-1][1]-path[0][1])
+        delta = (geometry_path[-1][0]-geometry_path[0][0], geometry_path[-1][1]-geometry_path[0][1])
+        opposed_or_still = math.hypot(*delta) >= motion_report.RESOLUTION and (
+            math.hypot(*raw_delta) < motion_report.RESOLUTION or sum(a*b for a, b in zip(delta, raw_delta)) <= 0)
+        if max(errors) >= limit or opposed_or_still:
+            return None, None, 'unknown_geometry_disagreement'
+        return motion_report.ease(ns, path), motion_report.speeds(ns, path), 'raw_consistent'
     apart = disagreement(points, reference_kind, centre, size, pose_frames) if pose_frames else {}
     uncertain = []
     limit = max(BODY_MOTION['min_px'], BODY_MOTION['min_ratio']*size)
@@ -239,9 +252,9 @@ def describe(packets, window, pose_frames=None, timing_packets=None):
     centre_shift = None
     if len(centre_runs) == 1 and len(frames) >= BODY_MOTION['min_frames'] and len(frames) == window['end']-window['seed']:
         shift = (centre[frames[-1]][0]-centre[frames[0]][0], centre[frames[-1]][1]-centre[frames[0]][1])
-        ease, speeds = timing(None, frames)
+        ease, speeds, timing_status = timing(None, frames, _median3([centre[n] for n in frames]))
         centre_shift = dict(direction=motion_report.direction(*shift), distance_px=round(math.hypot(*shift), 1),
-                            frames=[frames[0], frames[-1]], ease=ease, speeds=speeds)
+                            frames=[frames[0], frames[-1]], ease=ease, speeds=speeds, timing_status=timing_status)
     seen = coverage(packets, window)
     hidden = {k for k, (share, _) in seen.items() if share < BODY_MOTION['min_seen']}
     unknown = []
@@ -272,9 +285,9 @@ def describe(packets, window, pose_frames=None, timing_packets=None):
             for lo, hi in segments(rel, limit):
                 dx, dy = rel[hi][0]-rel[lo][0], rel[hi][1]-rel[lo][1]
                 if math.hypot(dx, dy) >= limit:
-                    ease, speeds = timing(pid, ns[lo:hi+1])
+                    ease, speeds, timing_status = timing(pid, ns[lo:hi+1], rel[lo:hi+1])
                     strokes.append(dict(direction=motion_report.direction(dx, dy), distance_px=round(math.hypot(dx, dy), 1),
-                                        frames=[ns[lo], ns[hi]], ease=ease, speeds=speeds, run=ri, from_start=lo == 0))
+                                        frames=[ns[lo], ns[hi]], ease=ease, speeds=speeds, timing_status=timing_status, run=ri, from_start=lo == 0))
         if not strokes:
             continue
         anchor = points.get(('hip-' if part in ('허벅지', '무릎', '발목') else 'shoulder-')+pid.rsplit('-', 1)[-1], {})
@@ -292,6 +305,10 @@ def describe(packets, window, pose_frames=None, timing_packets=None):
                 centre_shift=centre_shift, limbs=limbs, unknown=unknown, uncertain=uncertain, incomplete=sorted(incomplete))
 
 
+def timing_note(stroke):
+    return '(속도 모름: 위치·원시 궤적 불일치)' if stroke.get('timing_status') == 'unknown_geometry_disagreement' else ''
+
+
 def lines(result):
     """look-full.md: run gaps remain explicit, including an unavailable whole-window centre shift."""
     if not result:
@@ -301,12 +318,14 @@ def lines(result):
     head = f"- 몸 기준 움직임 (몸 중심={ref}, 기준 {result['limit_px']:.0f}px):"
     body = ('  - 몸 중심: 관측 끊김·기준점 변경, 전체 이동 모름' if c is None else
             f"  - 몸 중심: {motion_report.KO[c['direction']]} {c['distance_px']:.0f}px" if c['distance_px'] >= result['limit_px'] else '  - 몸 중심: 거의 그대로')
+    if c is not None:
+        body += timing_note(c)
     out = [head, body]
     for limb in result['limbs']:
         moves = []
         for i, s in enumerate(limb['strokes']):
             sep = '' if not i else ' → ' if s.get('run') == limb['strokes'][i-1].get('run') else ' / 관측 끊김 / '
-            moves.append(sep+f"{motion_report.KO[s['direction']].replace('화면 ', '')} {s['distance_px']:.0f}px(f{s['frames'][0]}..{s['frames'][1]})")
+            moves.append(sep+f"{motion_report.KO[s['direction']].replace('화면 ', '')} {s['distance_px']:.0f}px(f{s['frames'][0]}..{s['frames'][1]}){timing_note(s)}")
         axis = '' if not limb['axis_px'] else f", 몸 {'바깥으로' if limb['axis_px'] > 0 else '쪽으로'} {abs(limb['axis_px']):.0f}px"
         out.append(f"  - {limb['side']} {limb['part']}: {''.join(moves)}{axis}")
     for u in result.get('unknown', []):

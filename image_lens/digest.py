@@ -22,6 +22,9 @@ def _side(side):
 def _speed(stroke):
     """Per-frame speed of a stroke; from the window's first frame its start is cut off (the window begins where the
     drawing changes, clip A f47: 40 px in two frames), so that is said too."""
+    note = body_motion.timing_note(stroke)
+    if note:
+        return note
     text = motion_report.speed_text(stroke.get('speeds'))
     if not text:
         return ''
