@@ -4,8 +4,9 @@ person crops cannot show it). The frame budget is fixed and counted, so a gain c
 of frames spread evenly over the clip (--even). There the even frames gained more (clip D 8.5 -> 12 of 20 against
 10.5 -> 11.5 for the reader's own spans), so `look` also writes such frames for the whole clip (`overview`)."""
 import json
+from image_lens.frames import label as outlined
 
-ZOOM = dict(spans=2, span_s=4., frames=12, budget=24, columns=4, tile=480, label=22, every_s=1.25, max_overview=96)
+ZOOM = dict(spans=2, span_s=4., frames=12, budget=24, columns=4, tile=480, label=24, every_s=1.25, max_overview=96)
 
 
 def spans(texts):
@@ -40,7 +41,7 @@ def sheet(frames, fps, path):
     for n, image in frames:
         small = cv2.resize(image, (t, max(1, round(image.shape[0]*t/image.shape[1]))), interpolation=cv2.INTER_AREA)
         tile = np.zeros((small.shape[0]+top, t, 3), np.uint8); tile[top:] = small
-        cv2.putText(tile, f'{n/fps:.2f}s f{n}', (4, 16), cv2.FONT_HERSHEY_SIMPLEX, .55, (255, 255, 255), 1)
+        outlined(cv2, tile, f'{n/fps:.2f}s f{n}', (4, 18), .6, 1)
         tiles.append(tile)
     height = max(x.shape[0] for x in tiles)
     tiles = [np.vstack([x, np.zeros((height-x.shape[0], t, 3), np.uint8)]) for x in tiles]

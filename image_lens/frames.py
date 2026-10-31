@@ -8,6 +8,14 @@ _LAST = []  # [key, start, end, [(bgr, pos)]], most recent first
 KEEP = 3
 
 
+def label(cv2, image, text, at, scale, thickness):
+    """White text with a black rim, readable on any background (red grid numbers on a pink anime frame were nearly
+    invisible; of five styles tried, the user picked this one). Smaller than 0.6 the rim fills the strokes."""
+    scale = max(.6, scale)
+    for colour, t in (((0, 0, 0), thickness+3), ((255, 255, 255), thickness+1)):
+        cv2.putText(image, text, at, cv2.FONT_HERSHEY_SIMPLEX, scale, colour, t, cv2.LINE_AA)
+
+
 def window(video, start, end):
     """BGR frames start..end read in order after one seek, cut at the first failed read."""
     return [bgr for bgr, _ in _read(video, start, end)]

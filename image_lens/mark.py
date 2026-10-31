@@ -4,6 +4,7 @@ the marked crops are the evidence."""
 import json
 import math
 import re
+from image_lens.frames import label as outlined
 
 MARK = dict(grid_px=100, zoom_grid_px=50, snap_radius_px=15, max_points=8, uncertainty_px=10.)
 
@@ -34,10 +35,10 @@ def grid(video, frame, out, box=None):
     crop = cv2.resize(crop, None, fx=scale, fy=scale, interpolation=cv2.INTER_NEAREST)
     for x in range((x0//step+1)*step, x1, step):
         cv2.line(crop, ((x-x0)*scale, 0), ((x-x0)*scale, crop.shape[0]), (0, 200, 255), 1)
-        cv2.putText(crop, str(x), ((x-x0)*scale+2, 18), cv2.FONT_HERSHEY_SIMPLEX, .5, (0, 0, 200), 1)
+        outlined(cv2, crop, str(x), ((x-x0)*scale+2, 18), .5, 1)
     for y in range((y0//step+1)*step, y1, step):
         cv2.line(crop, (0, (y-y0)*scale), (crop.shape[1], (y-y0)*scale), (0, 200, 255), 1)
-        cv2.putText(crop, str(y), (2, (y-y0)*scale-3), cv2.FONT_HERSHEY_SIMPLEX, .5, (0, 0, 200), 1)
+        outlined(cv2, crop, str(y), (2, (y-y0)*scale-3), .5, 1)
     target = paths.confined(out, new=True)
     cv2.imwrite(str(target), crop)
     return dict(status='written', output=str(target), frame=frame, box=[x0, y0, x1, y1], grid_px=step, zoom=scale)

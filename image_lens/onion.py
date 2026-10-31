@@ -2,6 +2,7 @@
 skirt, a prop); splitting the person box into horizontal bands and following corner features in each band shows which
 height moved where. The onion image overlays the first frame (cyan) and the last (red) so the motion reads in one picture."""
 import math
+from image_lens.frames import label as outlined
 
 # Clip A pose 1 (black dress, f32..46): head right 20, chest 3, waist left 15, skirt left 8, hem right 4; the three
 # repeats agree within 3 px. Below min_px a band counts as still.
@@ -106,6 +107,16 @@ def _arrow(cv2, picture, start, vector):
     cv2.arrowedLine(picture, start, end, (0, 140, 0), 2, cv2.LINE_AA, tipLength=tip)
 
 
+def _grow(h, w):
+    """Mark and label size factor for a crop: 1 up to the solo dance clip's box, then in proportion (see TRAILS)."""
+    return max(1., w/TRAILS['box'][0], h/TRAILS['box'][1])
+
+
+def _frame_label(cv2, panel, n):
+    k = _grow(*panel.shape[:2])
+    outlined(cv2, panel, f'f{n}', (round(6*k), round(28*k)), .9*k, round(2*k))
+
+
 def _image(cv2, np, first, last, box, result, path, trails=()):
     x0, y0, x1, y1 = box
     a = cv2.cvtColor(first, cv2.COLOR_BGR2GRAY)[y0:y1, x0:x1]; b = last[y0:y1, x0:x1]
@@ -119,7 +130,7 @@ def _image(cv2, np, first, last, box, result, path, trails=()):
             _arrow(cv2, picture, (centre, mid), (s*band['dx'], s*band['dy']))
     # The sheet fits each onion in one tile, so a big person box shrinks more: a 1440 px clip's 3 px dots came out under
     # 1 px there. Sizes are for the solo dance clip's box (marks about 1.2 px on the sheet) and grow with larger boxes.
-    k = max(1., (x1-x0)/TRAILS['box'][0], (y1-y0)/TRAILS['box'][1])
+    k = _grow(y1-y0, x1-x0)
     dot, start, end, line = (max(1, round(TRAILS[n]*k)) for n in ('dot', 'start', 'end', 'line'))
     for trail, color in zip(trails, TRAILS['colors']):
         at = [(int(round(x-x0)), int(round(y-y0))) for _, x, y in trail['xy']]
@@ -176,7 +187,7 @@ def peak(video, start, end, bbox, image):
     onion = cv2.imread(str(image))
     panel = cv2.cvtColor(cv2.cvtColor(_crop(cv2, frame, bbox), cv2.COLOR_BGR2GRAY), cv2.COLOR_GRAY2BGR)
     if onion is not None and onion.shape[0] == panel.shape[0]:
-        cv2.putText(panel, f'f{n}', (6, 28), cv2.FONT_HERSHEY_SIMPLEX, .9, (0, 200, 255), 2)
+        _frame_label(cv2, panel, n)
         cv2.imwrite(str(image), np.hstack([onion, np.full((onion.shape[0], 6, 3), 255, np.uint8), panel]))
     return n
 
@@ -195,7 +206,7 @@ def who(video, frame, people, image):
     for p in people:
         x0, y0, x1, y1 = map(int, p['bbox'])
         cv2.rectangle(picture, (x0, y0), (x1, y1), (0, 0, 255), 6)
-        cv2.putText(picture, p['name'], (x0+12, y0+70), cv2.FONT_HERSHEY_SIMPLEX, 2.5, (0, 0, 255), 6)
+        outlined(cv2, picture, p['name'], (x0+12, y0+70), 2.5, 6)
     cv2.imwrite(str(image), picture)
     return image.name
 
@@ -215,7 +226,7 @@ def still(video, frame, bbox, image):
     return image.name
 
 
-SHEET = dict(tile=360, label=20, columns=4, rows=5, strip_height=200, gap_s=.05)
+SHEET = dict(tile=360, label=24, columns=4, rows=5, strip_height=200, gap_s=.05)
 
 
 def strip(video, start, end, bbox, image, count=5):
@@ -235,7 +246,7 @@ def strip(video, start, end, bbox, image, count=5):
             ok, frame = cap.read()
             if ok:
                 panel = _crop(cv2, frame, bbox)
-                cv2.putText(panel, f'f{n}', (6, 28), cv2.FONT_HERSHEY_SIMPLEX, .9, (0, 200, 255), 2)
+                _frame_label(cv2, panel, n)
                 panels.append(panel)
     finally:
         cap.release()
@@ -258,7 +269,7 @@ def sheets(root, items):
         return cv2.imread(str(root/name))
     def label(image, text):
         tile = np.zeros((image.shape[0]+top, image.shape[1], 3), np.uint8); tile[top:] = image
-        cv2.putText(tile, text, (4, 15), cv2.FONT_HERSHEY_SIMPLEX, .5, (255, 255, 255), 1)
+        outlined(cv2, tile, text, (4, 18), .6, 1)
         return tile
     def fit(image, w, h):
         k = min(w/image.shape[1], h/image.shape[0])
