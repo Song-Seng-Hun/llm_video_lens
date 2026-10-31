@@ -227,6 +227,6 @@ Pose confidence is uncalibrated. A pose-selected coordinate agreeing with that s
   - the ten posture/contact facts: 2.7 vs 4.5;
   - hand on the left shoulder: 0/3 vs 3 partial; hand leaves the shoulder: 0/3 vs 2 hits and 1 partial; arms crossed: 1 vs 2 hits.
 - Not helped: the hand at the cheek (readers put it at 5.4 s, where the pose has it; the human timeline says 7-9 s), twisted posture and forward lean (not measured here). The right-leg facts at 13-16 s stay mostly wrong, as in the earlier 20 runs; this change does not touch legs.
-- The "both arms raised" fact at 19-20 s is wrong in every run. In the frames and in the pose, both wrists hang about 1.4 torso lengths below the nose up to 20.0 s, so the raise is probably after the clip; the rubric item needs checking.
+- The "both arms raised" fact at 19-20 s was wrong in every run. The clip ends at 20.04 s with the arms still down (frames and pose); the hands rise to the shoulders just after it (checked with the human timeline's author). That fact is now out of the rubric (29 facts). Since every run missed it, the scores above are unchanged out of 29.
 - Time unchanged (85 s, one run). No numbers, windows, seeds or tracker code changed.
 
