@@ -210,6 +210,49 @@ class People(unittest.TestCase):
         self.assertEqual((len(found['people']), found['relations']), (1, []))
 
 
+
+class Phases(unittest.TestCase):
+    BODY = {5: (560, 400), 6: (720, 400), 11: (580, 640), 12: (700, 640), 9: (540, 620), 10: (740, 620), 13: (580, 760), 14: (700, 760),
+            15: (580, 880), 16: (700, 880)}  # torso 240 px
+
+    def frames(self, joints, n=100):
+        return {f: [dict(keypoints(joints(f)), track_id='t', bbox=[400, 300, 900, 900])] for f in range(n)}
+
+    def test_long_window_cuts_at_the_still_frame_and_names_the_mover(self):
+        def joints(f):
+            j = dict(self.BODY)
+            if f < 40:
+                j[9] = (540, 620-6*f)  # screen-left wrist rises 240 px (one torso), then holds
+            else:
+                j[9] = (540, 380)
+            if f >= 50:
+                j[14] = (700, 760-4*min(f-50, 30))  # screen-right knee lifts 120 px from f50
+            return j
+        steps = body_motion.phases(self.frames(joints, 90), dict(seed=0, end=89), 25)
+        self.assertEqual(len(steps), 2)
+        self.assertTrue(40 <= steps[0]['frames'][1] <= 50)  # the hold between the moves
+        first = steps[0]['moved'][0]
+        self.assertEqual((first['part'], first['side'], first['direction']), ('wrist', '화면 왼쪽', 'up'))
+        self.assertEqual(steps[1]['moved'][0]['part'], 'knee')
+
+    def test_out_and_back_is_kept(self):
+        def joints(f):
+            j = dict(self.BODY); j[10] = (740+8*min(f, 50-f), 620)  # out 200 px and back
+            return j
+        step, = body_motion.phases(self.frames(joints, 51), dict(seed=0, end=50), 25)
+        self.assertEqual(step['moved'][0]['part'], 'wrist'); self.assertIsNotNone(step['moved'][0]['back'])
+
+    def test_short_window_has_no_steps(self):
+        self.assertIsNone(body_motion.phases(self.frames(lambda f: dict(self.BODY), 40), dict(seed=0, end=39), 25))
+
+    def test_facing_follows_the_hips_not_the_crossed_shoulders(self):
+        crossed = {**self.BODY, 5: (720, 400), 6: (560, 400)}  # shoulders crossed on screen, hips unchanged
+        straight = body_motion.facing(self.frames(lambda f: self.BODY, 60), dict(seed=0, end=59))
+        self.assertIsNotNone(straight)
+        self.assertEqual(body_motion.facing(self.frames(lambda f: crossed, 60), dict(seed=0, end=59)), straight)
+        turned = {**self.BODY, 11: self.BODY[12], 12: self.BODY[11]}
+        self.assertNotEqual(body_motion.facing(self.frames(lambda f: turned, 60), dict(seed=0, end=59)), straight)
+
 if __name__ == '__main__': unittest.main()
 
 
@@ -224,11 +267,11 @@ class Hidden(unittest.TestCase):
                 q['visible'] = q['point_id'] != 'wrist-l' or f['frame'] in (0, 1, 2, 3, 4)
         r = body_motion.describe([p], dict(seed=0, end=20))
         self.assertEqual([l['point_id'] for l in r['limbs']], ['wrist-r'])
-        self.assertEqual(r['unknown'], [dict(kind='팔', side='화면 오른쪽', seen=.2)])
+        self.assertEqual(r['unknown'], [dict(kind='팔', side='화면 오른쪽', body='l', seen=.2)])
         self.assertIn('화면 오른쪽 팔: 대부분 가려져 모름(보인 프레임 20%)', '\n'.join(body_motion.lines(r)))
         from image_lens import digest
         line = digest.window_line(dict(window=dict(seed=0, end=20), body=r, groups=[]), 50.)
-        self.assertIn('오른팔 대부분 가려져 모름', line)
+        self.assertIn('왼팔(화면 오른쪽) 대부분 가려져 모름', line)
 
 
 class Disagree(unittest.TestCase):
@@ -244,11 +287,11 @@ class Disagree(unittest.TestCase):
         # 3D clip f96: the tracked wrist drifted 2x the person size off while the pose (and the drawing) kept it near the hip.
         r = body_motion.describe([packet(self.paths())], dict(seed=0, end=20), {n: self.pose((80., 700.)) for n in range(21)})
         self.assertEqual(r['limbs'], [])
-        self.assertEqual(r['uncertain'], [dict(point_id='wrist-r', part='손목', side='화면 왼쪽', share=1.)])
+        self.assertEqual(r['uncertain'], [dict(point_id='wrist-r', part='손목', side='화면 왼쪽', body='r', share=1.)])
         self.assertIn('화면 왼쪽 손목: 자세 모델과 추적이 어긋나 불확실(어긋난 프레임 100%)', '\n'.join(body_motion.lines(r)))
         from image_lens import digest
         line = digest.window_line(dict(window=dict(seed=0, end=20), body=r, groups=[]), 50.)
-        self.assertIn('왼손목 불확실(자세·추적 어긋남)', line); self.assertNotIn('미만', line)
+        self.assertIn('오른손목(화면 왼쪽) 불확실(자세·추적 어긋남)', line); self.assertNotIn('미만', line)
 
     def test_a_wrist_near_the_pose_joint_or_without_pose_is_described(self):
         paths = self.paths()

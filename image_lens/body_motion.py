@@ -1,6 +1,7 @@
 """Body-relative limb motion for look. Screen-space strokes mix a whole-body bounce or lean with the gesture itself,
 so each limb point is measured against the body centre, and its path is split where it turns.
-Sides are screen sides (화면 왼쪽/오른쪽), taken from where the point starts relative to the body centre."""
+Sides are screen sides (화면 왼쪽/오른쪽), taken from where the point starts relative to the body centre; `body` is the
+pose model's own side of the limb ('l'/'r', the dancer's left/right), which look.md names first."""
 import math
 from image_lens import motion_report
 
@@ -22,6 +23,33 @@ def _limb(pid):
     name, _, side = pid.rpartition('-')
     kind = next((k for k, names in LIMB_POINTS.items() if name in names), None)
     return (kind, side) if kind and side in ('l', 'r') else None
+
+
+def _body(pid):
+    """The pose model's side of a named limb point ('wrist-l' -> 'l'); None for unnamed move points."""
+    limb = _limb(pid)
+    return limb[1] if limb else None
+
+
+FACING = dict(share=.8)
+
+
+def facing(pose_frames, window):
+    """'front' when the seed person's hips face the camera in most posed frames (model's left hip on screen right),
+    'back' when they face away, None when mixed or unseen. Hips, not shoulders: a twisting dancer (solo clip 9.5-11.5 s)
+    crosses the shoulders while the hips keep facing."""
+    seed = largest(pose_frames.get(window['seed']))
+    if not seed:
+        return None
+    votes = []
+    for n in range(window['seed'], window['end']+1):
+        p = _person(pose_frames.get(n), seed.get('track_id'))
+        if p and min(p['scores'][11], p['scores'][12]) >= EVENTS['min_score'] and p['keypoints'][11][0] != p['keypoints'][12][0]:
+            votes.append(p['keypoints'][11][0] > p['keypoints'][12][0])
+    if not votes:
+        return None
+    share = sum(votes)/len(votes)
+    return 'front' if share >= FACING['share'] else 'back' if share <= 1-FACING['share'] else None
 
 
 def coverage(packets, window):
@@ -282,7 +310,7 @@ def describe(packets, window, pose_frames=None, timing_packets=None):
         x, other = seen[(kind, side)][1], seen.get((kind, 'r' if side == 'l' else 'l'), (0, None))[1]
         ref = other if other is not None else sorted(c[0] for c in centre.values())[len(centre)//2]
         if x is not None:
-            unknown.append(dict(kind=kind, side='화면 왼쪽' if x < ref else '화면 오른쪽', seen=round(seen[(kind, side)][0], 2)))
+            unknown.append(dict(kind=kind, side='화면 왼쪽' if x < ref else '화면 오른쪽', body=side, seen=round(seen[(kind, side)][0], 2)))
     all_parts = {p['point_id'] for packet in packets for f in packet['frames'] for p in f['points'] if PARTS.get(p['point_id'].split('-')[0])}
     incomplete = set(); limbs = []
     if centre_shift is None or len(centre) < window['end']-window['seed']:
@@ -314,11 +342,11 @@ def describe(packets, window, pose_frames=None, timing_packets=None):
         at = [anchor[n][0]-centre[n][0] for n in common if n in anchor]
         x = sorted(at)[len(at)//2] if at else track[common[0]][0]-centre[common[0]][0]
         if apart.get(pid, 0) >= BODY_MOTION['disagree_share']:
-            uncertain.append(dict(point_id=pid, part=part, side='화면 왼쪽' if x < 0 else '화면 오른쪽', share=round(apart[pid], 2)))
+            uncertain.append(dict(point_id=pid, part=part, side='화면 왼쪽' if x < 0 else '화면 오른쪽', body=_body(pid), share=round(apart[pid], 2)))
             continue
         if part == PARTS['move']:
             part = f"{part} {pid.rsplit('-', 1)[-1]}"
-        limbs.append(dict(point_id=pid, part=part, side='화면 왼쪽' if x < 0 else '화면 오른쪽', travel_px=round(travel, 1),
+        limbs.append(dict(point_id=pid, part=part, side='화면 왼쪽' if x < 0 else '화면 오른쪽', body=_body(pid), travel_px=round(travel, 1),
                           strokes=strokes[:BODY_MOTION['max_segments']], omitted=max(0, len(strokes)-BODY_MOTION['max_segments']),
                           runs=[[ns[0], ns[-1]] for ns in usable], axis_px=round(spread, 1) if abs(spread) >= limit else 0.))
     return dict(reference=reference_kind, geometry=geometry, size_px=round(size, 1), limit_px=round(limit, 1),
@@ -399,7 +427,7 @@ def bridge(before, after, frames):
                 continue
             shoulder = after['keypoints'][5 if side == 'l' else 6][0]-b[0][0]
             spread = abs(rb[0])-abs(ra[0])
-            limbs.append(dict(point_id=f'{part}-{side}', part=PARTS[part], side='화면 왼쪽' if shoulder < 0 else '화면 오른쪽',
+            limbs.append(dict(point_id=f'{part}-{side}', part=PARTS[part], side='화면 왼쪽' if shoulder < 0 else '화면 오른쪽', body=side,
                               direction=motion_report.direction(dx, dy), distance_px=round(math.hypot(dx, dy), 1),
                               axis_px=round(spread, 1) if abs(spread) >= limit else 0.))
     shift = (b[0][0]-a[0][0], b[0][1]-a[0][1])
@@ -610,7 +638,7 @@ def pose_events(pose_frames, window, fps):
             spots = sorted(where[s][n] for n in range(a, b+1) if n in where[s])
             if b-a+1 >= shortest:
                 # Held from the seed frame is a pose with an unknown start, not a gesture made here; still worth saying.
-                hand_face.append(dict(side=sides[s], frames=[a, b], seconds=round((b-a+1)/fps, 2), region=REGION_KO[spots[len(spots)//2]],
+                hand_face.append(dict(side=sides[s], body=s, frames=[a, b], seconds=round((b-a+1)/fps, 2), region=REGION_KO[spots[len(spots)//2]],
                                       enters=a > window['seed'], exits=b < window['end']))
     shoulders = []; width = []
     both = [n for n, p in people.items() if ok(p, 5) and ok(p, 6)]
@@ -623,7 +651,7 @@ def pose_events(pose_frames, window, fps):
         for i, s in ((5, 'l'), (6, 'r')):
             # Up is positive: the shoulder's height above the hips or eyes, in shoulder widths.
             height = _smooth([(_mean([k(n)[j] for j in ref])[1]-k(n)[i][1])/size for n in rows])
-            shoulders += [dict(side=sides[s], rise=c > 0, amount=round(abs(c), 2), frames=[rows[a], rows[b]])
+            shoulders += [dict(side=sides[s], body=s, rise=c > 0, amount=round(abs(c), 2), frames=[rows[a], rows[b]])
                           for a, b, c in _zigzag(height, EVENTS['shoulder_move'])]
         # Shoulder width against the eye distance, which does not turn with the chest: wider is a chest opening or a
         # turn toward the camera, narrower the reverse.
@@ -639,8 +667,75 @@ def pose_events(pose_frames, window, fps):
     shoulders = [e for e in shoulders if not any(e['frames'][0] <= b and a <= e['frames'][1] for a, b in turns)]
     lost = window['end']-window['seed']+1-len(people)
     return dict(lost_frames=lost, turns=turns, hand_face=sorted(hand_face, key=lambda e: e['frames'][0]), shoulders=sorted(shoulders, key=lambda e: e['frames'][0]),
-                width=width, hands_seen={sides[s]: round(seen[s]/max(1, len(people)), 2) for s in HANDS})
+                width=width, hands_seen={sides[s]: round(seen[s]/max(1, len(people)), 2) for s in HANDS},
+                hands_body={s: round(seen[s]/max(1, len(people)), 2) for s in HANDS})
 
+
+
+# Steps inside a long window (live-action solo dancer, 20 s: one 5.2 s window held a knee lift, crossed arms and a hand
+# on the shoulder, and its first/last onion showed none of them; a fresh reader got 8 of 30 facts). Cut at the
+# stillest frame 1-2 s after the last cut, then say which limb points moved most from the step's first to last frame.
+PHASES = dict(min_window=2., shortest=1., longest=2., merge=.5, smooth=5, move=.35, back=.35, parts=3)
+PHASE_POINTS = dict(wrist=(9, 10), elbow=(7, 8), knee=(13, 14), ankle=(15, 16))
+PHASE_KO = dict(wrist='손목', elbow='팔꿈치', knee='무릎', ankle='발목')
+
+
+def phases(pose_frames, window, fps):
+    """Steps of about 1-2 s for a window longer than 2 s, for the person posed on the seed frame: per step the limb
+    points that moved most against the body (shoulder midpoint, in torso lengths: shoulder midpoint to hip midpoint),
+    start to end, and a point that went out and came back. Sides and directions are screen sides on the seed frame.
+    None for a short window or when shoulders and hips are seen in too few frames."""
+    if (window['end']-window['seed']+1)/fps < PHASES['min_window']:
+        return None
+    seed = largest(pose_frames.get(window['seed']))
+    if not seed:
+        return None
+    ok = lambda p, i: p['scores'][i] >= EVENTS['min_score']
+    rel = {}
+    for n in range(window['seed'], window['end']+1):
+        p = _person(pose_frames.get(n), seed.get('track_id'))
+        if not p or not all(ok(p, i) for i in (5, 6, 11, 12)):
+            continue
+        k = p['keypoints']; c = _mean([k[5], k[6]]); torso = math.dist(c, _mean([k[11], k[12]]))
+        if torso:
+            rel[n] = {(part, side): ((k[i][0]-c[0])/torso, (k[i][1]-c[1])/torso)
+                      for part, pair in PHASE_POINTS.items() for side, i in zip('lr', pair) if ok(p, i)}
+    seen = sorted(rel)
+    if len(seen) < PHASES['shortest']*fps:
+        return None
+    step = {}
+    for a, b in zip(seen, seen[1:]):
+        both = rel[a].keys() & rel[b].keys()
+        if both:
+            step[b] = sum(math.dist(rel[a][j], rel[b][j]) for j in both)/len(both)/(b-a)
+    half = PHASES['smooth']//2
+    calm = {n: sorted(v)[len(v)//2] for n in step for v in [[step[m] for m in range(n-half, n+half+1) if m in step]]}
+    cuts = [seen[0]]
+    while seen[-1]-cuts[-1] > PHASES['longest']*fps:
+        lo, hi = cuts[-1]+PHASES['shortest']*fps, cuts[-1]+PHASES['longest']*fps
+        inside = [n for n in calm if lo <= n <= hi]
+        cuts.append(min(inside, key=lambda n: calm[n]) if inside else next(n for n in seen if n >= hi))
+    if seen[-1]-cuts[-1] < PHASES['merge']*fps and len(cuts) > 1:
+        cuts.pop()
+    cuts.append(seen[-1])
+    sides = dict(l=_screen_side(seed, 5), r=_screen_side(seed, 6))
+    out = []
+    for a, b in zip(cuts, cuts[1:]):
+        moved = []
+        for j in rel[a].keys() & rel[b].keys():
+            dx, dy = rel[b][j][0]-rel[a][j][0], rel[b][j][1]-rel[a][j][1]
+            far = max((math.dist(rel[n][j], rel[a][j]) for n in seen if a <= n <= b and j in rel[n]), default=0.)
+            back = far-math.hypot(dx, dy) >= PHASES['back'] and far >= PHASES['move']
+            if math.hypot(dx, dy) >= PHASES['move'] or back:
+                moved.append(dict(part=j[0], side=sides[j[1]], body=j[1], direction=motion_report.direction(100*dx, 100*dy),  # torso lengths: the px resolution would hide them
+                                  amount=round(math.hypot(dx, dy), 2), back=round(far, 2) if back else None))
+        # One statement per limb: the wrist or ankle unless the elbow or knee moved clearly more.
+        best = {}
+        for m in sorted(moved, key=lambda m: -max(m['amount'], m['back'] or 0.)):
+            limb = (m['body'], m['part'] in ('wrist', 'elbow'))
+            best.setdefault(limb, m)
+        out.append(dict(frames=[a, b], moved=sorted(best.values(), key=lambda m: -max(m['amount'], m['back'] or 0.))))
+    return out
 
 # Several people (clip D live scene: two or three girls lean on, pull and point at each other; only the largest was
 # followed, and a girl falling backward read as a camera pan). Each person is followed by the pose tracker id alone;

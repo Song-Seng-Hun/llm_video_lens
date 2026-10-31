@@ -125,3 +125,24 @@ class People(unittest.TestCase):
 
 
 if __name__ == '__main__': unittest.main()
+
+
+class PhaseLines(unittest.TestCase):
+    def test_steps_are_indented_under_the_window(self):
+        done = dict(window=dict(seed=0, end=99), phases=[
+            dict(frames=[0, 45], moved=[dict(part='wrist', side='화면 왼쪽', direction='up', amount=1., back=None)]),
+            dict(frames=[45, 99], moved=[dict(part='knee', side='화면 오른쪽', direction='up', amount=.5, back=1.2)])])
+        self.assertEqual(digest.phase_lines(done, 25.), ['  - 0.00–1.80s: 왼손목 위 1.0', '  - 1.80–4.00s: 오른무릎 위 0.5(최대 1.2 갔다 돌아옴)'])
+
+
+class BodySides(unittest.TestCase):
+    def test_model_side_comes_first_and_screen_side_follows_the_facing(self):
+        arm = limb('wrist-l', '손목', '화면 왼쪽', 'up', 40.)
+        arm['body'] = 'l'
+        self.assertTrue(digest.limbs(dict(limbs=[arm]), 'front')[0]['text'].startswith('왼팔(화면 오른쪽: 손목) 위 40px'))
+        self.assertTrue(digest.limbs(dict(limbs=[arm]), 'back')[0]['text'].startswith('왼팔(화면 왼쪽: 손목)'))
+        self.assertTrue(digest.limbs(dict(limbs=[arm]))[0]['text'].startswith('왼팔(화면 왼쪽: 손목)'))  # facing unknown: where measured
+
+    def test_back_facing_is_noted(self):
+        line = digest.window_line(dict(window=dict(seed=0, end=20), facing='back', groups=[]), 25.)
+        self.assertIn('뒤돈 자세', line); self.assertIn('뒤돎(사람 왼쪽=화면 왼쪽)', line)
