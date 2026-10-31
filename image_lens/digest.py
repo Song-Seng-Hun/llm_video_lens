@@ -186,7 +186,7 @@ def window_line(done, fps, first=None):
                 fields.append('몸 기준: ' + '; '.join(shown) + (f" (+{len(found)-DIGEST['parts']})" if len(found) > DIGEST['parts'] else ''))
             elif not body.get('unknown') and not body.get('uncertain'):
                 fields.append('몸 기준: 관측된 연속 구간에서 큰 이동 미검출(실제 동작은 모름)'
-                              if body.get('incomplete') or (done.get('body_geometry') or {}).get('source') in ('raw_tracker_source_switch', 'per_joint_source_stable')
+                              if body.get('incomplete') or ((done.get('body_geometry') or {}).get('source') in ('raw_tracker_source_switch', 'per_joint_source_stable') or (done.get('body_geometry') or {}).get('excluded_motion_frames'))
                               else f"몸 기준: 팔다리 {body['limit_px']:.0f}px 미만")
         else:
             moves = _screen(done.get('groups', []))
@@ -197,6 +197,8 @@ def window_line(done, fps, first=None):
                 fields.append('화면: ' + '; '.join(shown) + (f" (+{len(moves)-DIGEST['parts']})" if len(moves) > DIGEST['parts'] else ''))
             elif (done.get('body_geometry') or {}).get('source') in ('raw_tracker_source_switch', 'per_joint_source_stable'):
                 fields.append('몸 기준: 원시 기준점 부족, 움직임 모름')
+            elif (done.get('body_geometry') or {}).get('excluded_motion_frames'):
+                fields.append('몸 기준: 관절 돌출 교정 프레임 제외, 움직임 모름')
             elif done.get('groups'):
                 fields.append('화면: 24px 이상 이동 없음')
             else:  # seed or every track failed: nothing was measured, which is not stillness

@@ -18,6 +18,55 @@ def track_path(stem, group):
     return stem.with_suffix('.raw-tracks.json' if group in GROUPS else '.tracks.json')
 
 
+
+def _correct_excursions(selected, raw, samples, window, inside):
+    """Repair only a single pose-mode excursion supported by three real raw observations.
+    The repaired position remains visible; its motion is unknown, never interpolated across.
+    """
+    from image_lens.body_motion import BODY_MOTION
+    visible_sources = {}
+    raw_rows = {}
+    for frame in selected['frames']:
+        if window['seed'] < frame['frame'] <= window['end']:
+            for row in frame['points']:
+                if row['visible'] and row['status'] != 'anchor_input_not_prediction':
+                    visible_sources.setdefault(row['point_id'], set()).add(row.get('coordinate_source', 'point_tracker'))
+    for frame in raw['frames']:
+        for row in frame['points']:
+            raw_rows[frame['frame'], row['point_id']] = row
+    corrected = 0
+    for frame in selected['frames']:
+        n = frame['frame']
+        poses = [samples.get(f) for f in (n-1,n,n+1)]
+        if not all(poses):
+            continue
+        for row in frame['points']:
+            pid = row['point_id']; index = BODY.get(pid.replace('-', '_'))
+            if (index is None or not row['visible'] or row['status'] == 'anchor_input_not_prediction'
+                    or visible_sources.get(pid) != {'pose'}):
+                continue
+            observations = [raw_rows.get((f,pid)) for f in (n-1,n,n+1)]
+            if any(not p or not p['visible'] or p['status'] == 'anchor_input_not_prediction' or not inside(p.get('xy'))
+                   for p in observations):
+                continue
+            if any(p['scores'][index] < PARAMS['pose_score'] or min(p['scores'][5:7]) < PARAMS['shoulder_score']
+                   or not all(inside(p['keypoints'][i]) for i in (index,5,6)) for p in poses):
+                continue
+            width = min(math.dist(p['keypoints'][5],p['keypoints'][6]) for p in poses)
+            resolution = max(BODY_MOTION['min_px'], BODY_MOTION['min_ratio']*width)
+            support = [p['xy'] for p in observations] + [poses[0]['keypoints'][index], poses[2]['keypoints'][index]]
+            if (width <= 0 or any(math.dist(a,b) > resolution for i,a in enumerate(support) for b in support[i+1:])
+                    or math.dist(row['xy'],observations[1]['xy']) <= PARAMS['recovery_shoulder_widths']*width):
+                continue
+            evidence = dict(rejected_xy=list(row['xy']), rejected_pose_score=row.pop('pose_score',None),
+                            support_frames=[n-1,n+1], agreement_px=round(resolution,3))
+            row.update(xy=list(observations[1]['xy']), coordinate_source='point_tracker',visibility_source='point_tracker',
+                       status='pose_excursion_corrected_raw_unverified',claim_scope=observations[1]['claim_scope'],motion_pair_usable=False,
+                       motion_geometry_usable=False,motion_geometry_exclusion='isolated_pose_excursion',pose_excursion=evidence)
+            corrected += 1
+    return corrected
+
+
 def reconcile(packet, pose_frames, track_id, window, raw_path, pose_path):
     """Keep every raw visible prediction. A confident same-ID pose supplies a joint location; an
     invisible raw candidate requires in-frame pose/tracker agreement relative to shoulders, or three
@@ -94,6 +143,8 @@ def reconcile(packet, pose_frames, track_id, window, raw_path, pose_path):
             counts['pose_coordinates'] += 1
             counts['recovered_predictions'] += 1
             counts['temporal_recoveries'] += 1
+    counts['pose_excursion_corrections'] = _correct_excursions(result, packet, samples, window, inside)
+    counts['pose_coordinates'] -= counts['pose_excursion_corrections']
     result.update(schema='image-lens.joint-tracks/1', observation_scope='joint_and_surface_estimates_2d',
                   joint_tracking=dict(params=PARAMS, track_id=track_id, window=window, counts=counts,
                                       raw_tracks=dict(path=str(raw_path), sha256=paths.sha(raw_path)),
