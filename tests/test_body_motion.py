@@ -1,5 +1,6 @@
 """Body-relative limb motion; synthetic tracks, no models."""
 from pathlib import Path
+import math
 import sys
 import unittest
 
@@ -54,6 +55,52 @@ class BodyMotion(unittest.TestCase):
         paths = self.body(lambda n: 0); paths['wrist-r'] = {n: (150., 400.+(4*n if n <= 10 else 40-4*(n-10))) for n in range(21)}
         limb = body_motion.describe([packet(paths)], dict(seed=0, end=20))['limbs'][0]
         self.assertGreaterEqual(limb['travel_px'], 60.)  # out 36 px and back from f1 (seed left out); net is about 4
+
+    def test_supported_short_return_keeps_the_observed_body_apex(self):
+        # Body median3 flattened the 90px apex to60px and moved its boundary f9->f8.
+        import copy
+        y = [0.]*7+[30.,60.,90.,60.,30.]+[0.]*7
+        paths = self.body(lambda n: 0)
+        paths['wrist-r'] = {n: (150.,400.+v) for n,v in enumerate(y)}
+        source=packet(paths); before=copy.deepcopy(source)
+        limb=body_motion.describe([source],dict(seed=0,end=len(y)-1))['limbs'][0]
+        self.assertEqual([s['direction'] for s in limb['strokes']],['down','up'])
+        self.assertEqual([s['frames'] for s in limb['strokes']],[[1,9],[9,len(y)-1]])
+        self.assertEqual([s['distance_px'] for s in limb['strokes']],[90.,90.])
+        self.assertEqual(limb['travel_px'],180.)
+        self.assertTrue(all(s['timing_status']=='raw_consistent' for s in limb['strokes']))
+        self.assertEqual(source,before)
+
+    def test_apex_support_does_not_restore_an_isolated_body_spike(self):
+        # A wrong single native observation must not become a new body excursion.
+        paths=self.body(lambda n: 0)
+        paths['wrist-r']={n:(150.,400.+(90. if n==9 else 0.)) for n in range(21)}
+        self.assertEqual(body_motion.describe([packet(paths)],dict(seed=0,end=20))['limbs'],[])
+
+    def test_apex_correction_keeps_the_existing_segment_topology(self):
+        # Restoring a below-filter-resolution bob before segmentation added small
+        # strokes and evicted later movement from the existing three-stroke cap.
+        y=[0.]*7+[4.,8.,12.,8.,4.]+[0.]*9
+        path=[(3.*n,v) for n,v in enumerate(y)]
+        old=body_motion.segments(body_motion._median3(path),12.)
+        filtered,spans=body_motion._motion_segments(path,12.)
+        self.assertEqual(old,[(0,20)])
+        self.assertEqual(spans,old)
+        self.assertEqual(filtered,[list(p) for p in body_motion._median3(path)])
+
+        # A neighbouring axis apex is weaker than the existing corner and would
+        # remove the first returned stroke (22px becomes10px, below12px).
+        path=[(0.,0.),(-20.,-20.),(-10.,-10.),(-10.,0.),(-10.,-20.),(-20.,-40.),(-70.,-20.)]
+        filtered,spans=body_motion._motion_segments(path,12.)
+        self.assertEqual(spans,[(0,4),(4,6)])
+        self.assertGreaterEqual(math.dist(filtered[0],filtered[4]),12.)
+        paths=self.body(lambda n: 0)
+        paths['wrist-r']={0:(150.,400.)}
+        paths['wrist-r'].update({n:(150.+x,400.+y) for n,(x,y) in enumerate(path,1)})
+        limb=body_motion.describe([packet(paths)],dict(seed=0,end=7))['limbs'][0]
+        self.assertEqual([s['frames'] for s in limb['strokes']],[[1,5],[5,7]])
+        self.assertEqual([s['direction'] for s in limb['strokes']],['up_left','left'])
+        self.assertEqual([s['distance_px'] for s in limb['strokes']],[22.4,60.])
 
     def test_hand_crossing_the_centre_keeps_its_arm_side(self):
         paths = self.body(lambda n: 0); paths['wrist-r'] = {n: (210.+n, 400.) for n in range(21)}
