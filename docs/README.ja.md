@@ -1,9 +1,9 @@
-<p align="center"><a href="README.md">한국어</a> · <a href="README.en.md">English</a> · <b>日本語</b></p>
+<p align="center"><a href="../README.md">한국어</a> · <a href="README.en.md">English</a> · <b>日本語</b></p>
 
 <p align="center">
   <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="assets/banner-dark.svg">
-    <img src="assets/banner-light.svg" width="640" alt="ピクセルアートのバナー。虫めがねがカットをひとつ含むフィルムの 8 フレームを順に読むと、各フレームに姿勢のキーポイントと青から赤へ変わる追跡点が付き、Claude が BRIEF に 1 行ずつ書き、TRACK パネルにカットで途切れた点の経路が描かれます。">
+    <source media="(prefers-color-scheme: dark)" srcset="../assets/banner-dark.svg">
+    <img src="../assets/banner-light.svg" width="640" alt="ピクセルアートのバナー。虫めがねがカットをひとつ含むフィルムの 8 フレームを順に読むと、各フレームに姿勢のキーポイントと青から赤へ変わる追跡点が付き、Claude が BRIEF に 1 行ずつ書き、TRACK パネルにカットで途切れた点の経路が描かれます。">
   </picture>
 </p>
 
@@ -31,7 +31,7 @@
 1. Python 3.11 以上で依存パッケージをインストールします。`look` は姿勢推定と点の追跡を両方使うので、2 つのセットがどちらも必要です。
 
    ```sh
-   pip install -r requirements-pose.txt -r requirements-tracking.txt
+   pip install -r requirements/pose.txt -r requirements/tracking.txt
    ```
 
 2. モデルファイルを 3 つ自分で用意します。人物検出（YOLOX HumanArt、ONNX）、全身の姿勢（RTMW 133 キーポイント、ONNX）、点の追跡（CoTracker のチェックポイント）です。リポジトリには入っておらず、自動でダウンロードもしません。
@@ -94,18 +94,18 @@ python -m image_lens --workspace W mark --video V --shots W/look/shots.json --fr
 
 ## AIと一緒に作ったプロジェクト
 
-方向は人が決め、AIエージェントたちが一緒に作ったプロジェクトです。何を作るか、どの精度を目指すか、何を採用するかは人が決め、実装・計測・コードレビューは Claude（Anthropic）と Codex（OpenAI）のエージェントが分担しました。最近の改善案は、作った側からは見えない別保管の正解フレームで別のエージェントが採点してから採用しています。上のバナーもその様子を描いたもので、Claude が映像を読みながら BRIEF に一行ずつ書いていきます。[look ノート](docs/look-notes.md)はその過程でエージェントが残した計測記録です。
+方向は人が決め、AIエージェントたちが一緒に作ったプロジェクトです。何を作るか、どの精度を目指すか、何を採用するかは人が決め、実装・計測・コードレビューは Claude（Anthropic）と Codex（OpenAI）のエージェントが分担しました。最近の改善案は、作った側からは見えない別保管の正解フレームで別のエージェントが採点してから採用しています。上のバナーもその様子を描いたもので、Claude が映像を読みながら BRIEF に一行ずつ書いていきます。[look ノート](look-notes.md)はその過程でエージェントが残した計測記録です。
 
 ## ライセンス
 
-このプロジェクトのコードと文書は [MIT](LICENSE) です。同梱の外部コードはそれぞれの条件に従います。`image_lens/vendor/shot-detector`（PySceneDetect）は BSD 3-Clause、`image_lens/vendor/source`（CoTracker）は CC-BY-NC 4.0 で非商用利用のみです。モデルの重みは含まれていません。
+このプロジェクトのコードと文書は [MIT](../LICENSE) です。同梱の外部コードはそれぞれの条件に従います。`image_lens/vendor/shot-detector`（PySceneDetect）は BSD 3-Clause、`image_lens/vendor/source`（CoTracker）は CC-BY-NC 4.0 で非商用利用のみです。モデルの重みは含まれていません。
 
 ## もっと見る
 
 詳しい文書は英語です。
 
-- [全体のガイド](docs/guide.md)：すべてのコマンドとオプション、`look.md` の読み方の全体、出力ファイルの一覧、brief の形式、ジョブと追跡、姿勢シード
-- [LAN API](lan/README.md)：家の LAN にある別の PC（Windows など）から、この Mac の `look` と `at` を使うためのサーバーとクライアント
-- [look ノート](docs/look-notes.md)：`look` の基準値と、その根拠になった確認の記録
-- [限界](docs/limitations.md) · [検証](docs/verification.md) · [出所とライセンス](docs/provenance.md) · [ジョブの契約](docs/jobs.md)
+- [全体のガイド](guide.md)：すべてのコマンドとオプション、`look.md` の読み方の全体、出力ファイルの一覧、brief の形式、ジョブと追跡、姿勢シード
+- [LAN API](../lan/README.md)：家の LAN にある別の PC（Windows など）から、この Mac の `look` と `at` を使うためのサーバーとクライアント
+- [look ノート](look-notes.md)：`look` の基準値と、その根拠になった確認の記録
+- [限界](limitations.md) · [検証](verification.md) · [出所とライセンス](provenance.md) · [ジョブの契約](jobs.md)
 - テストの実行：`python -B -m unittest discover -s tests -v`

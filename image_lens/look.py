@@ -56,7 +56,7 @@ def _pose_child(arguments):
     import sys
     with LOG.open('a') as log:
         print(json.dumps(dict(step='pose', arguments=[str(a) for a in arguments])), file=log, flush=True)
-    return subprocess.Popen([sys.executable, '-I', '-B', str(Path(__file__).resolve().parents[1]/'image_lens_cli.py'),
+    return subprocess.Popen([sys.executable, '-I', '-B', str(Path(__file__).resolve().parents[1]/'tools'/'image_lens_cli.py'),
                              '--workspace', str(paths.workspace_root()), 'pose', *[str(a) for a in arguments]],
                             stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, start_new_session=True)
 

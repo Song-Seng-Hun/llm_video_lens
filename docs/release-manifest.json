@@ -20,7 +20,7 @@
   ],
   "manifest_self_excluded": true,
   "file_count": 136,
-  "total_bytes": 1528148,
+  "total_bytes": 1528135,
   "files": [
     {
       "path": ".gitattributes",
@@ -38,19 +38,9 @@
       "sha256": "f188924c9b14212df097bbeb982d2bfe2f738c9be2b486cdb72708e6ee439b46"
     },
     {
-      "path": "README.en.md",
-      "bytes": 6737,
-      "sha256": "7448ce419357938d2aaa2125a635de2c58580dde2c2dfd60ba37be7f9155651a"
-    },
-    {
-      "path": "README.ja.md",
-      "bytes": 8524,
-      "sha256": "bcb867e83ff27de6a4d92968e0e76b558554e6776ffa910fea56569d0d20d817"
-    },
-    {
       "path": "README.md",
-      "bytes": 8507,
-      "sha256": "f0abffebe5dfc07026cd106cb0f164e3e1db9af054ed6fddf830edc3b1b198da"
+      "bytes": 8517,
+      "sha256": "8463a983d699d98c68e8b436855cf0cdf5488395611d62c7a45acc11442ba811"
     },
     {
       "path": "assets/banner-dark.svg",
@@ -63,9 +53,19 @@
       "sha256": "4c2abc36a5e23ea59c90866f3c2c7c2a638fd2e9794e9b8cf6f65a9173792796"
     },
     {
+      "path": "docs/README.en.md",
+      "bytes": 6717,
+      "sha256": "fc2881db7ce06bbab5a586b22d9fdeaee9df6ab7fcb39e99c154b723273e7ddf"
+    },
+    {
+      "path": "docs/README.ja.md",
+      "bytes": 8504,
+      "sha256": "3e02a1586e00e25eb489da5fdcb85deb7d83f646a1b1e3c69a649b87e0bde4bc"
+    },
+    {
       "path": "docs/guide.md",
-      "bytes": 17210,
-      "sha256": "7428ec12b85b796c815f6136f8f1a17eb3c8236b1acb45d03a7e5f7c36b453f0"
+      "bytes": 17218,
+      "sha256": "9bd59a468b3b333ba14ebef83dc63caf0d9c52163e7644cfe1ad9ef6dfc327ea"
     },
     {
       "path": "docs/import-provenance.json",
@@ -89,8 +89,8 @@
     },
     {
       "path": "docs/provenance.md",
-      "bytes": 3037,
-      "sha256": "457fd799eeef3e361ae63af483aab4f9d4c3abd13ffe4a2661a696ee44945761"
+      "bytes": 3042,
+      "sha256": "b61c7c8e69bc77395f5a89b3f9f942230322d4136930dc47637a868d86176fed"
     },
     {
       "path": "docs/verification.md",
@@ -174,8 +174,8 @@
     },
     {
       "path": "image_lens/look.py",
-      "bytes": 37431,
-      "sha256": "d9bcbcdf0abeb1b883162b73c54cbdc15ad3a83b021f75fc3c0663aed31d26b0"
+      "bytes": 37439,
+      "sha256": "320aabd72cb2e4e7c4b455f25e8b7d76c18119e7e71e6eea9826c11a26861771"
     },
     {
       "path": "image_lens/mark.py",
@@ -568,11 +568,6 @@
       "sha256": "f75ed773db44ad3c680d2125e02fdbcabf49bc6db6aabdf9ec8e5f9b6b531f74"
     },
     {
-      "path": "image_lens_cli.py",
-      "bytes": 254,
-      "sha256": "6c96d0ec6c2351966f9a261fdfdeafeafedc1d9c3c36198153600c4ddab989bc"
-    },
-    {
       "path": "lan/README.md",
       "bytes": 5673,
       "sha256": "7a7ea30ab8a0add187df6d4c2ab5b0c73b5b5d75a84a6e7c117f4c7cc8bd5875"
@@ -613,19 +608,19 @@
       "sha256": "c1e00df0d267ba48e0091becd18c1f73ad9e538208d434ffc9bdb9edf88fdf22"
     },
     {
-      "path": "requirements-pose.txt",
-      "bytes": 196,
-      "sha256": "41ac47869841534abd02f74426ffae08457961d8c682c34dc384d50e67dda776"
-    },
-    {
-      "path": "requirements-tracking.txt",
-      "bytes": 109,
-      "sha256": "94979708df0aa72e59d052a87adc1398b00a354159f162520acf804be57ead96"
-    },
-    {
-      "path": "requirements.txt",
+      "path": "requirements/base.txt",
       "bytes": 191,
       "sha256": "90f9b8cc97c609e44be9016049f4af4062265dda8c78b6fe6adb9b913ede2e35"
+    },
+    {
+      "path": "requirements/pose.txt",
+      "bytes": 188,
+      "sha256": "ad171e9ed6dcc3ada1ceebe07d92e4d3da33354291d7feeb7c04aab25fc9f5c0"
+    },
+    {
+      "path": "requirements/tracking.txt",
+      "bytes": 101,
+      "sha256": "9dbd66570e62f98c05dff28ec05b38256232257d81ccaf752dbb286302a7a5b0"
     },
     {
       "path": "tests/smoke_runtime.py",
@@ -644,8 +639,8 @@
     },
     {
       "path": "tests/test_contracts.py",
-      "bytes": 22445,
-      "sha256": "18b43d551b4a15936a515af943d1c431e920858e0e0067577de4763e0353dda1"
+      "bytes": 22453,
+      "sha256": "ed98df2cb60f5eac2be07692ebcaf5ddaa66f0dea13db728760a2358ff762572"
     },
     {
       "path": "tests/test_digest.py",
@@ -701,6 +696,11 @@
       "path": "tools/build_banner.py",
       "bytes": 24550,
       "sha256": "273a65b56c1778445659cf8d7f7874396326a60f33eeb7eae658d25e273d4938"
+    },
+    {
+      "path": "tools/image_lens_cli.py",
+      "bytes": 258,
+      "sha256": "71eba29ba7c0812bf48dcd4c382aa26028496e5314076c4176d7d4bcafabe635"
     }
   ]
 }

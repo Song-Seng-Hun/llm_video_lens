@@ -1,4 +1,4 @@
-<p align="center"><b>한국어</b> · <a href="README.en.md">English</a> · <a href="README.ja.md">日本語</a></p>
+<p align="center"><b>한국어</b> · <a href="docs/README.en.md">English</a> · <a href="docs/README.ja.md">日本語</a></p>
 
 <p align="center">
   <picture>
@@ -31,7 +31,7 @@
 1. Python 3.11 이상에서 의존성을 설치합니다. `look`은 자세 추정과 점 추적을 함께 쓰므로 두 묶음이 모두 필요합니다.
 
    ```sh
-   pip install -r requirements-pose.txt -r requirements-tracking.txt
+   pip install -r requirements/pose.txt -r requirements/tracking.txt
    ```
 
 2. 모델 파일 세 개를 직접 준비합니다. 사람 검출(YOLOX HumanArt, ONNX), 전신 자세(RTMW 133 키포인트, ONNX), 점 추적(CoTracker 체크포인트)입니다. 저장소에 들어 있지 않고, 자동으로 내려받지도 않습니다.
