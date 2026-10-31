@@ -208,6 +208,81 @@ class PoseExcursion(unittest.TestCase):
                 self.assertEqual(out['joint_tracking']['counts'].get('pose_excursion_corrections',0),0)
 
 
+class PoseConflict(unittest.TestCase):
+    setUp=JointTracking.setUp
+    tearDown=JointTracking.tearDown
+    fused=PoseExcursion.fused
+    # The same observations could be a false pose mode or a genuine return with
+    # stuck raw tracks. Neither justifies replacing a multi-frame position.
+    def fixture(self):
+        raw,poses,w=PoseExcursion.fixture(self)
+        for n,f in enumerate(raw['frames']):
+            q=next(q for q in f['points'] if q['point_id']=='elbow-l')
+            q['xy']=[150.+n*.5,150.]
+            poses[n][0]['keypoints'][7]=[400.+n*.5 if n in (7,8,9) else 150.+n*.5,150.]
+        return raw,poses,w
+
+    def test_bracketed_conflict_keeps_positions_but_breaks_motion(self):
+        from image_lens import body_motion,digest
+        raw,poses,w=self.fixture();before=copy.deepcopy(raw);out=self.fused(raw,poses,w)
+        for n in (7,8,9):
+            q=next(q for q in out['frames'][n]['points'] if q['point_id']=='elbow-l')
+            self.assertFalse(q.get('motion_geometry_usable',True))
+            self.assertEqual(q['xy'],poses[n][0]['keypoints'][7]);self.assertTrue(q['visible'])
+            self.assertEqual(q['coordinate_source'],'pose');self.assertEqual(q['claim_scope'],'model_joint_2d')
+            self.assertEqual(q['pose_tracker_conflict']['interpretation'],'pose_or_stuck_raw_unresolved')
+            self.assertEqual(q['pose_tracker_conflict']['support_frames'],[6,10])
+            self.assertNotIn('pose_excursion',q)
+        counts=out['joint_tracking']['counts']
+        self.assertEqual((counts['pose_conflict_frames'],counts['pose_conflict_spans'],counts['pose_excursion_corrections']),(3,1,0))
+        self.assertEqual(counts['pose_coordinates'],sum(q.get('coordinate_source')=='pose' and q['visible'] for f in out['frames'][1:] for q in f['points']))
+        policy=body_motion.geometry_policy([out],w,[raw]);effective=body_motion.geometry_packets([out],w,[raw],policy)
+        self.assertEqual(policy['conflict_motion_frames'],{'elbow-l':[7,8,9]});self.assertEqual(policy['source_switches'],{})
+        self.assertEqual(set(body_motion.series(effective,w)['elbow-l']),set(range(1,17))-{7,8,9})
+        result=body_motion.describe([out],w,timing_packets=[raw])
+        self.assertFalse(any(s['frames'][0]<=n<=s['frames'][1] for l in result['limbs'] if l['point_id']=='elbow-l' for s in l['strokes'] for n in (7,8,9)))
+        self.assertIn('추정 충돌',body_motion.geometry_note(policy))
+        done=dict(window=w,body=None,body_geometry=policy,groups=[],motif='A')
+        self.assertIn('추정 충돌 프레임 제외, 움직임 모름',digest.window_line(done,30))
+        self.assertEqual(raw,before)
+
+    def test_narrow_neighbour_cannot_absorb_existing_isolated_repair(self):
+        raw=packet();raw['frames']=[];poses={};w=dict(seed=0,end=5)
+        for n,x in enumerate((150.,152.,400.,150.,150.),1):
+            raw['frames'].append(dict(frame=n,points=copy.deepcopy(packet(xy=[150.,150.])['frames'][0]['points'])))
+            p=person();p['keypoints'][7]=[x,150.]
+            if n==1:p['keypoints'][6]=[104.,100.]
+            poses[n]=[p]
+        out=self.fused(raw,poses,w);q=out['frames'][2]['points'][0]
+        self.assertEqual(q['xy'],[150.,150.]);self.assertEqual(q['pose_excursion']['support_frames'],[2,4])
+        self.assertEqual(out['joint_tracking']['counts']['pose_excursion_corrections'],1)
+        self.assertEqual(out['joint_tracking']['counts']['pose_conflict_frames'],0)
+
+    def test_supported_fast_return_is_not_flagged(self):
+        raw,poses,w=self.fixture()
+        for n in (7,8,9):
+            next(q for q in raw['frames'][n]['points'] if q['point_id']=='elbow-l')['xy']=list(poses[n][0]['keypoints'][7])
+        out=self.fused(raw,poses,w)
+        self.assertEqual(out['joint_tracking']['counts'].get('pose_conflict_frames',0),0)
+        self.assertTrue(all('motion_geometry_usable' not in q for f in out['frames'] for q in f['points']))
+
+    def test_unbracketed_or_unreliable_conflicts_are_not_invented(self):
+        for case in ('cut','seed','missing_raw','hidden_raw','missing_pose','foreign_id','weak','mixed','moving_raw'):
+            raw,poses,w=self.fixture()
+            if case=='cut':w['end']=9
+            elif case=='seed':w['seed']=6
+            elif case=='missing_raw':raw['frames'][8]['points']=[q for q in raw['frames'][8]['points'] if q['point_id']!='elbow-l']
+            elif case=='hidden_raw':next(q for q in raw['frames'][8]['points'] if q['point_id']=='elbow-l')['visible']=False
+            elif case=='missing_pose':del poses[10]
+            elif case=='foreign_id':poses[10][0]['track_id']='other'
+            elif case=='weak':poses[6][0]['scores'][7]=.49
+            elif case=='mixed':poses[3][0]['scores'][7]=.49
+            elif case=='moving_raw':next(q for q in raw['frames'][8]['points'] if q['point_id']=='elbow-l')['xy']=[180.,150.]
+            with self.subTest(case=case):
+                self.assertEqual(self.fused(raw,poses,w)['joint_tracking']['counts'].get('pose_conflict_frames',0),0)
+
+
+
 class Timing(unittest.TestCase):
     def test_fused_positions_do_not_manufacture_raw_ease(self):
         from image_lens import body_motion
