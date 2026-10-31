@@ -20,7 +20,7 @@
   ],
   "manifest_self_excluded": true,
   "file_count": 136,
-  "total_bytes": 1528225,
+  "total_bytes": 1530483,
   "files": [
     {
       "path": ".gitattributes",
@@ -64,8 +64,8 @@
     },
     {
       "path": "docs/guide.md",
-      "bytes": 17218,
-      "sha256": "25a07b664e497f345f90bd22d8759da58ae3eea1f2dbbcaae3485f6edd06c583"
+      "bytes": 17344,
+      "sha256": "9cf46e027eff2f6abbc02d2e031efbd31533b16fa33581343053d83e2d2dad31"
     },
     {
       "path": "docs/import-provenance.json",
@@ -204,8 +204,8 @@
     },
     {
       "path": "image_lens/onion.py",
-      "bytes": 21925,
-      "sha256": "e8fb968a8eb900cf366eb763a6b0f076bf75f5fed0e9921084d56b724f2347d6"
+      "bytes": 23023,
+      "sha256": "3f5f97b3c05fe9e647deab1310e177d194a1fe3cfb9a5083fea236c9f8c4bd52"
     },
     {
       "path": "image_lens/part_regions.py",
@@ -679,8 +679,8 @@
     },
     {
       "path": "tests/test_onion.py",
-      "bytes": 6931,
-      "sha256": "022847a36b0ebdf0aea66e39e08de8c15674ef412a1893c66754124a0bde5026"
+      "bytes": 7965,
+      "sha256": "8b3209b0e353ab0b93c3974b3e02c5481837f96a30d358fdcbabb20942b7513e"
     },
     {
       "path": "tests/test_pose.py",

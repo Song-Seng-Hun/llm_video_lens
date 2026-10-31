@@ -88,6 +88,26 @@ class Trails(unittest.TestCase):
             self.assertGreater(yellow.sum(), 100)
 
 
+    def test_arrow_head_fixed_and_kept_inside(self):
+        import cv2
+        import numpy as np
+        calls = []
+        class Spy:
+            LINE_AA = cv2.LINE_AA
+            def arrowedLine(self, picture, start, end, color, thickness, line_type, tipLength):
+                calls.append((start, end, tipLength))
+        picture = np.zeros((200, 100, 3), np.uint8)
+        onion._arrow(Spy(), picture, (50, 100), (400, 0))  # far past the right edge
+        start, end, tip = calls[-1]
+        self.assertTrue(0 <= end[0] < 100 and 0 <= end[1] < 200)
+        self.assertAlmostEqual(tip*abs(end[0]-start[0]), onion.ONION['arrow_head'], delta=1)
+        calls.clear(); onion._arrow(Spy(), picture, (50, 100), (0, 90))  # long arrow inside: same head size
+        start, end, tip = calls[-1]
+        self.assertAlmostEqual(tip*abs(end[1]-start[1]), onion.ONION['arrow_head'], delta=1)
+        calls.clear(); onion._arrow(Spy(), picture, (50, 100), (3, 2))  # shorter than the head: left out
+        self.assertEqual(calls, [])
+
+
     # Row-preservation tests above miss the renderer reconnecting f1 to f3.
     def test_rendered_trail_breaks_at_missing_native_frame(self):
         import tempfile

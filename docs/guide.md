@@ -115,7 +115,7 @@ Notes that change how to read a line:
 
 ### Pictures
 
-- `<window>-onion.jpg`: the first frame in cyan and the last in red, with band shifts as arrows. A grey panel on the right shows the frame most unlike the first, so a move that goes out and comes back is not read as still. Each part's lead point is drawn as white-rimmed dots, one per frame (big circle at the start, big square at the end): wide spacing is fast, tight spacing is slow.
+- `<window>-onion.jpg`: the first frame in cyan and the last in red, with band shifts as arrows (doubled; shortened to stay inside the picture, left out when shorter than the arrow head; the text keeps the measured shift). A grey panel on the right shows the frame most unlike the first, so a move that goes out and comes back is not read as still. Each part's lead point is drawn as white-rimmed dots, one per frame (big circle at the start, big square at the end): wide spacing is fast, tight spacing is slow.
 - `onion-sheet-N.jpg`: all onion images of the run with their time ranges. Ranges too short to track appear as a single "still" frame, and the six windows most likely to show a turn get a strip of five frames.
 - `frame-sheet-N.jpg`: whole frames spread evenly over the clip, about one per 1.25 s, up to 96.
 - `check-sheet-N.jpg`: one per "먼저 확인할 곳" span, dense frames in time order.
