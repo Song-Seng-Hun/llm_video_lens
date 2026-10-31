@@ -7,9 +7,11 @@
   </picture>
 </p>
 
-# LLM Image Lens
+# LLM Video Lens
 
 A command-line tool that turns video into short text and check images an AI (LLM) can read. It splits the video into shots, writes down how the body and the camera moved in each one, and keeps everything traceable to original frame numbers.
+
+The package, command and LAN service keep the original name, `image_lens` (`image-lens`).
 
 ## What is it?
 

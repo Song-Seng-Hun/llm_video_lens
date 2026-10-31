@@ -587,7 +587,7 @@ def build(theme):
     draw_board(bg)
     draw_panel(bg)
     title = Canvas()                                          # unit 3 px
-    draw_text(title, "LLM IMAGE LENS", W * P // 6 - text_width("LLM IMAGE LENS") // 2, 3, "text")
+    draw_text(title, "LLM VIDEO LENS", W * P // 6 - text_width("LLM VIDEO LENS") // 2, 3, "text")
     desc = ("Pixel-art banner: a magnifying lens moves along a film strip of eight frames with a cut in "
             "the middle; each frame it reads gets pose keypoints and a tracked point that turns from blue "
             "to red, Claude writes a line of the brief for it, and a panel draws the point's path, broken "
@@ -595,7 +595,7 @@ def build(theme):
     return (
         f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {W * P} {H * P}" width="{W * P}" '
         f'height="{H * P}" shape-rendering="crispEdges" role="img" aria-labelledby="t d">'
-        f'<title id="t">LLM Image Lens</title><desc id="d">{desc}</desc>'
+        f'<title id="t">LLM Video Lens</title><desc id="d">{desc}</desc>'
         + svg_paths(bg, pal) + frame_overlays(pal) + brief_layer(pal) + trajectory_layer(pal)
         + claude_layer(pal) + lens_layer(pal)
         + svg_paths(title, pal, unit=3) + svg_paths(frame_border(), pal)
