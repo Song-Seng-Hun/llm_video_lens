@@ -20,7 +20,7 @@
   ],
   "manifest_self_excluded": true,
   "file_count": 136,
-  "total_bytes": 1546159,
+  "total_bytes": 1546163,
   "files": [
     {
       "path": ".gitattributes",
@@ -84,8 +84,8 @@
     },
     {
       "path": "docs/look-notes.md",
-      "bytes": 49676,
-      "sha256": "a8132f35ed62667693b22fcf426fd57aafbc4b2316bd4cbf7cf6f64d471c2e50"
+      "bytes": 49680,
+      "sha256": "db7834739457728e0b9899ebb9d31bfe809b2ae6b879dcd67e764efafd1375e1"
     },
     {
       "path": "docs/provenance.md",
