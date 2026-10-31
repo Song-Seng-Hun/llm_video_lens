@@ -18,4 +18,4 @@ The portable engine set is `shot_boundaries`, `appearance_inspection`, `analyze_
 
 No blanket redistribution license has been granted to the user's authored code by this extraction. No root MIT/Apache license is asserted. Upstream notices apply to their own files; they do not relicense the rest of the repository. The repository's owner must choose authored-code terms separately if needed.
 
-Source videos, generated crops/contacts, model weights, environments, downloaded archives/wheels, credentials, personal host paths and the research history are excluded from the release. A private repository does not create redistribution rights for those assets. `release-manifest.json` records the new source-only file set; it is not a license clearance or model-quality certificate.
+Source videos, generated crops/contacts, model weights, environments, downloaded archives/wheels, credentials, personal host paths and the research history are excluded from the release. A private repository does not create redistribution rights for those assets. `docs/release-manifest.json` records the new source-only file set; it is not a license clearance or model-quality certificate.

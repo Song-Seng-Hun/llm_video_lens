@@ -30,7 +30,7 @@ class Contracts(unittest.TestCase):
         self.temp.cleanup()
 
     def cli(self, *arguments):
-        return subprocess.run([sys.executable, '-I', '-B', str(REPO/'image_lens_cli.py'),
+        return subprocess.run([sys.executable, '-I', '-B', str(REPO/'tools'/'image_lens_cli.py'),
                                '--workspace', str(self.root), *arguments],
                               cwd='/private/tmp' if Path('/private/tmp').exists() else self.root,
                               capture_output=True, text=True, timeout=10)

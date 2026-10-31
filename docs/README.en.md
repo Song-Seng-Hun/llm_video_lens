@@ -1,9 +1,9 @@
-<p align="center"><a href="README.md">한국어</a> · <b>English</b> · <a href="README.ja.md">日本語</a></p>
+<p align="center"><a href="../README.md">한국어</a> · <b>English</b> · <a href="README.ja.md">日本語</a></p>
 
 <p align="center">
   <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="assets/banner-dark.svg">
-    <img src="assets/banner-light.svg" width="640" alt="Pixel-art banner: a lens reads the eight frames of a film strip with one cut; each frame gets pose keypoints and a tracked point that turns from blue to red, Claude adds a line to the BRIEF, and the TRACK panel draws the point's path, broken at the cut.">
+    <source media="(prefers-color-scheme: dark)" srcset="../assets/banner-dark.svg">
+    <img src="../assets/banner-light.svg" width="640" alt="Pixel-art banner: a lens reads the eight frames of a film strip with one cut; each frame gets pose keypoints and a tracked point that turns from blue to red, Claude adds a line to the BRIEF, and the TRACK panel draws the point's path, broken at the cut.">
   </picture>
 </p>
 
@@ -31,7 +31,7 @@ It does not make up what it isn't sure of. Spans where points were lost are writ
 1. With Python 3.11 or later, install the dependencies. `look` uses both pose estimation and point tracking, so it needs both sets.
 
    ```sh
-   pip install -r requirements-pose.txt -r requirements-tracking.txt
+   pip install -r requirements/pose.txt -r requirements/tracking.txt
    ```
 
 2. Get the three model files yourself: person detection (YOLOX HumanArt, ONNX), whole-body pose (RTMW 133 keypoints, ONNX) and point tracking (a CoTracker checkpoint). They are not in the repository and are never downloaded for you.
@@ -94,16 +94,16 @@ python -m image_lens --workspace W mark --video V --shots W/look/shots.json --fr
 
 ## Built with AI
 
-A person set the direction and AI agents built this project together. What to build, which accuracy to aim for and what to adopt were human decisions; implementation, measurement and code review were split between Claude (Anthropic) and Codex (OpenAI) agents. Recent changes were accepted only after a different agent scored them on held-out labelled frames the author could not see. The banner shows the same idea: Claude reads the film strip and writes one line at a time into BRIEF. The [look notes](docs/look-notes.md) are the agents' measurement log.
+A person set the direction and AI agents built this project together. What to build, which accuracy to aim for and what to adopt were human decisions; implementation, measurement and code review were split between Claude (Anthropic) and Codex (OpenAI) agents. Recent changes were accepted only after a different agent scored them on held-out labelled frames the author could not see. The banner shows the same idea: Claude reads the film strip and writes one line at a time into BRIEF. The [look notes](look-notes.md) are the agents' measurement log.
 
 ## License
 
-The project's own code and documents are [MIT](LICENSE). Vendored code keeps its own terms: `image_lens/vendor/shot-detector` (PySceneDetect) is BSD 3-Clause, and `image_lens/vendor/source` (CoTracker) is CC-BY-NC 4.0, noncommercial use only. No model weights are included.
+The project's own code and documents are [MIT](../LICENSE). Vendored code keeps its own terms: `image_lens/vendor/shot-detector` (PySceneDetect) is BSD 3-Clause, and `image_lens/vendor/source` (CoTracker) is CC-BY-NC 4.0, noncommercial use only. No model weights are included.
 
 ## More
 
-- [Full guide](docs/guide.md): every command and option, the full way to read `look.md`, output files, the brief format, jobs and tracking, pose seeds
-- [LAN API](lan/README.md): a server and client for running this Mac's `look` and `at` from another PC on the home LAN
-- [look notes](docs/look-notes.md): `look`'s limits and the checks behind them
-- [Limitations](docs/limitations.md) · [Verification](docs/verification.md) · [Provenance and licenses](docs/provenance.md) · [Job contract](docs/jobs.md)
+- [Full guide](guide.md): every command and option, the full way to read `look.md`, output files, the brief format, jobs and tracking, pose seeds
+- [LAN API](../lan/README.md): a server and client for running this Mac's `look` and `at` from another PC on the home LAN
+- [look notes](look-notes.md): `look`'s limits and the checks behind them
+- [Limitations](limitations.md) · [Verification](verification.md) · [Provenance and licenses](provenance.md) · [Job contract](jobs.md)
 - Run the tests: `python -B -m unittest discover -s tests -v`

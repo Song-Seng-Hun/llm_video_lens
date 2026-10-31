@@ -1,6 +1,6 @@
 # LLM Image Lens: full guide
 
-The [README](../README.en.md) gives the overview and a quick start. This page keeps the full reference: every command, the brief format, jobs and tracking, how to read `look.md`, and pose seeds.
+The [README](README.en.md) gives the overview and a quick start. This page keeps the full reference: every command, the brief format, jobs and tracking, how to read `look.md`, and pose seeds.
 
 A source-bound video inspection CLI for an LLM: locate shot boundaries, request a small original-frame contact, and read conservative 2D surface-motion reports. The bounded improvement in this release is a compact shot brief/catalog, with native frame/PTS ranges, source hashes, missing coverage and exact raw-artifact locators. No pose, action, identity or easing accuracy improvement is claimed.
 
@@ -8,7 +8,7 @@ Core workflows retain the selected existing engines: diagnostic frame comparison
 
 ## Run without installing
 
-Requires Python 3.11+ for stdlib commands. Decode/render commands additionally need `requirements.txt`; dependencies, checkpoints and media are not bundled. Python 3.12 on macOS arm64 is the verified extraction environment. Windows core operation and installed-wheel execution remain unverified; experimental tracking requires a POSIX parent watchdog.
+Requires Python 3.11+ for stdlib commands. Decode/render commands additionally need `requirements/base.txt`; dependencies, checkpoints and media are not bundled. Python 3.12 on macOS arm64 is the verified extraction environment. Windows core operation and installed-wheel execution remain unverified; experimental tracking requires a POSIX parent watchdog.
 
 From the repository:
 
@@ -23,7 +23,7 @@ python -m image_lens --workspace /path/to/workspace compare --shots shots.json -
 From a different working directory, including isolated Python, use the absolute path to the thin direct launcher:
 
 ```sh
-python -I /path/to/llm_image_lens/image_lens_cli.py --workspace /path/to/workspace brief --shots shots.json --out brief.json
+python -I /path/to/llm_image_lens/tools/image_lens_cli.py --workspace /path/to/workspace brief --shots shots.json --out brief.json
 ```
 
 An optional installation exposes `image-lens`; extras are `.[core]`, `.[tracking]` and `.[pose]`. A stdlib-only installation has no mandatory runtime dependencies. Pinned PySceneDetect source is already vendored. The public CLI is the supported entrypoint; individual engine mains are internal adapters.
@@ -156,7 +156,7 @@ A flag on the command line wins. The workspace is Git-ignored, so each machine k
 
 ## Whole-body seeds from pose (optional)
 
-`pose` runs a local whole-body pose model over the canonical scan: YOLOX HumanArt person boxes, RTMW-l 384x288 133 keypoints (rtmlib, ONNX Runtime; scores divided by `pose_score_scale` back to 0..1; boxes and keypoints on CoreML) and ByteTrack IDs reset at every detected cut. The two ONNX files are user-supplied and pinned by size and SHA256; nothing is downloaded or bundled, and the weight license is not established. Install `requirements-pose.txt` into the same environment. The packet also flags frames where the pose layer itself is unreliable: overlapping person boxes (echo copies, afterimages) and body-skeleton jumps within one track.
+`pose` runs a local whole-body pose model over the canonical scan: YOLOX HumanArt person boxes, RTMW-l 384x288 133 keypoints (rtmlib, ONNX Runtime; scores divided by `pose_score_scale` back to 0..1; boxes and keypoints on CoreML) and ByteTrack IDs reset at every detected cut. The two ONNX files are user-supplied and pinned by size and SHA256; nothing is downloaded or bundled, and the weight license is not established. Install `requirements/pose.txt` into the same environment. The packet also flags frames where the pose layer itself is unreliable: overlapping person boxes (echo copies, afterimages) and body-skeleton jumps within one track.
 
 `seed` turns one frame of that packet into fresh observation jobs, one per group so each fits the 12-point surface contract: `<job>-head` (nose, eyes, front/top/side hair), `<job>-arms` and `<job>-legs`. Hair points are geometry on a head frame built from the eyes (distance and the up direction away from the nose), so they are candidate surface points, not detected hair. Joints near the frame edge are dropped because off-screen joints come back clamped there. Each seed gets a marked source crop as its pinned visual reference; look at them before tracking. `bind` writes the report bindings for one tracked job.
 
