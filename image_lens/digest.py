@@ -198,7 +198,9 @@ def window_line(done, fps, first=None):
             elif (done.get('body_geometry') or {}).get('source') in ('raw_tracker_source_switch', 'per_joint_source_stable'):
                 fields.append('몸 기준: 원시 기준점 부족, 움직임 모름')
             elif (done.get('body_geometry') or {}).get('excluded_motion_frames'):
-                fields.append('몸 기준: 관절 돌출 교정 프레임 제외, 움직임 모름')
+                fields.append('몸 기준: 관절 추정 충돌 프레임 제외, 움직임 모름'
+                              if (done.get('body_geometry') or {}).get('conflict_motion_frames')
+                              else '몸 기준: 관절 돌출 교정 프레임 제외, 움직임 모름')
             elif done.get('groups'):
                 fields.append('화면: 24px 이상 이동 없음')
             else:  # seed or every track failed: nothing was measured, which is not stillness
