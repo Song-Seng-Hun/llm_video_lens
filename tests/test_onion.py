@@ -121,6 +121,20 @@ class Trails(unittest.TestCase):
             self.assertEqual(rendered[100,160].tolist(),[128]*3)  # no inferred f1->f3 path
             self.assertEqual(rendered[100,270].tolist(),list(onion.TRAILS['colors'][0]))  # real f3->f4 remains
 
+    # A large person box shrinks more in the onion sheet; fixed 3 px dots read as single markers there.
+    def test_trail_marks_grow_with_the_person_box(self):
+        import tempfile
+        import cv2
+        import numpy as np
+        def coloured(width):
+            with tempfile.TemporaryDirectory() as d:
+                image=np.full((200,width,3),128,np.uint8);out=Path(d)/'o.png'
+                onion._image(cv2,np,image,cv2.cvtColor(image,cv2.COLOR_BGR2GRAY),(0,0,width,200),[],out,
+                             [dict(point='move-a',xy=[(1,100,100)])])
+                return int((abs(cv2.imread(str(out)).astype(int)-np.array(onion.TRAILS['colors'][0])).sum(2) < 90).sum())
+        self.assertEqual(coloured(220), coloured(440))
+        self.assertGreater(coloured(1760), 2*coloured(440))
+
 
 class Peak(unittest.TestCase):
     def test_out_and_back_shows_the_far_frame(self):

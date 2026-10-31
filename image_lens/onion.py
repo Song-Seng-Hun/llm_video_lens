@@ -17,7 +17,7 @@ def _box(bbox, w, h):
 
 # Each part's lead point (digest.limbs) drawn frame by frame on the onion: the overlay shows only start and end, the
 # trail shows how the part got there and where it bunched up (slow) or spread out (fast).
-TRAILS = dict(parts=6, dot=3, start=9, end=8, line=2,
+TRAILS = dict(parts=6, dot=3, start=9, end=8, line=2, box=(440, 680),
               colors=((0, 220, 255), (255, 0, 255), (255, 80, 0), (0, 128, 255), (255, 255, 255), (160, 0, 160)),
               names=('노랑', '자홍', '파랑', '주황', '흰색', '보라'))  # BGR; not cyan, red or green, which the onion already uses
 
@@ -117,19 +117,23 @@ def _image(cv2, np, first, last, box, result, path, trails=()):
         if band['dx'] is not None:
             mid = (band['y'][0]+band['y'][1])//2-y0; s = ONION['arrow_scale']
             _arrow(cv2, picture, (centre, mid), (s*band['dx'], s*band['dy']))
+    # The sheet fits each onion in one tile, so a big person box shrinks more: a 1440 px clip's 3 px dots came out under
+    # 1 px there. Sizes are for the solo dance clip's box (marks about 1.2 px on the sheet) and grow with larger boxes.
+    k = max(1., (x1-x0)/TRAILS['box'][0], (y1-y0)/TRAILS['box'][1])
+    dot, start, end, line = (max(1, round(TRAILS[n]*k)) for n in ('dot', 'start', 'end', 'line'))
     for trail, color in zip(trails, TRAILS['colors']):
         at = [(int(round(x-x0)), int(round(y-y0))) for _, x, y in trail['xy']]
         frames = [n for n, _, _ in trail['xy']]
         for i, (a, b) in enumerate(zip(at, at[1:])):
             if frames[i+1] == frames[i]+1:
-                cv2.line(picture, a, b, color, TRAILS['line'])
+                cv2.line(picture, a, b, color, line)
         for p in at:  # white rim: middle dots on a busy drawing were hard to find
-            cv2.circle(picture, p, TRAILS['dot']+1, (255, 255, 255), -1); cv2.circle(picture, p, TRAILS['dot'], color, -1)
+            cv2.circle(picture, p, dot+1, (255, 255, 255), -1); cv2.circle(picture, p, dot, color, -1)
         for i, p in enumerate(at):
             if i == 0 or frames[i] != frames[i-1]+1:
-                cv2.circle(picture, p, TRAILS['start'], color, 2)
+                cv2.circle(picture, p, start, color, line)
             if i == len(at)-1 or frames[i+1] != frames[i]+1:
-                e = TRAILS['end']; cv2.rectangle(picture, (p[0]-e, p[1]-e), (p[0]+e, p[1]+e), color, 2)
+                cv2.rectangle(picture, (p[0]-end, p[1]-end), (p[0]+end, p[1]+end), color, line)
     cv2.imwrite(str(path), picture)
 
 
@@ -329,7 +333,7 @@ def lines(result, image_name=None):
     out = ['- 높이별 흐름 (사람 상자 5등분, 카메라 뺌): ' + ' · '.join(parts)]
     if image_name:
         out.append(f"  - 어니언 그림: {image_name} (청록=시작, 빨강=끝, 초록 화살표=띠별 이동 ×{ONION['arrow_scale']}(그림 밖으로 나가면 줄임, 머리보다 짧으면 생략); 오른쪽 회색=시작과 가장 다른 가운데 프레임; "
-                   f"색 점선=부위별 대표 점의 프레임마다 위치({'·'.join(TRAILS['names'])} 순, 카메라 뺌), 큰 원·네모=각 연속 관측의 시작·끝, 선 끊김=관측 누락, 이어진 점 간격이 좁으면 느림·넓으면 빠름)")
+                   f"색 점선=부위별 대표 점(몸 기준이 없으면 '화면'에 적힌 점)의 프레임마다 위치({'·'.join(TRAILS['names'])} 순, 카메라 뺌), 큰 원·네모=각 연속 관측의 시작·끝, 선 끊김=관측 누락, 이어진 점 간격이 좁으면 느림·넓으면 빠름)")
     return out
 
 
