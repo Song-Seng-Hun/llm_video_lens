@@ -1,6 +1,6 @@
 {
   "schema": "image-lens.source-release/1",
-  "date_kst": "2026-10-31",
+  "date_kst": "2026-11-01",
   "source_only": true,
   "authored_code_license": "MIT (LICENSE); vendored code keeps its own terms",
   "vendor_licenses": {
@@ -20,7 +20,7 @@
   ],
   "manifest_self_excluded": true,
   "file_count": 138,
-  "total_bytes": 1770824,
+  "total_bytes": 1781076,
   "files": [
     {
       "path": ".gitattributes",
@@ -94,8 +94,8 @@
     },
     {
       "path": "docs/look-notes.md",
-      "bytes": 61296,
-      "sha256": "abfac7b55186ee03c4e70c6e03be5d4751df2120b9643d972a06aa490dad44fa"
+      "bytes": 62891,
+      "sha256": "5fbf4cc16888594ff2ac9c4087cbc9f88eb47bd7d03549365826061e5e72d77f"
     },
     {
       "path": "docs/provenance.md",
@@ -159,8 +159,8 @@
     },
     {
       "path": "image_lens/digest.py",
-      "bytes": 34173,
-      "sha256": "3721c59da42ab5235dad30ae58ecc1a21238dafda0cf9238eec1c87369addef4"
+      "bytes": 34465,
+      "sha256": "0a6a5379733ff35857560e16a1ef96de1a2074fb931168c252c200b99042dd24"
     },
     {
       "path": "image_lens/foreground_regions.py",
@@ -184,13 +184,13 @@
     },
     {
       "path": "image_lens/look.py",
-      "bytes": 41817,
-      "sha256": "50d59f77b81335c58455c9a9d81e5793ffce99c97028c313d5a923c1b2fb0018"
+      "bytes": 42976,
+      "sha256": "55b1bdcdf389ed1664c083e54879a0618cd1a0e7a805f478a041320b2fdf6e23"
     },
     {
       "path": "image_lens/mark.py",
-      "bytes": 12208,
-      "sha256": "dd7822271e35fafba9b296fe8c35eacf7ff1b2a72ee95fbcc5fcf8ae6b2a94a1"
+      "bytes": 12952,
+      "sha256": "4e8c1e18f6a0485576ff1d8a548816a785cc0a5624c88b0ae63db3aeed09ecbc"
     },
     {
       "path": "image_lens/motif.py",
@@ -199,8 +199,8 @@
     },
     {
       "path": "image_lens/motion_report.py",
-      "bytes": 34998,
-      "sha256": "9e9aa87dbac48d7d8ef306cffaa24b11ded233851bdfd49714b7c7e456adce32"
+      "bytes": 37310,
+      "sha256": "759b11f0d9c1aa74305ef53b9912b27a18897ba04cd7540693f4f6c4e4977302"
     },
     {
       "path": "image_lens/motion_view.py",
@@ -669,8 +669,8 @@
     },
     {
       "path": "tests/test_look.py",
-      "bytes": 14732,
-      "sha256": "6fd75c92b35e01f198b69ebcbeb81c2236e5eaaabf0819a0c4471a0d107a068d"
+      "bytes": 18882,
+      "sha256": "ac9ff5e04066a88a1d27575d7d972741f6eccd99b7e6cfe81c694dbae8bb2b20"
     },
     {
       "path": "tests/test_mark.py",

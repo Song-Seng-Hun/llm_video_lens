@@ -149,19 +149,88 @@ class Cut(unittest.TestCase):
 
 
 class Camera(unittest.TestCase):
-    def test_strokes_that_only_follow_the_frame_are_set_aside(self):
-        unit = lambda dx: dict(major=True, start_frame=1, end_frame=20, start_seconds=.04, end_seconds=.8, dx_px=dx, dy_px=0., direction='left', distance_px=abs(dx))
-        report = dict(features=[dict(point_id='a', continuous_runs=[dict(frames=[1, 20], strokes=dict(units=[unit(-33.)]))]),
-                                dict(point_id='b', continuous_runs=[dict(frames=[1, 20], strokes=dict(units=[unit(-90.)]))])])
-        lines, summary = look._summary(report, dict(seed=0, end=20), 'move', 'x', 'y', {1: (0., 0., 1.), 20: (-33., 0., 1.)})
-        self.assertEqual(summary['camera_only_moves'], 1); self.assertEqual(len(summary['major_moves']), 1)
-        self.assertIn('b 화면 왼쪽 90px', lines[0])
+    def view(self, screen, shifts, missing=None):
+        from image_lens import analyze_motion, motion_report
+        frames=[]
+        for n,xy in enumerate(screen):
+            anchor=n==0; visible=n!=missing
+            p=dict(point_id='hand',xy=list(xy),visible=visible,model_visible=visible,in_frame=True,
+                   status='anchor_input_not_prediction' if anchor else 'tracked_unverified',
+                   claim_scope='visible_surface_2d',anatomical_interpretation=None,query_index=0,
+                   anchor_index=0,anchor_frame=0,tracking_metric_eligible=not anchor,
+                   metric_excluded_common_anchor_frame=anchor,motion_pair_usable=not anchor and visible)
+            frames.append(dict(frame=n,pts_seconds=n/25.,tracking_metric_eligible=not anchor,points=[p]))
+        packet=dict(schema='team-eye.observed-tracks/1',observation_scope='visible_surface_2d',anatomical_claims=False,
+                    job=dict(width=1920,height=1080,points=[dict(point_id='hand')]),frames=frames)
+        binding=dict(schema='team-eye.motion-bindings/1',source_tracks_sha256='0'*64,basis='source_frame_grouping_only',
+                     actors=[dict(actor_id='marked',label='marked',features=[dict(point_id='hand',label='hand')])])
+        import copy
+        original=copy.deepcopy(packet)
+        raw=motion_report.build_report(packet,binding,0,len(screen)-1,analyze_motion.collect_observations,analyze_motion.infer)
+        view=motion_report.camera_relative(raw,packet,binding,shifts,analyze_motion.collect_observations,analyze_motion.infer)
+        self.assertEqual(packet,original)
+        return packet,raw,view
 
-    def test_small_camera_shift_does_not_remove_a_move(self):
-        unit = dict(major=True, start_frame=1, end_frame=20, start_seconds=.04, end_seconds=.8, dx_px=0., dy_px=-25., direction='up', distance_px=25.)
-        report = dict(features=[dict(point_id='a', continuous_runs=[dict(frames=[1, 20], strokes=dict(units=[unit]))])])
-        _, summary = look._summary(report, dict(seed=0, end=20), 'move', 'x', 'y', {1: (0., 0., 1.), 20: (0., -12., 1.)})
-        self.assertEqual(summary['camera_only_moves'], 0); self.assertEqual(len(summary['major_moves']), 1)
+    def test_opposite_motion_uses_the_same_coordinates_as_onion_and_mark(self):
+        from image_lens import mark,onion
+        screen=[(400+40*max(0,n-1)/24,300) for n in range(26)]
+        shifts={n:(100*max(0,n-1)/24,0.,1.) for n in range(26)}
+        packet,raw,view=self.view(screen,shifts)
+        self.assertEqual(raw['features'][0]['continuous_runs'][0]['net_screen_direction'],'right')
+        run=view['features'][0]['continuous_runs'][0]
+        self.assertAlmostEqual(run['net_dx_px'],-60.)
+        self.assertEqual(run['net_screen_direction'],'left')
+        lines,summary=look._summary(view,dict(seed=0,end=25),'marked','raw.md','raw.png')
+        self.assertIn('왼쪽',lines[0]);self.assertNotIn('오른쪽',lines[0])
+        self.assertEqual(summary['coordinate_scope'],'camera_translation_relative_2d')
+        self.assertIn('왼쪽',' '.join(mark._all_moves(view)))
+        trail=onion.trails([packet],['hand'],0,25,shifts)[0]['xy']
+        self.assertAlmostEqual(trail[-1][1]-trail[0][1],run['net_dx_px'])
+        self.assertEqual(view['coordinate_transform']['camera_path'][-1],[25,100.,0.])
+
+    def test_pan_and_returning_pan_do_not_reappear_in_all_moves(self):
+        from image_lens import mark
+        for pan in ([4*n for n in range(26)],[8*min(n,25-n) for n in range(26)]):
+            with self.subTest(pan=pan):
+                _,_,view=self.view([(400+x,300) for x in pan],{n:(x,0.,1.) for n,x in enumerate(pan)})
+                _,summary=look._summary(view,dict(seed=0,end=25),'marked','x','y')
+                self.assertEqual(summary['moves'],[])
+                self.assertFalse(any(u['direction']!='hold' for r in view['features'][0]['continuous_runs'] for u in r['strokes']['units']))
+                self.assertNotIn('오른쪽',' '.join(mark._all_moves(view)))
+
+    def test_camera_gaps_and_raw_gaps_are_not_bridged_or_filled(self):
+        screen=[(400+3*n,300) for n in range(26)]
+        shifts={n:(n,0.,1.) for n in range(26) if n!=12}
+        _,_,view=self.view(screen,shifts,missing=18)
+        runs=view['features'][0]['continuous_runs']
+        self.assertEqual([r['frames'] for r in runs],[[1,11],[13,17],[19,25]])
+        self.assertIn('camera_translation_unknown',view['features'][0]['break_reasons'])
+        self.assertEqual(view['features'][0]['excluded_anchor_ranges'],[[0,0]])
+        _,_,view=self.view(screen,{0:(0.,0.,1.)})
+        lines,summary=look._summary(view,dict(seed=0,end=25),'marked','x','y')
+        self.assertTrue(summary['motion_unknown']);self.assertIn('모름',' '.join(lines))
+
+    def test_partial_camera_support_cannot_claim_the_missing_motion_was_still(self):
+        from image_lens import mark
+        screen=[(400 if n<6 else 400+100*(n-5)/14 if n<20 else 500,300) for n in range(26)]
+        shifts={n:(0.,0.,1.) for n in list(range(6))+list(range(20,26))}
+        _,_,view=self.view(screen,shifts)
+        lines,summary=look._summary(view,dict(seed=0,end=25),'marked','x','y')
+        self.assertTrue(summary['incomplete']);self.assertIn('빈 구간 움직임은 모름',' '.join(lines))
+        self.assertIn('빈 구간 움직임 모름',' '.join(mark._all_moves(view)))
+
+    def test_real_camera_numpy_scalar_output_is_supported(self):
+        import numpy as np
+        _,_,view=self.view([(400+4*n,300) for n in range(26)],{n:(np.float64(4*n),np.float64(0),1.) for n in range(26)})
+        self.assertEqual(view['features'][0]['usable_prediction_frames'],25)
+        self.assertAlmostEqual(view['features'][0]['continuous_runs'][0]['net_dx_px'],0.)
+
+    def test_no_camera_path_keeps_explicit_screen_scope(self):
+        _,raw,view=self.view([(400+3*n,300) for n in range(26)],None)
+        self.assertIs(view,raw)
+        _,summary=look._summary(view,dict(seed=0,end=25),'marked','x','y')
+        self.assertEqual(summary['coordinate_scope'],'screen_2d')
+
 
 if __name__ == '__main__': unittest.main()
 

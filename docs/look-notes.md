@@ -285,3 +285,13 @@ Pose confidence is uncalibrated. A pose-selected coordinate agreeing with that s
 - Live2D wave clip (4 s, upper-body framing, three elbow waves): the window line gave the left arm 88 → 141 → 134 px back and forth, while all three 1-2 s step lines said "팔다리 거의 그대로". The step lines only report a limb that moved at least 0.35 torso lengths (`PHASES['move']`); with a 458 px torso the wave was 0.31 (tracked) or about 0.2 (pose wrist on the drawn hand).
 - Tried, not kept: steps from the tracked joints instead of the pose joints. The wave stayed under the threshold, and on the dancer clip 5.5–6.8 s the pose wrist moved 1.5 torso lengths where the tracker lost the wrist, so a real move turned into "still" (dancer step lines with no move: 0 → 1 of 8).
 - The empty step now reads "팔다리 큰 이동 없음(몸통 길이 0.35배 미만)", so it no longer contradicts the window line's smaller moves. Threshold and numbers unchanged.
+
+## Camera-relative numerical summaries
+
+`look` group summaries and `mark` (including its all-moves list) recompute strokes, direction, distance, speeds and timing after subtracting the estimated camera translation at every supported native frame. Onion trails use that same translation path, including a pan that returns to its starting position. Missing camera support breaks the numerical run and the trail; gaps are not stationary evidence. An onion overlay needs supported camera positions at both comparison frames.
+
+The coordinate label distinguishes camera-translation-relative output from raw screen output when no camera path is available. This is translation compensation only: scale, rotation, camera-fit errors and tracker errors remain. Body-relative joint summaries retain their own declared basis.
+
+Raw `.report.json`, `.report.md`, track packets and trajectory pictures keep screen coordinates for source verification. A `.relative.json` sidecar records the derived numerical report, source track hash, camera translations and unsupported frames; the group summary points to it and labels the raw trajectory's basis. Existing direction field names in that sidecar follow its declared `coordinate_scope`.
+
+Authored controls check opposite camera/point motion, pure and returning pans, native gaps, NumPy camera values, and incomplete-support wording. A generated-video CLI smoke exercises scan, analyze, mark, camera estimation and onion rendering with authored tracks replacing neural inference. These are coordinate-consistency checks, not real-video tracking-accuracy scores.

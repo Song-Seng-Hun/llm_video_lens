@@ -123,21 +123,27 @@ def run(video, shots, frame, points, checkpoint, out, end=None, snap_points=True
     paths.write(root/'mark.report.md', motion_report.markdown(report))
     frame_motion = camera.path(source, frame, stop)
     cam = camera.between(frame_motion, frame, stop)
+    view = look._motion_view(report, tracks, bindings, frame_motion)
+    relative = paths.write_json(root/'mark.relative.json', view) if view is not report else None
     text = [f'# 찍은 점 추적 f{frame}..{stop}', '',
             '이름은 찍은 에이전트가 붙인 것이다(부위 미검증). 근거 그림: crops/<이름>.png, 프레임별 좌표: mark.tracks.json.', '']
     text += [f"- {p['point_id']}: 준 위치 {p['given'][0]:.0f},{p['given'][1]:.0f} → 놓은 위치 {p['seed'][0]:.0f},{p['seed'][1]:.0f}"
              + (f" ({p['snapped_px']:.0f}px 옮김)" if p['snapped_px'] else '') for p in placed]
     if cam and math.hypot(*cam) >= motion_report.STROKE['major_min_px']:
         text.append(f"- 화면 전체: {motion_report.KO[motion_report.direction(*cam)]} {math.hypot(*cam):.0f}px (카메라·배경 이동 추정; 이것만 따라간 이동은 뺌)")
-    moving = cam if cam and math.hypot(*cam) >= motion_report.STROKE['major_min_px'] else None
-    onion_image = _onion(source, frame, stop, [n for n, _ in parsed], tracks, moving, frame_motion if moving else None, root/'mark-onion.jpg')
+    text.append(f'- 움직임 수치·점선 기준: {motion_report.coordinate_label(view)}. 원시 보고서·trajectory는 화면 좌표다.')
+    if relative:text.append('- 카메라 보정 수치 근거: mark.relative.json')
+    onion_image = (_onion(source, frame, stop, [n for n, _ in parsed], tracks, cam, frame_motion or None, root/'mark-onion.jpg')
+                   if not frame_motion or cam is not None else None)
+    if frame_motion and cam is None:text.append('- 어니언 생략: 끝 프레임 카메라 이동을 추정하지 못함.')
     if onion_image:
-        text.append(f"- 어니언 그림: {onion_image} (청록=f{frame}, 빨강=f{stop}(진한 윤곽선 기준; 배경보다 밝은 면은 띠 색이 반대(청록 띠=간 쪽); 카메라가 움직였으면 끝 프레임을 카메라만큼 되돌려 겹침), 색 점선=찍은 점의 프레임마다 위치(이름표=점 이름, 카메라 뺌), "
+        text.append(f"- 어니언 그림: {onion_image} (청록=f{frame}, 빨강=f{stop}(진한 윤곽선 기준; 배경보다 밝은 면은 띠 색이 반대(청록 띠=간 쪽); 카메라가 움직였으면 끝 프레임을 카메라만큼 되돌려 겹침), 색 점선=찍은 점의 프레임마다 위치(이름표=점 이름, {motion_report.coordinate_label(view)}), "
                     '큰 원·네모=각 연속 관측의 시작·끝, 선 끊김=관측 누락, 이어진 점 간격이 좁으면 느림·넓으면 빠름; 오른쪽 회색=시작과 가장 다른 가운데 프레임)')
         text.append(f"  - {SLIP}")
-    lines, summary = look._summary(report, dict(seed=frame, end=stop), 'marked', 'mark.report.md', 'mark-traj/trajectory.png', frame_motion)
+    lines, summary = look._summary(view, dict(seed=frame, end=stop), 'marked', 'mark.report.md', 'mark-traj/trajectory.png')
+    if relative:summary['relative_report']=relative.name
     text += lines or ['- 찍은 점: 큰 이동 없음']
-    text += ['', '## 점별 전체 움직임 (멈춤 제외, 완급 포함)'] + _all_moves(report)
+    text += ['', '## 점별 전체 움직임 (멈춤 제외, 완급 포함)'] + _all_moves(view)
     output = paths.write(root/'mark.md', '\n'.join(text)+'\n')
     paths.write_json(root/'mark.json', dict(schema='image-lens.mark/1', source_video=str(source), frames=[frame, stop], points=placed,
                                             camera=cam, summary=summary))
@@ -145,7 +151,7 @@ def run(video, shots, frame, points, checkpoint, out, end=None, snap_points=True
 
 
 SLIP = ('궤적 의심: 어니언에서 그 부위의 청록·빨강 윤곽선이 벌어진 만큼 궤적이 따라가지 않으면(짧거나 다른 방향) 추적이 미끄러진 것으로 본다'
-        '(어니언과 궤적 모두 카메라를 뺐다). 그 점은 가까운 모서리에 다시 찍어 본다.')
+        '(카메라 추정이 있으면 어니언과 궤적 모두 평행이동을 뺐다). 그 점은 가까운 모서리에 다시 찍어 본다.')
 
 
 # Two more colours than look's six, for mark's eight points: brown and light blue (BGR), still not cyan, red or green.
@@ -178,5 +184,7 @@ def _all_moves(report):
             continue
         moves = [f"{motion_report.KO[u['direction']].replace('화면 ', '')} {u['distance_px']:.0f}px(f{u['start_frame']}..{u['end_frame']}"
                  + (f", {motion_report.EASE_KO[u['ease']]}" if u.get('ease') else '') + ')' for u in units]
-        out.append(f"- {f['point_id']}: " + (' → '.join(moves) if moves else '거의 그대로'))
+        missing = bool(f.get('unusable_prediction_ranges'))
+        text = ' → '.join(moves) if moves else '관측된 연속 구간에서는 거의 그대로'
+        out.append(f"- {f['point_id']}: " + text + ('; 빈 구간 움직임 모름' if missing else ''))
     return out

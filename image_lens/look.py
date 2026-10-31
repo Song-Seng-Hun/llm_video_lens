@@ -172,22 +172,23 @@ def lost(report, window, min_frames=LOOK['min_frames']):
     return dict(count=len(gone), total=len(ends), after=max(seen) if seen else window['seed'])
 
 
-def _summary(report, window, group, md_path, traj, frame_motion=None):
-    """Short per-group lines for look.md, built from the recomputed report JSON. Major strokes that only follow the
-    whole frame (camera pan, scrolling UI) are set aside and counted."""
-    import math
-    from image_lens import camera, motion_report
-    moves = []; facts = []; with_camera = 0; kept = set()
+def _motion_view(report, tracks, binding, frame_motion):
+    """One numerical view for look and mark. Raw analyze reports and trajectory pictures remain source evidence."""
+    from image_lens import analyze_motion, motion_report
+    if not frame_motion:return report
+    packet,_=paths.load(tracks);bindings,_=paths.load(binding)
+    return motion_report.camera_relative(report,packet,bindings,frame_motion,
+                                         analyze_motion.collect_observations,analyze_motion.infer)
+
+
+def _summary(report, window, group, md_path, traj):
+    """Short lines from a fully recomputed report in its declared coordinate scope."""
+    from image_lens import motion_report
+    moves = []; facts = []; kept = set()
     for f in report['features']:
         for run in f['continuous_runs']:
             for u in run['strokes']['units']:
                 if not u['major']:
-                    continue
-                cam = camera.between(frame_motion, u['start_frame'], u['end_frame'])
-                # A camera shift below the stroke threshold is noise (a big figure's own matches leak into it); keep the move.
-                if cam and math.hypot(*cam) >= motion_report.STROKE['major_min_px'] \
-                        and math.hypot(u['dx_px']-cam[0], u['dy_px']-cam[1]) < motion_report.STROKE['major_min_px']:
-                    with_camera += 1
                     continue
                 timing = f", {motion_report.speed_text(u['speeds'])}" if u.get('speeds') else ''
                 moves.append(f"{f['point_id']} {motion_report.KO[u['direction']]} {u['distance_px']:.0f}px(f{u['start_frame']}..{u['end_frame']}{timing})")
@@ -195,7 +196,7 @@ def _summary(report, window, group, md_path, traj, frame_motion=None):
                                   frames=[u['start_frame'], u['end_frame']], ease=u.get('ease'), speeds=u.get('speeds')))
                 kept.add(f['point_id'])
     together = [g for g in motion_report.together(report) if 2*len(kept & set(g['points'])) >= len(g['points'])]
-    lines = [f"- {NAMES[group]}: " + ('; '.join(moves) if moves else '큰 이동 없음')]
+    lines = [f"- {NAMES[group]} [{motion_report.coordinate_label(report)}]: " + ('; '.join(moves) if moves else '큰 이동 없음')]
     lines += [f"  - 함께 움직임 {motion_report.quote(g['points'])}: {motion_report.KO[g['direction']]} 약 {g['distance_px']:.0f}px, f{g['frames'][0]}..{g['frames'][1]}"
               for g in together]
     view = report.get('trajectory_view')
@@ -205,10 +206,16 @@ def _summary(report, window, group, md_path, traj, frame_motion=None):
     cut = lost(report, window)
     if cut:
         lines.append(f"  - f{cut['after']} 뒤로 점 {cut['count']}/{cut['total']}개 끊김(그림 바뀜·가려짐·화면 밖). 그 뒤는 정지가 아니라 모름.")
+    incomplete = any(f.get('unusable_prediction_ranges') for f in report['features'])
+    if incomplete and not cut:
+        lines.append('  - 일부 프레임 관측·카메라 보정 누락: 연속 관측 구간만 계산, 빈 구간 움직임은 모름.')
     if not moves and not any(f['continuous_runs'] for f in report['features']):
         lines = [f"- {NAMES[group]}: 쓸 수 있는 연속 관측 없음(가려짐·화면 밖·추적 끊김). 정지가 아니라 모름."]
-    return (lines if moves or cut or len(lines) == 1 and '모름' in lines[0] else []), dict(group=group, major_moves=moves, moves=facts, together=together, warnings=len(warnings),
-                       lost=cut, camera_only_moves=with_camera, report=str(md_path), trajectory=str(traj))
+    return (lines if moves or cut or incomplete or len(lines) == 1 and '모름' in lines[0] else []), dict(group=group, major_moves=moves, moves=facts, together=together, warnings=len(warnings),
+                       lost=cut, motion_unknown=not any(f['continuous_runs'] for f in report['features']),
+                       incomplete=incomplete,
+                       coordinate_scope=report.get('coordinate_scope','screen_2d'),
+                       report=str(md_path), trajectory=str(traj), trajectory_scope='screen_2d')
 
 
 def fit(source, root, max_pixels=1920*1080):
@@ -364,6 +371,7 @@ def _run(video, detector, pose_model, checkpoint, out, max_shots=LOOK['max_shots
         except Exception as error:  # OpenCV raises its own error type; a missing estimate only disables the filter
             frame_motion = None; errors.append(dict(window=w, step='camera', error=str(error)[:300]))
         cam = camera.between(frame_motion, w['seed'], end)
+        done['coordinate_scope'] = 'camera_translation_relative_2d' if frame_motion else 'screen_2d'
         done['camera'] = camera.describe(frame_motion, w['seed'], end, motion_report.STROKE['major_min_px'])
         if done['camera'].get('unknown'):
             try:
@@ -387,7 +395,8 @@ def _run(video, detector, pose_model, checkpoint, out, max_shots=LOOK['max_shots
         for name, group, stem, tracks in tracked:
             raw_tracks = joint_tracking.track_path(stem, group)
             if group == 'move' and not (tracks['frames'] and tracks['frames'][0]['points']):
-                quiet.append(NAMES[group]); continue
+                slot.append(f'  - {NAMES[group]}: 대표 이동 후보 없음(후보 선택 결과; 실제 움직임 모름).')
+                continue
             try:
                 _step('bind', ['--queries', base.with_suffix('.obs.json'), '--tracks', raw_tracks,
                                '--job', name, '--out', stem.with_suffix('.bindings.json')])
@@ -405,13 +414,18 @@ def _run(video, detector, pose_model, checkpoint, out, max_shots=LOOK['max_shots
                 found, _ = paths.load(stem.with_suffix('.report.json'))
                 from image_lens import motion_report
                 md = paths.write(stem.with_suffix('.report.md'), motion_report.markdown(found))
-                group_lines, summary = _summary(found, dict(w, end=end), group, md.relative_to(root), stem.with_name(stem.name+'-traj').relative_to(root)/'trajectory.png', frame_motion)
+                view = _motion_view(found, raw_tracks, binding, frame_motion)
+                relative = paths.write_json(stem.with_suffix('.relative.json'), view) if view is not found else None
+                group_lines, summary = _summary(view, dict(w, end=end), group, md.relative_to(root), stem.with_name(stem.name+'-traj').relative_to(root)/'trajectory.png')
+                if relative:
+                    summary['relative_report']=str(relative.relative_to(root))
+                    if group_lines:group_lines.append(f"  - 보정 수치: {relative.name}; 원시 .report.md·trajectory 그림은 화면 좌표.")
                 slot += ['  '+l for l in group_lines]; done['groups'].append(summary)
                 if not group_lines:quiet.append(NAMES[group])
             except STEP_ERRORS as error:
                 errors.append(dict(window=w, job=name, error=str(error)[:300]))
                 slot.append(f'  - {group} 실패: {str(error)[:120]}')
-        if quiet:slot.append(f"  - {'·'.join(quiet)}: 화면 기준 큰 이동({motion_report.STROKE['major_min_px']:.0f}px 이상) 없음")
+        if quiet:slot.append(f"  - {'·'.join(quiet)}: {motion_report.coordinate_label(done)} 기준 큰 이동({motion_report.STROKE['major_min_px']:.0f}px 이상) 없음")
         if tracked and skeleton['plausible']:
             done['body_geometry'] = body_motion.geometry_policy([t[3] for t in tracked], dict(w, end=end), raw_packets)
             note = body_motion.geometry_note(done['body_geometry'])
@@ -439,12 +453,13 @@ def _run(video, detector, pose_model, checkpoint, out, max_shots=LOOK['max_shots
             from image_lens import onion
             picture = base.with_name(base.name+'-onion.jpg')
             try:
-                moving = cam if cam and math.hypot(*cam) >= motion_report.STROKE['major_min_px'] else None
+                if frame_motion and cam is None:raise ValueError('onion unavailable: end-frame camera translation unknown')
+                moving = cam
                 from image_lens import digest
                 # No trusted body: the "화면" moves stand in, in the order that line lists them (one trail per point).
                 leads = ([f['point'] for f in digest.limbs(done['body'])] if done.get('body')
                          else list(dict.fromkeys(m['point'] for m in digest._screen(done.get('groups', [])))))
-                done['trails'] = onion.trails(raw_packets, leads, w['seed'], end, frame_motion if moving else None)
+                done['trails'] = onion.trails(raw_packets, leads, w['seed'], end, frame_motion or None)
                 done['bands'] = onion.bands(source, w['seed'], end, person['bbox'], moving, picture, done['trails'])
                 if not done.get('body') and done['trails']:
                     hint = dict(frame=w['seed'], end=end, points=_seed_xy(raw_packets, [t['point'] for t in done['trails']], w['seed']))
@@ -466,7 +481,7 @@ def _run(video, detector, pose_model, checkpoint, out, max_shots=LOOK['max_shots
             except Exception as error:  # OpenCV raises its own error type; without the frames the cause stays open
                 errors.append(dict(window=w, step='cut_diff', error=str(error)[:300])); why = '그림 바뀜·가려짐·화면 밖'
             slot.append(f"  - f{end} 뒤 점이 한꺼번에 끊김({why}): f{end+1}부터 점을 다시 놓음")
-        if done['groups']:slot.append(f"  - 자세히: {base.name}-<head|arms|legs>.report.md, 그림 {base.name}-<묶음>-traj/trajectory.png")
+        if done['groups']:slot.append(f"  - 자세히: {base.name}-<묶음>.report.md·<묶음>-traj/trajectory.png는 화면 좌표, .relative.json은 카메라 보정 수치(있을 때).")
         last_end = end if done['groups'] else None
         if person:
             from image_lens import motif
