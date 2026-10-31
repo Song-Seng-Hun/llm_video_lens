@@ -19,52 +19,88 @@ def track_path(stem, group):
 
 
 
-def _correct_excursions(selected, raw, samples, window, inside):
-    """Repair only a single pose-mode excursion supported by three real raw observations.
-    The repaired position remains visible; its motion is unknown, never interpolated across.
+def _resolve_excursions(selected, raw, samples, window, inside):
+    """One-frame excursions may use actual raw xy. Longer disputes remain positional
+    estimates, with motion unknown: stuck raw tracks and genuine return gestures are ambiguous.
+    Both cases require compact native raw support and two agreeing confident pose flanks.
     """
     from image_lens.body_motion import BODY_MOTION
-    visible_sources = {}
-    raw_rows = {}
+    visible_sources = {}; selected_rows = {}; raw_rows = {}
     for frame in selected['frames']:
-        if window['seed'] < frame['frame'] <= window['end']:
+        n = frame['frame']
+        if window['seed'] < n <= window['end']:
             for row in frame['points']:
                 if row['visible'] and row['status'] != 'anchor_input_not_prediction':
-                    visible_sources.setdefault(row['point_id'], set()).add(row.get('coordinate_source', 'point_tracker'))
+                    pid = row['point_id']
+                    visible_sources.setdefault(pid, set()).add(row.get('coordinate_source', 'point_tracker'))
+                    selected_rows[n, pid] = row
     for frame in raw['frames']:
         for row in frame['points']:
             raw_rows[frame['frame'], row['point_id']] = row
-    corrected = 0
-    for frame in selected['frames']:
-        n = frame['frame']
-        poses = [samples.get(f) for f in (n-1,n,n+1)]
-        if not all(poses):
+    corrected = conflicts = spans = 0
+    for pid, sources in visible_sources.items():
+        index = BODY.get(pid.replace('-', '_'))
+        if index is None or sources != {'pose'}:
             continue
-        for row in frame['points']:
-            pid = row['point_id']; index = BODY.get(pid.replace('-', '_'))
-            if (index is None or not row['visible'] or row['status'] == 'anchor_input_not_prediction'
-                    or visible_sources.get(pid) != {'pose'}):
+        valid = {}
+        for n in range(window['seed']+1, window['end']+1):
+            row = selected_rows.get((n,pid)); observation = raw_rows.get((n,pid)); pose = samples.get(n)
+            if (row is None or observation is None or not observation['visible']
+                    or observation['status'] == 'anchor_input_not_prediction' or not inside(observation.get('xy'))
+                    or pose is None or pose['scores'][index] < PARAMS['pose_score']
+                    or min(pose['scores'][5:7]) < PARAMS['shoulder_score']
+                    or not all(inside(pose['keypoints'][i]) for i in (index,5,6))):
                 continue
-            observations = [raw_rows.get((f,pid)) for f in (n-1,n,n+1)]
-            if any(not p or not p['visible'] or p['status'] == 'anchor_input_not_prediction' or not inside(p.get('xy'))
-                   for p in observations):
+            width = math.dist(pose['keypoints'][5],pose['keypoints'][6])
+            if width > 0:
+                valid[n] = row, observation, pose, width
+        def support(ns):
+            a,b = ns[0]-1,ns[-1]+1
+            if a not in valid or b not in valid:
+                return None
+            context = [valid[n] for n in range(a,b+1)]
+            width = min(v[3] for v in context)
+            resolution = max(BODY_MOTION['min_px'],BODY_MOTION['min_ratio']*width)
+            points = [v[1]['xy'] for v in context]+[valid[n][2]['keypoints'][index] for n in (a,b)]
+            if any(math.dist(x,y) > resolution for i,x in enumerate(points) for y in points[i+1:]):
+                return None
+            return a,b,width,resolution
+        # Preserve the original isolated decision before classifying longer runs.
+        # Neighbouring shoulder widths must not absorb an otherwise repairable frame.
+        for n, (row, observation, _, _) in valid.items():
+            bounded = support([n])
+            if bounded is None:
                 continue
-            if any(p['scores'][index] < PARAMS['pose_score'] or min(p['scores'][5:7]) < PARAMS['shoulder_score']
-                   or not all(inside(p['keypoints'][i]) for i in (index,5,6)) for p in poses):
+            a,b,width,resolution = bounded
+            if math.dist(row['xy'],observation['xy']) <= PARAMS['recovery_shoulder_widths']*width:
                 continue
-            width = min(math.dist(p['keypoints'][5],p['keypoints'][6]) for p in poses)
-            resolution = max(BODY_MOTION['min_px'], BODY_MOTION['min_ratio']*width)
-            support = [p['xy'] for p in observations] + [poses[0]['keypoints'][index], poses[2]['keypoints'][index]]
-            if (width <= 0 or any(math.dist(a,b) > resolution for i,a in enumerate(support) for b in support[i+1:])
-                    or math.dist(row['xy'],observations[1]['xy']) <= PARAMS['recovery_shoulder_widths']*width):
-                continue
-            evidence = dict(rejected_xy=list(row['xy']), rejected_pose_score=row.pop('pose_score',None),
-                            support_frames=[n-1,n+1], agreement_px=round(resolution,3))
-            row.update(xy=list(observations[1]['xy']), coordinate_source='point_tracker',visibility_source='point_tracker',
-                       status='pose_excursion_corrected_raw_unverified',claim_scope=observations[1]['claim_scope'],motion_pair_usable=False,
+            evidence = dict(rejected_xy=list(row['xy']),rejected_pose_score=row.pop('pose_score',None),
+                            support_frames=[a,b],agreement_px=round(resolution,3))
+            row.update(xy=list(observation['xy']),coordinate_source='point_tracker',visibility_source='point_tracker',
+                       status='pose_excursion_corrected_raw_unverified',claim_scope=observation['claim_scope'],motion_pair_usable=False,
                        motion_geometry_usable=False,motion_geometry_exclusion='isolated_pose_excursion',pose_excursion=evidence)
             corrected += 1
-    return corrected
+        runs = []
+        for n, (row, observation, _, width) in valid.items():
+            if (row.get('coordinate_source') == 'pose'
+                    and math.dist(row['xy'],observation['xy']) > PARAMS['recovery_shoulder_widths']*width):
+                if not runs or n != runs[-1][-1]+1:
+                    runs.append([])
+                runs[-1].append(n)
+        for ns in runs:
+            if len(ns) < 2:
+                continue
+            bounded = support(ns)
+            if bounded is None:
+                continue
+            a,b,_,resolution = bounded
+            evidence = dict(frames=[ns[0],ns[-1]],support_frames=[a,b],agreement_px=round(resolution,3),
+                            interpretation='pose_or_stuck_raw_unresolved')
+            for n in ns:
+                valid[n][0].update(motion_geometry_usable=False,motion_geometry_exclusion='pose_tracker_conflict',
+                                   pose_tracker_conflict=evidence)
+            conflicts += len(ns); spans += 1
+    return corrected, conflicts, spans
 
 
 def reconcile(packet, pose_frames, track_id, window, raw_path, pose_path):
@@ -143,7 +179,7 @@ def reconcile(packet, pose_frames, track_id, window, raw_path, pose_path):
             counts['pose_coordinates'] += 1
             counts['recovered_predictions'] += 1
             counts['temporal_recoveries'] += 1
-    counts['pose_excursion_corrections'] = _correct_excursions(result, packet, samples, window, inside)
+    counts['pose_excursion_corrections'], counts['pose_conflict_frames'], counts['pose_conflict_spans'] = _resolve_excursions(result, packet, samples, window, inside)
     counts['pose_coordinates'] -= counts['pose_excursion_corrections']
     result.update(schema='image-lens.joint-tracks/1', observation_scope='joint_and_surface_estimates_2d',
                   joint_tracking=dict(params=PARAMS, track_id=track_id, window=window, counts=counts,

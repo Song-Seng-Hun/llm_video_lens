@@ -127,7 +127,7 @@ def disagreement(points, kind, centre, size, pose_frames):
 def geometry_policy(packets, window, raw_packets=None):
     """Choose one source per point for this window. A changing point uses raw geometry;
     other points retain selected estimates. Neither source switches nor anchors are motion."""
-    previous = {}; switches = {}; selected = set(); excluded = {}
+    previous = {}; switches = {}; selected = set(); excluded = {}; conflicts = {}
     for packet in packets:
         for frame in packet['frames']:
             n = frame['frame']
@@ -139,6 +139,8 @@ def geometry_policy(packets, window, raw_packets=None):
                 pid = point['point_id']
                 if point.get('motion_geometry_usable') is False:
                     excluded.setdefault(pid, []).append(n)
+                    if point.get('motion_geometry_exclusion') == 'pose_tracker_conflict':
+                        conflicts.setdefault(pid, []).append(n)
                     continue
                 source = point.get('coordinate_source', 'point_tracker')
                 selected.add((n, pid))
@@ -152,10 +154,13 @@ def geometry_policy(packets, window, raw_packets=None):
         for _, pid in selected-raw_seen:
             if pid in switches:
                 lost[pid] = lost.get(pid, 0)+1
-    return dict(source='per_joint_source_stable' if switches else 'selected_estimates',
+    policy = dict(source='per_joint_source_stable' if switches else 'selected_estimates',
                 source_switches={pid: switches[pid] for pid in sorted(switches)},
                 lost_observations={pid: lost[pid] for pid in sorted(lost)},
                 excluded_motion_frames={pid: excluded[pid] for pid in sorted(excluded)})
+    if conflicts:
+        policy['conflict_motion_frames'] = {pid: conflicts[pid] for pid in sorted(conflicts)}
+    return policy
 
 
 def geometry_packets(packets, window, raw_packets, policy=None):
@@ -164,7 +169,7 @@ def geometry_packets(packets, window, raw_packets, policy=None):
     policy = policy or geometry_policy(packets, window, raw_packets)
     switched = policy['source_switches']
     if policy.get('excluded_motion_frames'):
-        # A corrected position is available for inspection, but its native frame is a motion gap.
+        # A corrected or disputed position remains inspectable; its native frame is a motion gap.
         packets = [dict(packet, frames=[dict(f, points=[dict(p, visible=False) if p.get('motion_geometry_usable') is False else p
                                                        for p in f['points']]) for f in packet['frames']]) for packet in packets]
     if not switched:
@@ -206,7 +211,8 @@ def geometry_note(policy):
     exclusion_note = None
     if excluded:
         ids = list(excluded); points = ', '.join(ids[:2]) + (f" 외 {len(ids)-2}점" if len(ids)>2 else '')
-        exclusion_note = f"관절 좌표 돌출 교정({points}): 해당 프레임 동작·속도 모름"
+        reason = "관절 교정·추정 충돌" if policy.get("conflict_motion_frames") else "관절 좌표 돌출 교정"
+        exclusion_note = f"{reason}({points}): 해당 프레임 동작·속도 모름"
     if not policy or policy['source'] not in ('raw_tracker_source_switch', 'per_joint_source_stable'):
         return exclusion_note
     ids = list(policy['source_switches'])
