@@ -19,8 +19,8 @@
     "historical experiment outputs"
   ],
   "manifest_self_excluded": true,
-  "file_count": 136,
-  "total_bytes": 1582262,
+  "file_count": 137,
+  "total_bytes": 1651830,
   "files": [
     {
       "path": ".gitattributes",
@@ -29,8 +29,8 @@
     },
     {
       "path": ".gitignore",
-      "bytes": 228,
-      "sha256": "0e19822010301a9f3a5880d71ce22f16a6461f6bf086242da94645fb26be8af0"
+      "bytes": 254,
+      "sha256": "095da944575320a3b668042754a8d233f9d8967123d8b9b53346a68a6649bb2a"
     },
     {
       "path": "LICENSE",
@@ -51,6 +51,11 @@
       "path": "assets/banner-light.svg",
       "bytes": 28467,
       "sha256": "9e79ca3f5a297241b0d9e234c74d879f326a8d3bdf98827a6a02a607b423b56b"
+    },
+    {
+      "path": "assets/example-onion.jpg",
+      "bytes": 69542,
+      "sha256": "d4be639b7e91f6a8017c4329b62a93fc037de0808528744fa1e0c3efb6ebf85b"
     },
     {
       "path": "docs/README.en.md",
