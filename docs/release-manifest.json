@@ -20,7 +20,7 @@
   ],
   "manifest_self_excluded": true,
   "file_count": 137,
-  "total_bytes": 1581600,
+  "total_bytes": 1651830,
   "files": [
     {
       "path": ".gitattributes",
@@ -29,8 +29,8 @@
     },
     {
       "path": ".gitignore",
-      "bytes": 228,
-      "sha256": "0e19822010301a9f3a5880d71ce22f16a6461f6bf086242da94645fb26be8af0"
+      "bytes": 254,
+      "sha256": "095da944575320a3b668042754a8d233f9d8967123d8b9b53346a68a6649bb2a"
     },
     {
       "path": "LICENSE",
@@ -39,8 +39,8 @@
     },
     {
       "path": "README.md",
-      "bytes": 11029,
-      "sha256": "ab2529ac73fe7480f94ca9acc8618f6cab34334014ac16957b151cfbf3b1f9ef"
+      "bytes": 12504,
+      "sha256": "1c0b565b37cab731bc014da40648919bfbc51bf5679df34b5dc354bfcee828bb"
     },
     {
       "path": "assets/banner-dark.svg",
@@ -53,19 +53,19 @@
       "sha256": "9e79ca3f5a297241b0d9e234c74d879f326a8d3bdf98827a6a02a607b423b56b"
     },
     {
-      "path": "assets/example-onion.svg",
-      "bytes": 4038,
-      "sha256": "7d1fcd4f0dd65044223e3c7e4cf0ff4915a900a56614f631391af38e0229d4a0"
+      "path": "assets/example-onion.jpg",
+      "bytes": 69542,
+      "sha256": "d4be639b7e91f6a8017c4329b62a93fc037de0808528744fa1e0c3efb6ebf85b"
     },
     {
       "path": "docs/README.en.md",
-      "bytes": 9169,
-      "sha256": "b9776a22e88ac330934fad129434789da3f4f6e5a945bfc5b76dbc3a83a727f8"
+      "bytes": 10411,
+      "sha256": "07820fc6c7cbeba41f48c349aaf5c615f7bf86e3272159b54b537b4f9fe47200"
     },
     {
       "path": "docs/README.ja.md",
-      "bytes": 11212,
-      "sha256": "d19722d1529e714cc7719062d2c106b12270b2183d99ca3b0e7616c30c3ff1bf"
+      "bytes": 12787,
+      "sha256": "5c6dee8ba0c3dc5c4a5d53aac0b536da8950d7e4ce397ef74564ee7d3df085b4"
     },
     {
       "path": "docs/guide.md",
@@ -94,8 +94,8 @@
     },
     {
       "path": "docs/provenance.md",
-      "bytes": 3042,
-      "sha256": "b61c7c8e69bc77395f5a89b3f9f942230322d4136930dc47637a868d86176fed"
+      "bytes": 3450,
+      "sha256": "3a2c9479c88d0e8993f3f9f522cc50d38cf689c977adf31b0619b70f6ea1fd8c"
     },
     {
       "path": "docs/verification.md",

@@ -22,6 +22,7 @@ __pycache__/
 *.webm
 *.png
 *.jpg
+!assets/example-onion.jpg
 *.jpeg
 *.whl
 *.zip
