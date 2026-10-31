@@ -212,6 +212,44 @@ def build_report(packet,binding,start,end,collect,infer):
 TOGETHER=dict(min_overlap=.5,max_distance_ratio=1.25)
 COMPACT_ABOVE_FEATURES=2
 
+def camera_relative(report,packet,binding,frame_motion,collect,infer):
+    """Derived translation-relative report; retain raw evidence and the collector's continuity guards.
+    A missing camera observation breaks the run. No endpoint subtraction, gap filling, scale or rotation correction.
+    """
+    if not frame_motion:return report
+    start,end=report['requested_frames']
+    # camera.path returns NumPy scalar translations after its matrix fit; store plain finite JSON numbers.
+    shifts={n:tuple(float(x) for x in v[:2]) for n,v in frame_motion.items() if type(n) is int and start<=n<=end
+            and len(v)>=2 and all(math.isfinite(x) for x in v[:2])}
+    def relative_collect(packet,pid,a,b,**kwargs):
+        source=collect(packet,pid,a,b,**kwargs)
+        if type(source) is dict:return source
+        rows=[]
+        for n,t,points in source[1]:
+            if n not in shifts:return dict(reasons=['camera_translation_unknown'])
+            dx,dy=shifts[n];point=points[pid]
+            rows.append((n,t,{pid:dict(point,xy=[point['xy'][0]-dx,point['xy'][1]-dy])}))
+        return source[0],rows,*source[2:]
+    derived=dict(report,**build_report(packet,binding,start,end,relative_collect,infer))
+    derived.update(coordinate_scope='camera_translation_relative_2d',
+        coordinate_transform=dict(kind='subtract_estimated_camera_translation',
+            source_tracks_sha256=binding['source_tracks_sha256'],
+            camera_path=[[n,*shifts[n]] for n in sorted(shifts)],
+            unsupported_frames=ranges(set(range(start,end+1))-set(shifts)),
+            scale_rotation_corrected=False),
+        limitations=['Coordinates subtract estimated camera translation only; tracking, camera fit, scale and rotation errors remain.']+report['limitations'][1:])
+    for feature in derived['features']:
+        for run in feature['continuous_runs']:
+            run['strokes']['basis']=run['strokes']['basis'].replace('screen path','camera-translation-relative path')
+    if report.get('trajectory_view'):
+        derived['trajectory_view']=dict(report['trajectory_view'],coordinate_scope='screen_2d')
+    return derived
+
+
+def coordinate_label(report):
+    return '카메라 이동 제외(평행이동 추정)' if report.get('coordinate_scope')=='camera_translation_relative_2d' else '화면'
+
+
 def together(report):
     """Major strokes of different points that share direction, time and size: the same body or camera move seen by several points."""
     units=[(f['point_id'],u) for f in report['features'] for run in f['continuous_runs'] for u in run['strokes']['units'] if u['major']]
