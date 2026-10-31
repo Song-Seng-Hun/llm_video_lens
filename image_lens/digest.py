@@ -195,8 +195,10 @@ def window_line(done, fps, first=None):
                          + f" {_dir(m['direction'])} {m['distance_px']:.0f}px" + (f"({motion_report.speed_text(m['speeds'])})" if m.get('speeds') else '')
                          for m in moves[:DIGEST['parts']]]
                 fields.append('화면: ' + '; '.join(shown) + (f" (+{len(moves)-DIGEST['parts']})" if len(moves) > DIGEST['parts'] else ''))
-            elif ((done.get('body_geometry') or {}).get('source') in ('raw_tracker_source_switch', 'per_joint_source_stable') or (done.get('body_geometry') or {}).get('excluded_motion_frames')):
+            elif (done.get('body_geometry') or {}).get('source') in ('raw_tracker_source_switch', 'per_joint_source_stable'):
                 fields.append('몸 기준: 원시 기준점 부족, 움직임 모름')
+            elif (done.get('body_geometry') or {}).get('excluded_motion_frames'):
+                fields.append('몸 기준: 관절 돌출 교정 프레임 제외, 움직임 모름')
             elif done.get('groups'):
                 fields.append('화면: 24px 이상 이동 없음')
             else:  # seed or every track failed: nothing was measured, which is not stillness

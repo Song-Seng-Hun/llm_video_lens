@@ -178,6 +178,8 @@ class PoseExcursion(unittest.TestCase):
         for first in (None,done):self.assertIn('교정',digest.window_line(done,30,first))
         none=dict(done,body=None)
         self.assertIn('모름',digest.window_line(none,30));self.assertNotIn('24px 이상 이동 없음',digest.window_line(none,30))
+        self.assertIn('관절 돌출 교정 프레임 제외, 움직임 모름',digest.window_line(none,30))
+        self.assertNotIn('원시 기준점 부족',digest.window_line(none,30))
 
     # Named control: an actual raw+pose fast pulse must retain its observed coordinate.
     def test_actual_fast_pulse_and_sustained_motion_are_not_repaired(self):
