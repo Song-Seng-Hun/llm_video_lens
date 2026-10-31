@@ -382,7 +382,7 @@ def markdown(record, scan, full_name):
         out.insert(3, f"원본 {record['scaled']['from'][0]}×{record['scaled']['from'][1]}을 {record['scaled']['to'][0]}×{record['scaled']['to'][1]}로 줄여서 봄: px는 줄인 영상 기준.")
     if record.get('onion_sheets') or record.get('frame_sheets'):
         # Same 30 facts of a solo dance, fresh reader: frames only 6, this text with onion sheets 8, with every sheet 12.5.
-        out.insert(-1, '그림과 같이 읽기: 글만으로는 중간 동작·손 모양·닿음이 빠진다. 아래 그림을 모두 열어 글과 같이 본다: 어니언 모음(구간 처음·끝과 궤적, strip), 전체 화면 모음(시간 순서).')
+        out.insert(-1, '그림과 같이 읽기: 글만으로는 중간 동작·손 모양·닿음이 빠진다. 아래 그림을 모두 열어 글과 같이 본다. 가장 믿을 만한 근거는 궤적이 그려진 어니언 그림이다(실제 장면 위에 추적한 점을 프레임마다 그대로 찍은 것이고, 글은 그것을 줄인 것). 글과 그림이 어긋나면 그림을 믿는다. 그다음 strip, 전체 화면 모음(시간 순서).')
     if record.get('onion_sheets'):
         out.insert(-1, f"어니언 모음 그림: {', '.join(record['onion_sheets'])} (구간마다 청록=시작, 빨강=끝, 초록 화살표=높이별 이동, 오른쪽 회색=시작과 가장 다른 가운데 프레임: 돌거나 갔다 돌아오는 동작은 여기서 보임; "
                        f"색 점선=각 줄 \"몸 기준\"의 부위 대표 점 궤적({'·'.join(onion.TRAILS['names'])} = 몸 기준에 적힌 순서, 점 하나가 한 프레임, 카메라 뺌, 큰 원=시작·큰 네모=끝, 점 간격이 좁으면 느림); "
