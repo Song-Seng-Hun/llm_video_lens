@@ -441,6 +441,10 @@ def markdown(record, scan, full_name):
     if record.get('frame_sheets'):
         out.insert(-1, f"전체 화면 모음: {', '.join(record['frame_sheets'])} (전 구간 균등 추출, 최대 {zoom.ZOOM['max_overview']}장, 장마다 시간 표시; 사이에 빠진 빠른 동작은 여기 안 나옴: "
                        '사람끼리 하는 동작(당기기·기대기·찌르기)과 넘어짐은 포즈 상자가 합쳐지면 글에 안 나오거나 엉뚱한 사람에게 붙으니 여기서 본다.)')
+    unnamed = [d for s in record['shots'] for d in s['windows'] if isinstance(d, dict) and d.get('mark_hint')]
+    if unnamed:
+        out.insert(-1, f"이름 없는 점(\"화면\" 줄의 move-a… 등, {len(unnamed)}구간): 어니언 그림에서 부위를 알아보면 mark로 이름 붙인 점을 새로 찍어 추적할 수 있다. "
+                       '명령과 점 위치는 look-full.md의 그 구간 "이름 붙이기" 줄(focus --shot shot-NNNN).')
     whole_camera = clip_camera(record)
     if whole_camera:
         out.insert(3, whole_camera)

@@ -132,6 +132,22 @@ class Describe(unittest.TestCase):
         self.assertIsNone(digest.clip_camera(dict(source_video='v.mp4', shots=[shot([plain[0], dict(net=[0., 0.], frames=20, known=1.)])])))
         self.assertIn('배경이 프레임끼리 맞지 않음', digest.clip_camera(dict(source_video='v.mp4', shots=[shot([plain[0], dict(plain[1], plain=False)])])))
 
+    # Anime music video: 17 of 41 windows had no trusted body and only move-a... points; a reader can name them with mark.
+    def test_unnamed_windows_point_to_mark(self):
+        from image_lens import look
+        packets = [dict(frames=[dict(frame=n, points=[dict(point_id='move-a', xy=[100.4+n, 50.6], visible=True),
+                                                      dict(point_id='move-b', xy=[9., 9.], visible=n != 30)]) for n in (30, 31)])]
+        hint = dict(frame=30, end=59, points=look._seed_xy(packets, ['move-a', 'move-b'], 30))
+        self.assertEqual(hint['points'], {'move-a': [130, 51]})  # move-b hidden at the seed
+        line = look._mark_hint(hint, 'W/v.mp4', 'W/look/shots.json')
+        self.assertIn('mark --video W/v.mp4 --shots W/look/shots.json --frame 30 --end 59', line); self.assertIn('move-a 130,51', line)
+        shot = dict(segment_id='shot-0000', frames=[0, 99], seconds=[0, 4.], skipped=[], errors=[],
+                    windows=[window(30, 59, mark_hint=hint), window(60, 79)])
+        text = digest.markdown(dict(source_video='v.mp4', shots=[shot], check=[]), dict(fps=25, source_frame_count=100), 'look-full.md')
+        self.assertIn('mark로 이름 붙인 점을 새로 찍어', text); self.assertIn('1구간', text)
+        shot['windows'] = [window(60, 79)]
+        self.assertNotIn('mark로', digest.markdown(dict(source_video='v.mp4', shots=[shot], check=[]), dict(fps=25, source_frame_count=100), 'look-full.md'))
+
     def test_old_look_json_reads_the_net_shift(self):
         self.assertEqual(digest.camera(dict(net=[0., 30.], frames=12), 10), '카메라 아래 30px')
         self.assertIsNone(digest.camera(dict(net=[2., 0.], frames=12), 10))

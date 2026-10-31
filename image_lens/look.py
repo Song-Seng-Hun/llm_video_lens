@@ -236,6 +236,28 @@ def fit(source, root, max_pixels=1920*1080):
     return copy, {'from': [w, h], 'to': list(size)}
 
 
+def _seed_xy(packets, points, seed):
+    """{point id: [x, y]} at the seed frame, rounded, for the points visible there."""
+    out = {}
+    for packet in packets:
+        for frame in packet['frames']:
+            if frame['frame'] == seed:
+                for q in frame['points']:
+                    if q['point_id'] in points and q['visible']:
+                        out.setdefault(q['point_id'], [round(q['xy'][0]), round(q['xy'][1])])
+    return {p: out[p] for p in points if p in out}
+
+
+def _mark_hint(hint, video, shots):
+    """One look-full line for a window with no trusted body: how to track named points there with `mark`, and where
+    its unnamed points sit at the seed frame (px of the video look tracked)."""
+    from image_lens import mark
+    at = '; '.join(f"{p} {x},{y}" for p, (x, y) in hint['points'].items())
+    return (f"- 이름 붙이기: 이름 없는 점의 부위를 그림에서 알아보면 mark로 이름 붙인 점을 새로 찍어 추적한다(이름은 에이전트 판단): "
+            f"python -m image_lens --workspace W mark --video {video} --shots {shots} --frame {hint['frame']} --end {hint['end']} "
+            f"--point <name>=x,y (최대 {mark.MARK['max_points']}개, ASCII) --out W/<새 폴더>; f{hint['frame']} 점 위치(px): {at}")
+
+
 def run(*args, **kwargs):
     from image_lens import watchdog
     # One tracker child serves every window (clip B: 137 jobs each paid about 0.85 s to start Torch and load the model).
@@ -424,6 +446,10 @@ def _run(video, detector, pose_model, checkpoint, out, max_shots=LOOK['max_shots
                          else list(dict.fromkeys(m['point'] for m in digest._screen(done.get('groups', [])))))
                 done['trails'] = onion.trails(raw_packets, leads, w['seed'], end, frame_motion if moving else None)
                 done['bands'] = onion.bands(source, w['seed'], end, person['bbox'], moving, picture, done['trails'])
+                if not done.get('body') and done['trails']:
+                    hint = dict(frame=w['seed'], end=end, points=_seed_xy(raw_packets, [t['point'] for t in done['trails']], w['seed']))
+                    if hint['points']:
+                        done['mark_hint'] = hint; slot.append('  '+_mark_hint(hint, source, root/'shots.json'))
                 done['onion'] = picture.name
                 done['peak'] = onion.peak(source, w['seed'], end, person['bbox'], picture)
                 turns = [e['share'] for e in (done.get('events') or {}).get('width', []) if e['share'] >= body_motion.EVENTS['turn']]
