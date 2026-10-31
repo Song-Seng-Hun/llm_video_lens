@@ -67,10 +67,24 @@ def speeds(fs,path):
 def speed_text(values):
     return '속도 '+'→'.join(f'{v:.1f}'.rstrip('0').rstrip('.') for v in values)+' px/f' if values else ''
 
+def _smooth(xy):
+    """Median noise rejection with a supported reversal retained at its observed frame.
+    A raw apex needs two non-still increments on each side, coherent within each side and opposite across it.
+    Single/two-frame error plateaus fail that support; longer coherent tracker errors remain possible.
+    """
+    half=STROKE['median_samples']//2
+    smooth=[[statistics.median(p[a] for p in xy[max(0,i-half):i+half+1]) for a in (0,1)] for i in range(len(xy))]
+    for i in range(2,len(xy)-2):
+        for axis in (0,1):
+            d=[xy[j+1][axis]-xy[j][axis] for j in range(i-2,i+2)]
+            if (min(map(abs,d))>=STROKE['hold_step_px'] and d[0]*d[1]>0
+                    and d[2]*d[3]>0 and d[1]*d[2]<0):smooth[i][axis]=xy[i][axis]
+    return smooth
+
+
 def strokes(fs,ts,xy):
     """Coarse readable movement units over one continuous run; summary only, raw coordinates are untouched."""
-    half=STROKE['median_samples']//2
-    smooth=[(statistics.median(p[0] for p in xy[max(0,i-half):i+half+1]),statistics.median(p[1] for p in xy[max(0,i-half):i+half+1])) for i in range(len(xy))]
+    smooth=_smooth(xy)
     keep={0,len(xy)-1};_simplify(smooth,0,len(xy)-1,STROKE['simplify_px'],keep)
     # A pause on a straight line is not a corner; split at near-still runs so holds stay visible.
     still=[math.dist(a,b)<STROKE['hold_step_px'] for a,b in zip(smooth,smooth[1:])];i=0
@@ -96,7 +110,7 @@ def strokes(fs,ts,xy):
         elapsed=u['end_seconds']-u['start_seconds'];u['mean_speed_px_per_s']=u['distance_px']/elapsed if elapsed>0 else 0.
         u['major']=u['direction']!='hold' and u['distance_px']>=max(largest/2,STROKE['major_min_px'])
     return dict(units=units[:STROKE['max_strokes']],omitted_unit_count=max(0,len(units)-STROKE['max_strokes']),params=STROKE,
-                basis='median-filtered screen path simplified to corners; major = at least half the largest unit and 24 px; holds are small net travel, not proof of held drawings')
+                basis='median-filtered screen path with supported raw extrema, simplified to corners; major = at least half the largest unit and 24 px; holds are small net travel, not proof of held drawings')
 
 def quote(value):
     # Code-span delimiter exceeds every embedded backtick run. JSON encodes literal newlines.
