@@ -20,7 +20,7 @@
   ],
   "manifest_self_excluded": true,
   "file_count": 136,
-  "total_bytes": 1528135,
+  "total_bytes": 1528225,
   "files": [
     {
       "path": ".gitattributes",
@@ -39,33 +39,33 @@
     },
     {
       "path": "README.md",
-      "bytes": 8517,
-      "sha256": "8463a983d699d98c68e8b436855cf0cdf5488395611d62c7a45acc11442ba811"
+      "bytes": 8632,
+      "sha256": "cc64ce5345f57de16fb2d7af4e6db6a6716dc200b6b2b1f8887e38a7e7752a16"
     },
     {
       "path": "assets/banner-dark.svg",
-      "bytes": 28585,
-      "sha256": "6e21b1c148e7774f4e698df6f15941a7269cfe4918d98ac5165dc4a186bd3d0c"
+      "bytes": 28468,
+      "sha256": "fc11a042b4f3848c798d92dafa56580741f6bea9731c6cc6bbb7b8cbc6dae610"
     },
     {
       "path": "assets/banner-light.svg",
-      "bytes": 28584,
-      "sha256": "4c2abc36a5e23ea59c90866f3c2c7c2a638fd2e9794e9b8cf6f65a9173792796"
+      "bytes": 28467,
+      "sha256": "9e79ca3f5a297241b0d9e234c74d879f326a8d3bdf98827a6a02a607b423b56b"
     },
     {
       "path": "docs/README.en.md",
-      "bytes": 6717,
-      "sha256": "fc2881db7ce06bbab5a586b22d9fdeaee9df6ab7fcb39e99c154b723273e7ddf"
+      "bytes": 6808,
+      "sha256": "f421c2a3e8079e2fa2762d66a43a540c08a6abd86a8062c908eff3500a5bf4b0"
     },
     {
       "path": "docs/README.ja.md",
-      "bytes": 8504,
-      "sha256": "3e02a1586e00e25eb489da5fdcb85deb7d83f646a1b1e3c69a649b87e0bde4bc"
+      "bytes": 8622,
+      "sha256": "9b4189ece97a6cb4233f2b927c49aae7838257ba6037e6c2991aaba7422d4488"
     },
     {
       "path": "docs/guide.md",
       "bytes": 17218,
-      "sha256": "9bd59a468b3b333ba14ebef83dc63caf0d9c52163e7644cfe1ad9ef6dfc327ea"
+      "sha256": "25a07b664e497f345f90bd22d8759da58ae3eea1f2dbbcaae3485f6edd06c583"
     },
     {
       "path": "docs/import-provenance.json",
@@ -695,7 +695,7 @@
     {
       "path": "tools/build_banner.py",
       "bytes": 24550,
-      "sha256": "273a65b56c1778445659cf8d7f7874396326a60f33eeb7eae658d25e273d4938"
+      "sha256": "95fe617ed5fabf935c3d3ccd379e0bd9964920d5b06039d21b75d2457ff006bf"
     },
     {
       "path": "tools/image_lens_cli.py",

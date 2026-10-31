@@ -1,4 +1,4 @@
-# LLM Image Lens: full guide
+# LLM Video Lens: full guide
 
 The [README](README.en.md) gives the overview and a quick start. This page keeps the full reference: every command, the brief format, jobs and tracking, how to read `look.md`, and pose seeds.
 
@@ -23,7 +23,7 @@ python -m image_lens --workspace /path/to/workspace compare --shots shots.json -
 From a different working directory, including isolated Python, use the absolute path to the thin direct launcher:
 
 ```sh
-python -I /path/to/llm_image_lens/tools/image_lens_cli.py --workspace /path/to/workspace brief --shots shots.json --out brief.json
+python -I /path/to/llm_video_lens/tools/image_lens_cli.py --workspace /path/to/workspace brief --shots shots.json --out brief.json
 ```
 
 An optional installation exposes `image-lens`; extras are `.[core]`, `.[tracking]` and `.[pose]`. A stdlib-only installation has no mandatory runtime dependencies. Pinned PySceneDetect source is already vendored. The public CLI is the supported entrypoint; individual engine mains are internal adapters.
