@@ -74,7 +74,9 @@ It also makes pictures:
 - `frame-sheet-N.jpg`: frames picked evenly from the whole video
 - `check-sheet-N.jpg`: dense frames of each "먼저 확인할 곳" span
 
-### Reading one line
+### Example results
+
+#### Live action
 
 One line from the `look.md` of a live-action solo dance video, the span where the dancer lifts a knee (shortened with `…`). The output text is Korean.
 
@@ -96,11 +98,9 @@ The onion picture of the same span. The left side overlays the start (cyan) and 
 
 Video: Antoni Shkraba, ["Video of a Man Dancing"](https://www.pexels.com/video/video-of-a-man-dancing-7571381/), Pexels ([Pexels License](https://www.pexels.com/license/)). Seconds 0–20, scaled to 1280×674, then run through `look`.
 
-**Parts of it are still wrong.**
-- Even this line has an error. The frames of this span show no turn, yet it lists a turn candidate (the shoulder width probably changed as the leg came up). The left arm's speed is unknown.
-- So read the text together with the pictures and "먼저 확인할 곳". Measurements are in the [look notes](look-notes.md).
+Even this line has an error. The frames of this span show no turn, yet it lists a turn candidate (the shoulder width probably changed as the leg came up). The left arm's speed is unknown.
 
-### Reading an animated character
+#### Animation
 
 <p align="center"><img src="../assets/example-live2d-onion.jpg" width="560" alt="An onion picture of a 2D animated character. On the left the start (cyan) and end (red) are overlaid; magenta and yellow dotted trails run side by side from the fingertips at the hat brim outward, and a blue trail follows the elbow a short way down. The cyan and red outlines of the hat and face split apart where the head tilted. On the right is frame f35, near the end."></p>
 
