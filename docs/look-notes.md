@@ -254,3 +254,11 @@ Pose confidence is uncalibrated. A pose-selected coordinate agreeing with that s
 - look-full.md now has an "이름 붙이기" line for each such window: the `mark` command for its seed frame and end, and the seed-frame px of its trail points. look.md gets one line saying how many windows have it and where to find it. look.json keeps it as `mark_hint`.
 - Anime music video: 11 windows got the line; the rest of look.md is unchanged. The command from the f180 window ran as written with six points named by eye (raised foot, bent knee, lower leg, apple, eye, hand); `mark` placed them within 10 px and tracked f180..209.
 - Untested: whether readers use it, or whether named points improve the reading. That needs a ground-truth timeline for this clip.
+
+## Pictures: readable labels (2026-10-31)
+
+- Grid numbers were red on the frame, nearly invisible on a pink anime frame; frame numbers on the onion's grey panel came out a few px tall in the onion sheet.
+- Every label on a picture (grid and mark numbers, onion and strip frame numbers, person names, sheet and overview times) is now white with a black rim, at least 0.6 scale. Five styles were drawn on the pink frame; the user picked this one. A white and a black rim around coloured text at 0.5 scale filled the strokes (500 read as 800).
+- Frame numbers on the onion panel and strips grow with the person box, the same factor as the trail marks.
+- Sheet and overview label bands are 24 px (from 20 and 22) for the larger text.
+- Not changed: text, numbers, picture content.

@@ -19,8 +19,8 @@
     "historical experiment outputs"
   ],
   "manifest_self_excluded": true,
-  "file_count": 137,
-  "total_bytes": 1659053,
+  "file_count": 139,
+  "total_bytes": 1776724,
   "files": [
     {
       "path": ".gitattributes",
@@ -89,8 +89,18 @@
     },
     {
       "path": "docs/look-notes.md",
-      "bytes": 57089,
-      "sha256": "2ea49bfd11798c1e11b7a5cd3c4816d75f80843463fe60a0ad4fced472980dda"
+      "bytes": 57867,
+      "sha256": "6d0537a8ffeacccf2e421640d2220f1e7daacc9fdf749b1863a40415793465c4"
+    },
+    {
+      "path": "docs/look-notes.md",
+      "bytes": 57867,
+      "sha256": "6d0537a8ffeacccf2e421640d2220f1e7daacc9fdf749b1863a40415793465c4"
+    },
+    {
+      "path": "docs/look-notes.md",
+      "bytes": 57867,
+      "sha256": "6d0537a8ffeacccf2e421640d2220f1e7daacc9fdf749b1863a40415793465c4"
     },
     {
       "path": "docs/provenance.md",
@@ -164,8 +174,8 @@
     },
     {
       "path": "image_lens/frames.py",
-      "bytes": 1938,
-      "sha256": "2445f1aae8e8de7f8cb8b6a0554f1f79e51211407d30a8fe47eaefc15b0a93e8"
+      "bytes": 2419,
+      "sha256": "1e8910d7264f04cee72667e8d0bad4fa93e4d90c89910698f0a8f3f7d574dd03"
     },
     {
       "path": "image_lens/jobs.py",
@@ -184,8 +194,8 @@
     },
     {
       "path": "image_lens/mark.py",
-      "bytes": 9359,
-      "sha256": "94197c20106192ce7e772ae75190af9987f575b8f787eb956ee8e86eb9ec6d70"
+      "bytes": 9333,
+      "sha256": "53255b4124227e4e69f99008ad4678f418aa0e228f755bb4342a7dc6198e1cb8"
     },
     {
       "path": "image_lens/motif.py",
@@ -209,8 +219,8 @@
     },
     {
       "path": "image_lens/onion.py",
-      "bytes": 23449,
-      "sha256": "6e03cef4aa260eaa7729b11c62486b9c7b47c6a1c18b7ff4319189f970ee35c6"
+      "bytes": 23606,
+      "sha256": "cbda9f03ed7a10ec9fd37ef7f7023270557aa635b2f7dbf1ca4a5cbcad4e2d8e"
     },
     {
       "path": "image_lens/part_regions.py",
@@ -569,8 +579,8 @@
     },
     {
       "path": "image_lens/zoom.py",
-      "bytes": 6016,
-      "sha256": "f75ed773db44ad3c680d2125e02fdbcabf49bc6db6aabdf9ec8e5f9b6b531f74"
+      "bytes": 6022,
+      "sha256": "85476d4588bb455e55d25f6d8c76c1cf3a06288ef66fd2ec25858341204f98ac"
     },
     {
       "path": "lan/README.md",
@@ -684,8 +694,8 @@
     },
     {
       "path": "tests/test_onion.py",
-      "bytes": 8769,
-      "sha256": "171505fb878ac88e78fbca37e07a727835b94aa1450ac741c13d6974cffccd31"
+      "bytes": 9310,
+      "sha256": "7433c738fa85f3f099fc110cb431d952884efd788ad49cef86b0a4f2ae943f7c"
     },
     {
       "path": "tests/test_pose.py",

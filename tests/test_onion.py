@@ -135,6 +135,16 @@ class Trails(unittest.TestCase):
         self.assertEqual(coloured(220), coloured(440))
         self.assertGreater(coloured(1760), 2*coloured(440))
 
+    # Red grid numbers on a pink anime frame were nearly invisible: every label is white with a black rim.
+    def test_labels_are_white_with_a_black_rim(self):
+        import cv2
+        import numpy as np
+        from image_lens import frames
+        image = np.full((60, 120, 3), (180, 60, 240), np.uint8)
+        frames.label(cv2, image, '400', (10, 40), .9, 2)
+        pixels = image.reshape(-1, 3).astype(int)
+        self.assertTrue((pixels.max(1) < 30).any()); self.assertTrue((pixels.min(1) > 240).any())  # edges are anti-aliased
+
 
 class Peak(unittest.TestCase):
     def test_out_and_back_shows_the_far_frame(self):
