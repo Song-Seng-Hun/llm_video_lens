@@ -6,7 +6,7 @@ import math
 # Clip A pose 1 (black dress, f32..46): head right 20, chest 3, waist left 15, skirt left 8, hem right 4; the three
 # repeats agree within 3 px. Below min_px a band counts as still.
 ONION = dict(bands=('맨 위', '위', '가운데', '아래', '맨 아래'), features=40, quality=.02, spacing=10, min_features=5,
-             min_px=8., pad=.1, arrow_scale=2)
+             min_px=8., pad=.1, arrow_scale=2, arrow_head=9, arrow_margin=4)
 
 
 def _box(bbox, w, h):
@@ -87,6 +87,25 @@ def bands(video, start, end, bbox, camera=None, image=None, trails=()):
     return result
 
 
+def _arrow(cv2, picture, start, vector):
+    """Band shift arrow: fixed head size, black and white rim, kept inside the picture so the head is never cut.
+    Arrows shorter than the head are left out; the shift stays in the text report."""
+    head, margin = ONION['arrow_head'], ONION['arrow_margin']
+    h, w = picture.shape[:2]; dx, dy = vector
+    fit = 1.
+    for d, lo, hi in ((dx, margin-start[0], w-1-margin-start[0]), (dy, margin-start[1], h-1-margin-start[1])):
+        if d > hi > 0: fit = min(fit, hi/d)
+        elif d < lo < 0: fit = min(fit, lo/d)
+    dx, dy = dx*fit, dy*fit
+    length = (dx*dx+dy*dy)**.5
+    if length < head:
+        return
+    end = (int(round(start[0]+dx)), int(round(start[1]+dy))); tip = min(.5, head/length)
+    cv2.arrowedLine(picture, start, end, (0, 0, 0), 6, cv2.LINE_AA, tipLength=tip)  # black then white rim: visible on light and dark
+    cv2.arrowedLine(picture, start, end, (255, 255, 255), 4, cv2.LINE_AA, tipLength=tip)
+    cv2.arrowedLine(picture, start, end, (0, 140, 0), 2, cv2.LINE_AA, tipLength=tip)
+
+
 def _image(cv2, np, first, last, box, result, path, trails=()):
     x0, y0, x1, y1 = box
     a = cv2.cvtColor(first, cv2.COLOR_BGR2GRAY)[y0:y1, x0:x1]; b = last[y0:y1, x0:x1]
@@ -97,7 +116,7 @@ def _image(cv2, np, first, last, box, result, path, trails=()):
         cv2.line(picture, (0, top), (x1-x0, top), (150, 150, 150), 1)
         if band['dx'] is not None:
             mid = (band['y'][0]+band['y'][1])//2-y0; s = ONION['arrow_scale']
-            cv2.arrowedLine(picture, (centre, mid), (int(centre+s*band['dx']), int(mid+s*band['dy'])), (0, 140, 0), 4, tipLength=.3)
+            _arrow(cv2, picture, (centre, mid), (s*band['dx'], s*band['dy']))
     for trail, color in zip(trails, TRAILS['colors']):
         at = [(int(round(x-x0)), int(round(y-y0))) for _, x, y in trail['xy']]
         frames = [n for n, _, _ in trail['xy']]
@@ -309,7 +328,7 @@ def lines(result, image_name=None):
         return []
     out = ['- 높이별 흐름 (사람 상자 5등분, 카메라 뺌): ' + ' · '.join(parts)]
     if image_name:
-        out.append(f"  - 어니언 그림: {image_name} (청록=시작, 빨강=끝, 초록 화살표=띠별 이동 ×{ONION['arrow_scale']}; 오른쪽 회색=시작과 가장 다른 가운데 프레임; "
+        out.append(f"  - 어니언 그림: {image_name} (청록=시작, 빨강=끝, 초록 화살표=띠별 이동 ×{ONION['arrow_scale']}(그림 밖으로 나가면 줄임, 머리보다 짧으면 생략); 오른쪽 회색=시작과 가장 다른 가운데 프레임; "
                    f"색 점선=부위별 대표 점의 프레임마다 위치({'·'.join(TRAILS['names'])} 순, 카메라 뺌), 큰 원·네모=각 연속 관측의 시작·끝, 선 끊김=관측 누락, 이어진 점 간격이 좁으면 느림·넓으면 빠름)")
     return out
 
