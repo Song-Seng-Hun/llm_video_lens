@@ -109,6 +109,8 @@ python -m image_lens --workspace W at --look W/look-clip --span 18-22 --out W/at
 
 Look at a frame with a coordinate grid drawn by `grid`, then place and track points with `mark`. You can place up to 8 points, named in ASCII.
 
+Place points on a corner where two outlines meet, or on a small spot (an eye, a button). A point mid-way along a straight edge or on a flat fill misses motion along that edge. If a part's dark outline moved a lot in the result picture (`mark-onion.jpg`) but its trail is short, the tracking slipped: place that point on a corner and try again.
+
 ```bash
 python -m image_lens --workspace W grid --video V --frame 572 --box 100,250,1000,1000 --out W/grid-f572.jpg
 python -m image_lens --workspace W mark --video V --shots W/look/shots.json --frame 572 --end 599 --point hammer-stripe=430,680 --point eye=322,738 --checkpoint C --out W/mark-s19

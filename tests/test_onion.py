@@ -159,6 +159,27 @@ class Trails(unittest.TestCase):
         self.assertEqual(len(onion.trails([dict(frames=[dict(frame=1, points=[dict(point_id=f'p{i}', xy=[i, i], visible=True) for i in range(8)])])],
                                           [f'p{i}' for i in range(8)], 0, 1, limit=8)), 8)
 
+    # Anime clip f180..209: the whole screen panned 60 px, the onion showed it as motion while the trails (camera taken
+    # out) stayed short, so a correct track looked slipped.
+    def test_onion_takes_the_camera_out(self):
+        import tempfile
+        import cv2
+        import numpy as np
+        with tempfile.TemporaryDirectory() as d:
+            video = Path(d)/'v.avi'; out = cv2.VideoWriter(str(video), cv2.VideoWriter_fourcc(*'MJPG'), 10, (320, 240))
+            for k in range(11):  # a dark square panned 3 px left per frame with its background stripes
+                f = np.full((240, 320, 3), 200, np.uint8)
+                for x in range(0, 400, 40):
+                    cv2.line(f, (x-3*k, 0), (x-3*k, 240), (60, 60, 60), 2)
+                cv2.rectangle(f, (150-3*k, 90), (190-3*k, 130), (0, 0, 0), -1); out.write(f)
+            out.release()
+            def coloured(camera):
+                image = Path(d)/'o.png'
+                onion.bands(video, 0, 10, (100, 60, 240, 200), camera, image)
+                picture = cv2.imread(str(image)).astype(int)
+                return int((abs(picture[..., 0]-picture[..., 2]) > 80).sum())  # cyan or red pixels
+            self.assertGreater(coloured(None), 4*coloured((-30., 0.)))
+
 
 class Peak(unittest.TestCase):
     def test_out_and_back_shows_the_far_frame(self):

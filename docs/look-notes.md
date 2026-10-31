@@ -269,3 +269,13 @@ Pose confidence is uncalibrated. A pose-selected coordinate agreeing with that s
 - It now also writes `mark-onion.jpg`: look's onion view over the box the marked points cover (60 px margin), one colour trail per point with its name beside the start, and the grey panel of the frame most unlike the start. Names near the right edge go to the left of the point. Two more colours (brown, light blue) cover mark's eight points; look's six are unchanged. mark.md lists the picture with its legend.
 - Anime music video, f180..209, six points named by eye: all six names readable, each trail stays on its part.
 - trajectory.png is kept.
+
+## Pictures: onion without the camera, denser grid (2026-10-31)
+
+- Anime music video f180..209, `mark` with a raised foot: the onion showed the foot's outlines about 100 px apart, the trail 23 px, so the track looked slipped. The track was right. On the real frames both foot corners moved 59 px left, as did the screen UI: the whole screen panned. Trails had the camera shift taken out, the onion did not. Also, a fill lighter than the background shows the colours the other way round (cyan band where the shape went), so the foot even seemed to move the wrong way.
+- The onion now moves the end frame back by the window's camera shift when the camera moved (the same `moving` that trails and bands use). On that clip the UI icons now overlap as one and the foot stays put, as its trails say. 36 of the clip's 41 onions changed; the solo dance clip (camera unknown) is pixel-identical.
+- Legends say to read the dark outlines and that light fills show the colours reversed. look.md, mark.md, guide.md and the READMEs say to suspect a slipped track when a part's outlines are far apart and its trail is short or goes another way.
+- First guess, wrong: the seed sat mid-edge, where motion along the edge cannot be seen. Re-marking both foot corners gave the same trails.
+- `grid` draws lines every 50 px (25 px in a zoom box), numbers every other line, so a corner can be read by eye. Its output and the guide say to place points on corners or small spots, not mid-edge or on flat fills.
+- In `mark-onion.jpg`, names keep off every start mark and each other; a name moved away gets a line in its trail colour to the point.
+- Not changed: numbers, windows, seeds, look.md text other than the legend and reading lines.

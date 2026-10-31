@@ -20,7 +20,7 @@
   ],
   "manifest_self_excluded": true,
   "file_count": 137,
-  "total_bytes": 1665048,
+  "total_bytes": 1672637,
   "files": [
     {
       "path": ".gitattributes",
@@ -39,8 +39,8 @@
     },
     {
       "path": "README.md",
-      "bytes": 12504,
-      "sha256": "1c0b565b37cab731bc014da40648919bfbc51bf5679df34b5dc354bfcee828bb"
+      "bytes": 12885,
+      "sha256": "e1bd6358e9071a1eeba35523dbe6f0155085cf08bbce593b26b5a047a949524f"
     },
     {
       "path": "assets/banner-dark.svg",
@@ -59,18 +59,18 @@
     },
     {
       "path": "docs/README.en.md",
-      "bytes": 10411,
-      "sha256": "07820fc6c7cbeba41f48c349aaf5c615f7bf86e3272159b54b537b4f9fe47200"
+      "bytes": 10756,
+      "sha256": "e21afead44f2653f2960d08b6c46baaf232d9e14498a098a52ce719a58bf7577"
     },
     {
       "path": "docs/README.ja.md",
-      "bytes": 12787,
-      "sha256": "5c6dee8ba0c3dc5c4a5d53aac0b536da8950d7e4ce397ef74564ee7d3df085b4"
+      "bytes": 13180,
+      "sha256": "738fd1f40ed6677c81c807800414d5580836e86e6d1907260412023c0fdb293a"
     },
     {
       "path": "docs/guide.md",
-      "bytes": 17344,
-      "sha256": "9cf46e027eff2f6abbc02d2e031efbd31533b16fa33581343053d83e2d2dad31"
+      "bytes": 17972,
+      "sha256": "620f1ab884f20d3f69ff6f44f4670323b50a79fcc1394b4a8f1949d3907c3867"
     },
     {
       "path": "docs/import-provenance.json",
@@ -89,8 +89,8 @@
     },
     {
       "path": "docs/look-notes.md",
-      "bytes": 58652,
-      "sha256": "55dc9803303cb4224b2f272c4f20b2e654a9db4e99697d6625ea66e902cb5b01"
+      "bytes": 60369,
+      "sha256": "7fbf3022233716a7e5172025248cf826f8227649973e4d6270a245a789fcdcbe"
     },
     {
       "path": "docs/provenance.md",
@@ -154,8 +154,8 @@
     },
     {
       "path": "image_lens/digest.py",
-      "bytes": 33666,
-      "sha256": "e57c33611a37fc8ba495aac7bbca50a443f42ddbfd2bafff2b24bc96cd702576"
+      "bytes": 34115,
+      "sha256": "f3aeaf2c25761e3e2be76b81777ccfc9e7de0c5e98a5d27fbae78a0334ed3ae4"
     },
     {
       "path": "image_lens/foreground_regions.py",
@@ -184,8 +184,8 @@
     },
     {
       "path": "image_lens/mark.py",
-      "bytes": 11103,
-      "sha256": "9e7b4802aee318778472c2500c91cb311ba533c914b8babe3f3a242ba0458887"
+      "bytes": 12208,
+      "sha256": "dd7822271e35fafba9b296fe8c35eacf7ff1b2a72ee95fbcc5fcf8ae6b2a94a1"
     },
     {
       "path": "image_lens/motif.py",
@@ -209,8 +209,8 @@
     },
     {
       "path": "image_lens/onion.py",
-      "bytes": 24143,
-      "sha256": "f6a53d23639a9a94e1fc502c525e74a5f915fb4b44a9a41a207fe0f0f643b2f0"
+      "bytes": 25463,
+      "sha256": "953bbba3056af180a3e0378d634df4b15a38e9c04393887ec60876357022eb0b"
     },
     {
       "path": "image_lens/part_regions.py",
@@ -684,8 +684,8 @@
     },
     {
       "path": "tests/test_onion.py",
-      "bytes": 10276,
-      "sha256": "5f91a093d469f0333fad255dcc1e2899ee34a67d3cde7905d4df45b477b507a5"
+      "bytes": 11527,
+      "sha256": "f2116021d3b4120336f9a6bae3e20d8728bea86bd777caf862d9217443df0c4f"
     },
     {
       "path": "tests/test_pose.py",

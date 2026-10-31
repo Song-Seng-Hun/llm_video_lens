@@ -140,7 +140,9 @@ python -m image_lens --workspace W grid --video V --frame 572 --box 100,250,1000
 python -m image_lens --workspace W mark --video V --shots W/look/shots.json --frame 572 --end 599 --point hammer-stripe=430,680 --point eye=322,738 --checkpoint C --out W/mark-s19
 ```
 
-- `grid` draws a labelled pixel grid on the source frame (50 px inside a zoom box, 100 px otherwise) to read positions from.
+- `grid` draws a pixel grid on the source frame to read positions from: lines every 25 px inside a zoom box and every 50 px otherwise, numbers on every other line.
+- Place points on a corner where two outlines meet, or on a small spot (eye, button, pattern dot), not mid-edge on a straight line or inside a flat fill, where a tracker cannot see motion along the edge.
+- `mark` also writes `mark-onion.jpg`. Check each trail against it: if a part's start (cyan) and end (red) outlines are far apart and its trail is short or goes another way, the tracking slipped. Read the dark outlines: a fill lighter than the background shows the colours the other way round (cyan band on the side it moved to). Onion and trails both have the camera shift taken out.
 - `mark` moves each point to the nearest trackable corner within 15 px (`--no-snap` keeps it), saves marked crops as evidence, tracks the points and writes `mark.md` plus per-frame coordinates in `mark.tracks.json`.
 - Names are ASCII, up to 8 points. They are the agent's reading, not verified anatomy.
 
