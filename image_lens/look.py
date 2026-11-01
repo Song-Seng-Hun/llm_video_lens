@@ -430,9 +430,10 @@ def _run(video, detector, pose_model, checkpoint, out, max_shots=LOOK['max_shots
             frame_motion = None; errors.append(dict(window=w, step='camera', error=str(error)[:300]))
         cam = camera.between(frame_motion, w['seed'], end)
         camera_supported = camera.supported(frame_motion, w['seed'], end)
-        done['coordinate_scope'] = ('camera_translation_relative_2d'
+        done['coordinate_scope'] = (camera.scope(frame_motion)
                                     if camera_supported else 'screen_2d')
         done['camera'] = camera.describe(frame_motion, w['seed'], end, motion_report.STROKE['major_min_px'])
+        if 'transform' in done['camera']:done['camera']['transform']['source_sha256']=scan['source_sha256']
         if done['camera'].get('unknown'):
             try:
                 done['camera']['plain'] = camera.plain(source, w['seed'], main['bbox'] if main else None)
@@ -441,14 +442,14 @@ def _run(video, detector, pose_model, checkpoint, out, max_shots=LOOK['max_shots
         from image_lens import digest
         camera_text = digest.camera(done['camera'], fps)
         if camera_text:
-            basis_note = ('(카메라·배경 이동 추정; 아래 수치·그림에서 뺌)' if camera_supported
-                          else '(카메라·배경 이동 추정, 일부 프레임 모름; 아래 수치·그림은 화면 기준)')
+            basis_note = ('(카메라·배경 이동 추정; 추적 수치·그림에서 뺌, 자세 진단은 원본 화면 기준)' if camera_supported
+                          else '(카메라·배경 이동 추정, 일부 프레임 모름; 추적 수치·그림은 화면 기준)')
             slot.append(f"  - 화면 전체: {camera_text} {basis_note}")
         # Move candidates: report one per group that moved together (see onion.parts); the rest stay in the tracks file.
         from image_lens import onion
         for k, (name, group, stem, tracks) in enumerate(tracked):
             if group == 'move':
-                keep = set(onion.parts(tracks, end, frame_motion))
+                keep = set(onion.parts(tracks, end, frame_motion if camera_supported else None))
                 done['move_candidates'] = len(tracks['frames'][0]['points']) if tracks['frames'] else 0
                 tracked[k] = (name, group, stem, dict(tracks, frames=[dict(f, points=[p for p in f['points'] if p['point_id'] in keep])
                                                                       for f in tracks['frames']]))
@@ -496,14 +497,16 @@ def _run(video, detector, pose_model, checkpoint, out, max_shots=LOOK['max_shots
             if note:
                 slot.append('  - '+note)
             done['body'] = body_motion.describe([t[3] for t in tracked], dict(w, end=end), view_frames,
-                                               timing_packets=raw_packets)
+                                               timing_packets=raw_packets, **(dict(camera_path=frame_motion) if camera_supported else {}))
             slot += ['  '+l for l in body_motion.lines(done['body'])]
         done['events'] = body_motion.pose_events(view_frames, dict(w, end=end), fps)
         done['phases'] = body_motion.phases(view_frames, dict(w, end=end), fps)
         done['facing'] = body_motion.facing(view_frames, dict(w, end=end))
         done['arms'] = body_motion.arm_poses(view_frames, dict(w, end=end),
                                              [w['seed']]+([p['frames'][1] for p in done['phases']] if done['phases'] else [end]))
-        done['people'] = body_motion.people(pose_frames, dict(w, end=end), fps, cam)
+        done['pose_diagnostic_bases'] = {field:dict(coordinate_scope='screen_2d', camera_corrected=False,
+                                                  source='native_pose_observations') for field in ('events','phases','facing','arms')}
+        done['people'] = body_motion.people(pose_frames, dict(w, end=end), fps, frame_motion if camera_supported else None)
         if actor:
             done['people_scope'] = 'full_frame_context; not the selected actor motion job'
         if len(done['people']['people']) > 1:
@@ -513,6 +516,7 @@ def _run(video, detector, pose_model, checkpoint, out, max_shots=LOOK['max_shots
             except Exception as error:  # OpenCV raises its own error type; the picture is optional
                 errors.append(dict(window=w, step='who', error=str(error)[:300]))
         from image_lens import digest
+        slot.append('  - '+digest.POSE_BASIS)
         slot += ['  - '+f for f in digest.events(done['events'], fps)]
         person = body_motion.largest(view_frames.get(w['seed']))
         if tracked and person:
@@ -522,18 +526,18 @@ def _run(video, detector, pose_model, checkpoint, out, max_shots=LOOK['max_shots
                 # End-frame camera unknown (plain backgrounds): draw in screen coordinates and say so; dropping the
                 # picture left the plain-background README examples with no onion at all.
                 screen = not camera_supported
-                moving = cam if camera_supported else None
+                moving = frame_motion if camera_supported else None
                 if screen:
                     done['onion_basis'] = 'screen'
                 from image_lens import digest
                 # No trusted body: the "화면" moves stand in, in the order that line lists them (one trail per point).
                 leads = ([f['point'] for f in digest.limbs(done['body'])] if done.get('body')
                          else list(dict.fromkeys(m['point'] for m in digest._screen(done.get('groups', [])))))
-                centre = path = onion.body_path(raw_packets, w['seed'], end)
-                body_shift = onion.body_basis(source, person['bbox'], path, raw_packets)
+                centre = path = onion.body_path(raw_packets, w['seed'], end, **(dict(camera=moving) if moving is not None else {}))
+                body_shift = onion.body_basis(source, person['bbox'], path, raw_packets, **(dict(camera=moving,reference=w['seed']) if moving is not None else {}))
                 if body_shift:
                     done['picture_basis'] = 'body'; done['body_shift'] = [round(v, 1) for v in body_shift]  # onion_basis stays: it names the text's numbers
-                    done['trails'] = onion.trails(raw_packets, leads, w['seed'], end, body=path)
+                    done['trails'] = onion.trails(raw_packets, leads, w['seed'], end, camera=moving, body=path)
                 else:
                     path = None
                     done['trails'] = onion.trails(raw_packets, leads, w['seed'], end, None if screen else frame_motion or None)
@@ -545,7 +549,7 @@ def _run(video, detector, pose_model, checkpoint, out, max_shots=LOOK['max_shots
                 done['onion'] = picture.name
                 done['peak'] = onion.peak(source, w['seed'], end, person['bbox'], picture)
                 known = frame_motion if camera_supported else None
-                charted, palette = onion.references(done['trails'], w['seed'], end, known, centre)
+                charted, palette = onion.references(done['trails'], w['seed'], end, known, centre, body_corrected=known is not None)
                 done['spacing'] = onion.spacing(source, picture, charted, palette, context=(w['seed'], person['bbox'], path, known and onion.moved(known), person['bbox']))
                 turns = [e['share'] for e in (done.get('events') or {}).get('width', []) if e['share'] >= body_motion.EVENTS['turn']]
                 if turns:

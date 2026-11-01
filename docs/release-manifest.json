@@ -1,6 +1,6 @@
 {
   "schema": "image-lens.source-release/1",
-  "date_kst": "2026-11-01",
+  "date_kst": "2026-11-02",
   "source_only": true,
   "authored_code_license": "MIT (LICENSE); vendored code keeps its own terms",
   "vendor_licenses": {
@@ -20,8 +20,8 @@
     "historical experiment outputs"
   ],
   "manifest_self_excluded": true,
-  "file_count": 167,
-  "total_bytes": 2254587,
+  "file_count": 168,
+  "total_bytes": 2286416,
   "files": [
     {
       "path": ".gitattributes",
@@ -95,8 +95,8 @@
     },
     {
       "path": "docs/look-notes.md",
-      "bytes": 79359,
-      "sha256": "2fc11f63dc11b14ad357df6bafd622c60bff0aeffc757cbbac32df3768d4fe87"
+      "bytes": 81558,
+      "sha256": "aa0e95cd674b9502a7fb84b8556e0c88c89e2d3ed9b7942895640a55e31cf93a"
     },
     {
       "path": "docs/person-detectors.md",
@@ -240,8 +240,8 @@
     },
     {
       "path": "image_lens/body_motion.py",
-      "bytes": 54664,
-      "sha256": "33b8decc0c5d64cd6befa8448e23fdee36a380dda17d67dd0f81f48dc34e18ed"
+      "bytes": 56365,
+      "sha256": "7c358ac2ed6a6e019a6f92f8169b5eceaa824101a1a1ad2e979f65f8d7bac92e"
     },
     {
       "path": "image_lens/box.py",
@@ -255,8 +255,8 @@
     },
     {
       "path": "image_lens/camera.py",
-      "bytes": 11033,
-      "sha256": "04b1cbb5bd5d6233b7134c146c546ff9b738782d45b63181528e2cfff335a4a2"
+      "bytes": 19482,
+      "sha256": "bba5847bd0e2c2fc5f78157d3783bf11578c939356533a32d3ec9cf34f64c745"
     },
     {
       "path": "image_lens/check.py",
@@ -275,8 +275,8 @@
     },
     {
       "path": "image_lens/digest.py",
-      "bytes": 38418,
-      "sha256": "da9b0b92169a2c66f62cc0b5e33feffae8d0088819c5cb95fd98f30b863fdbbd"
+      "bytes": 38939,
+      "sha256": "3e7b4f8c185bca4c41bf6a257f136a8364c932a9d50badb94c2a0e8ed9b589f0"
     },
     {
       "path": "image_lens/foreground_regions.py",
@@ -300,13 +300,13 @@
     },
     {
       "path": "image_lens/look.py",
-      "bytes": 53530,
-      "sha256": "ceb36271937b9b8a062aaef7cbb1b52fc63979274f0cf37f24a91e37609ff221"
+      "bytes": 54279,
+      "sha256": "85423afd1018c53ca051f5d7d868e142bd690c953b0a24248774a46bff959c51"
     },
     {
       "path": "image_lens/mark.py",
-      "bytes": 16163,
-      "sha256": "860e4aa9af85b8a8fbc1cd07a91ed4bbfde34dbffa940dc3102813806b38c923"
+      "bytes": 16507,
+      "sha256": "df551a1163daa57f510396616126f00a3ec819aec6979fe6f08093b35dd53a17"
     },
     {
       "path": "image_lens/motif.py",
@@ -315,8 +315,8 @@
     },
     {
       "path": "image_lens/motion_report.py",
-      "bytes": 38321,
-      "sha256": "ef22bc540d5118eb94a54a354f5a3cf40b35c8c289a899ca06a9ab33245433a1"
+      "bytes": 38627,
+      "sha256": "0d53ffe44685016f0d4e9079715bc9b21d3188b686aaba44d10f7391e62f7925"
     },
     {
       "path": "image_lens/motion_view.py",
@@ -330,8 +330,8 @@
     },
     {
       "path": "image_lens/onion.py",
-      "bytes": 44423,
-      "sha256": "58a42b7acb80b6202158510d9f39d67edd18e1f63be13bb4df8eae450dff8fad"
+      "bytes": 46559,
+      "sha256": "6d9953375de264b5cf97761269a97da905d3f11faaacf7694d55eb20b74e85d1"
     },
     {
       "path": "image_lens/part_regions.py",
@@ -779,9 +779,14 @@
       "sha256": "8e56f2adca3153f67e897adc5bb1fec88701d2b580e061379607c6c9057da82d"
     },
     {
+      "path": "tests/test_camera_similarity.py",
+      "bytes": 13804,
+      "sha256": "7e505d1e722b4913b45f38fd7249b66d7d7c82ba293b71f94eddec3826005793"
+    },
+    {
       "path": "tests/test_check.py",
-      "bytes": 16164,
-      "sha256": "bc7dca6542c71df574e5d1496fcde6249780498c61e3e57cb1ce845c21165f6c"
+      "bytes": 16244,
+      "sha256": "7e10a6b974784b8b89530fa1fe600fbe46564e7704dfc1799ad14dc5f262cc93"
     },
     {
       "path": "tests/test_contracts.py",
@@ -790,8 +795,8 @@
     },
     {
       "path": "tests/test_digest.py",
-      "bytes": 12183,
-      "sha256": "16fd8a31b31470b8a46ee4cdfe61a8de3194df805c9092f7ea279ea60a411c71"
+      "bytes": 12396,
+      "sha256": "7619cfb06a6a377c501e28a763de76a32c0974b28fe940a4756c238630f8c17d"
     },
     {
       "path": "tests/test_joint_tracking.py",
@@ -805,8 +810,8 @@
     },
     {
       "path": "tests/test_look.py",
-      "bytes": 37332,
-      "sha256": "0e84eae88ea92b4eba96f89604656043a87b79cbd22308a1edd3a0c5980efc1f"
+      "bytes": 38423,
+      "sha256": "77c183dedf6a634bbabe36cc58084e1acd91a7188b18765ae2b803fc369ba7d8"
     },
     {
       "path": "tests/test_mark.py",
@@ -825,8 +830,8 @@
     },
     {
       "path": "tests/test_onion.py",
-      "bytes": 20932,
-      "sha256": "ba9a516dcacbd0aab342859dc822617cf31a2432a8727220cb733688024d249f"
+      "bytes": 21168,
+      "sha256": "1660448c72f610991b78010774514db32f387456753141a8d9560c7a177f575d"
     },
     {
       "path": "tests/test_person_models.py",

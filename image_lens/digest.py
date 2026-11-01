@@ -187,6 +187,8 @@ def camera(cam, fps):
     elif cam.get('zoom_back'):
         z = cam['zoom_back']
         parts.append(('줌 인' if z['scale'] > 1 else '줌 아웃') + f" ×{z['scale']:.2f}까지 갔다 돌아옴({z['frame']/fps:.2f}s)")
+    angle=round(cam.get('rotation_clockwise_degrees',0.),1)
+    if angle:parts.append(f"회전 {'시계' if angle>0 else '반시계'} 방향 {abs(angle):.1f}°")
     if parts and cam.get('until'):
         parts[-1] += f" (f{cam['until']}까지만 맞춤)"
     return ', '.join(parts) or None
@@ -205,6 +207,9 @@ def clip_camera(record):
             '화면 이동 px에 카메라 움직임이 섞였을 수 있다.')
 
 
+POSE_BASIS = '자세 진단: 원본 화면 좌표(카메라 미보정; 단계·방향·팔 자세 포함)'
+
+
 def window_line(done, fps, first=None):
     """One window. With `first` (the first window of the same repeated pose) only the differences are written."""
     w = done['window']; end = done.get('cut_after', w['end'])
@@ -221,7 +226,7 @@ def window_line(done, fps, first=None):
     if done.get('phases') or len(words) == 1:
         words = words[:1]
     if words and set(words) != {'모름'}:
-        fields.append('팔 자세: ' + (f"{words[0]} 그대로" if len(words) == 2 and words[0] == words[1] else ' → '.join(words)))
+        fields.append('팔 자세(원본 화면·미보정): ' + (f"{words[0]} 그대로" if len(words) == 2 and words[0] == words[1] else ' → '.join(words)))
     camera_text = camera(done.get('camera'), fps)
     if first is not None:
         fw = first['window']
@@ -277,6 +282,8 @@ def window_line(done, fps, first=None):
         if done.get('picture_basis') == 'body':  # the onion of this window is drawn against the body centre (onion.BODY_VIEW)
             dx, dy = done['body_shift']
             fields.append(f"어니언은 몸 기준(몸 중심 {motion_report.KO[motion_report.direction(dx, dy)].replace('화면 ', '')} {math.hypot(dx, dy):.0f}px 이동을 빼고 겹침, 그 이동은 차트 body 줄)")
+    if done.get('pose_diagnostic_bases') or any(done.get(field) for field in ('events','phases','facing','arms')):
+        fields.append(POSE_BASIS)
     fields += events(done.get('events'), fps, done.get('facing'))
     fields += people(done.get('people'), fps)
     notes = []
@@ -297,7 +304,7 @@ def window_line(done, fps, first=None):
     if first is not None and body and body.get('centre_shift') is None:
         notes.append('몸 전체 이동 모름')
     if done.get('facing') == 'back':
-        notes.append('뒤돈 자세(엉덩이로 판단): 팔다리 왼/오른은 모델 추정, 틀리기 쉬움')
+        notes.append('뒤돈 자세(원본 화면 진단, 엉덩이로 판단): 팔다리 왼/오른은 모델 추정, 틀리기 쉬움')
     if done.get('chibi'):
         notes.append('SD 체형: 팔다리 이름 안 붙임')
     elif not done.get('skeleton', True):
@@ -331,7 +338,7 @@ def phase_lines(done, fps):
         said = [f"{_named(m, body_motion.PHASE_KO[m['part']], done.get('facing'))} {_dir(m['direction'])} {m['amount']:.1f}"
                 + (f"(최대 {m['back']:.1f} 갔다 돌아옴)" if m['back'] else '') for m in p['moved'][:body_motion.PHASES['parts']]]
         pose = arm_words(ends.get(p['frames'][1]))
-        out.append(f"  - {a/fps:.2f}–{b/fps:.2f}s: " + ('; '.join(said) if said else f"팔다리 큰 이동 없음(몸통 길이 {body_motion.PHASES['move']:g}배 미만)")
+        out.append(f"  - {a/fps:.2f}–{b/fps:.2f}s: 자세 단계(원본 화면·미보정): " + ('; '.join(said) if said else f"팔다리 큰 이동 없음(몸통 길이 {body_motion.PHASES['move']:g}배 미만)")
                    + (f" | 끝 팔: {pose}" if pose else ''))
     return out
 
@@ -467,10 +474,10 @@ def markdown(record, scan, full_name):
     if record.get('onion_sheets') or record.get('frame_sheets'):
         # Same 30 facts of a solo dance, fresh reader: frames only 6, this text with onion sheets 8, with every sheet 12.5.
         out.insert(-1, '그림과 같이 읽기: 글만으로는 중간 동작·손 모양·닿음이 빠진다. 아래 그림을 모두 열어 글과 같이 본다. 가장 믿을 만한 근거는 궤적이 그려진 어니언 그림이다(실제 장면 위에 추적한 점을 프레임마다 그대로 찍은 것이고, 글은 그것을 줄인 것). 글과 그림이 어긋나면 그림을 믿는다. 그다음 strip, 전체 화면 모음(시간 순서). '
-                       '단, 어니언에서 그 부위의 청록·빨강 윤곽선이 벌어진 만큼 궤적(과 글의 숫자)이 따라가지 않으면(짧거나 다른 방향) 추적이 미끄러진 것으로 의심한다(카메라 추정 시 어니언과 궤적의 평행이동을 뺐다).')
+                       '단, 어니언에서 그 부위의 청록·빨강 윤곽선이 벌어진 만큼 궤적(과 글의 숫자)이 따라가지 않으면(짧거나 다른 방향) 추적이 미끄러진 것으로 의심한다(카메라 추정 시 어니언과 궤적의 추정 카메라 변환을 뺐다).')
     if record.get('onion_sheets'):
         out.insert(-1, f"어니언 모음 그림: {', '.join(record['onion_sheets'])} (구간마다 청록=시작, 빨강=끝(진한 윤곽선 기준; 배경보다 밝은 면은 띠 색이 반대(청록 띠=간 쪽); 카메라가 움직였으면 끝 프레임을 카메라만큼 되돌려 겹침), 초록 화살표=높이별 이동, {'왼쪽 회색=시작과 가장 다른 가운데 프레임: 돌거나 갔다 돌아오는 동작은 여기서 보임; ' if any(w.get('peak') for s in record.get('shots', []) for w in s.get('windows', [])) else ''}"
-                       f"색 점선=각 줄 \"몸 기준\"의 부위 대표 점 궤적, 몸 기준이 없는 줄은 \"화면\"에 적힌 점의 궤적({'·'.join(onion.TRAILS['names'])} = 그 줄에 적힌 순서, 점 하나가 한 프레임, 카메라 추정 시 평행이동 제외, 큰 원=시작·큰 네모=끝, 점 간격이 좁으면 느림, 조금 큰 점={onion.TRAILS['tick_seconds']:g}초마다(그 간격이 좁아지면 느려짐); 맨 오른쪽 spacing=부위마다 지나온 길이를 같은 길이 줄로 펼친 것, 굵은 눈금이 모이면 느림·벌어지면 빠름, 작은 이동의 완급은 여기서 봄, 맨 위 camera 줄=화면 전체 이동·body 줄=몸 중심 이동(움직였을 때만), 그 아래 작은 그림=구간 첫 프레임 전체(노란 테두리=어니언이 잘라 보여 준 범위, 초록 테두리=추적한 사람(틀렸으면 box 명령에 상자를 주어 다시), 카메라가 움직였으면 회색 선=화면 중심의 궤적·회색 점선 사각형=구간 끝의 화면)); "
+                       f"색 점선=각 줄 \"몸 기준\"의 부위 대표 점 궤적, 몸 기준이 없는 줄은 \"화면\"에 적힌 점의 궤적({'·'.join(onion.TRAILS['names'])} = 그 줄에 적힌 순서, 점 하나가 한 프레임, 카메라 추정 시 해당 변환 제외, 큰 원=시작·큰 네모=끝, 점 간격이 좁으면 느림, 조금 큰 점={onion.TRAILS['tick_seconds']:g}초마다(그 간격이 좁아지면 느려짐); 맨 오른쪽 spacing=부위마다 지나온 길이를 같은 길이 줄로 펼친 것, 굵은 눈금이 모이면 느림·벌어지면 빠름, 작은 이동의 완급은 여기서 봄, 맨 위 camera 줄=화면 중심 이동·body 줄=몸 중심 이동(움직였을 때만), 그 아래 작은 그림=구간 첫 프레임 전체(노란 테두리=어니언이 잘라 보여 준 범위, 초록 테두리=추적한 사람(틀렸으면 box 명령에 상자를 주어 다시), 카메라가 움직였으면 회색 선=화면 중심의 궤적·회색 점선 사각형=구간 끝의 화면)); "
                        '"who"=사람이 여럿인 구간의 P1·P2 상자; "still"=추적하기엔 짧은 컷의 한 장면, 붙어 있는 컷은 한 줄에 시간 순서; "strip"=몸 돌림 후보 구간의 프레임 5장을 시간 순서로). '
                        '손 모양(하트·브이)처럼 글에 안 나오는 동작은 그림에서 본다.')
     if record.get('frame_sheets'):

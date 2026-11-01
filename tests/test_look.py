@@ -472,7 +472,7 @@ class MultipleActors(unittest.TestCase):
                             (onion, 'body_path', lambda *args: None), (onion, 'body_basis', lambda *args: None),
                             (onion, 'parts', lambda *args: ['wrist-l']),
                             (onion, 'trails', lambda *args: []), (onion, 'bands', bands), (onion, 'peak', lambda *args: None),
-                            (onion, 'references', lambda *args: ([], [])), (onion, 'spacing', lambda *args, **kwargs: None),
+                            (onion, 'references', lambda *args, **kwargs: ([], [])), (onion, 'spacing', lambda *args, **kwargs: None),
                             (onion, 'lines', lambda *args, **kwargs: []), (onion, 'sheets', lambda *args: []),
                             (motif, 'thumb', lambda *args: None), (zoom, 'overview', lambda *args: []),
                             (check, 'sheets', lambda *args: None)]
@@ -541,6 +541,10 @@ class MultipleActors(unittest.TestCase):
                 self.assertEqual(shot['actor_accounting']['completed'], 2)
                 self.assertTrue(all(w['context_pose_flags'] for w in shot['windows']))
                 self.assertTrue(all(w['source_native_range'] == shot['frames'] for w in shot['windows']))
+                for window in shot['windows']:
+                    self.assertEqual(set(window['pose_diagnostic_bases']), {'events','phases','facing','arms'})
+                    self.assertTrue(all(basis['coordinate_scope']=='screen_2d' and not basis['camera_corrected']
+                                        for basis in window['pose_diagnostic_bases'].values()))
             text = (Path(directory)/'look/look.md').read_text()
             self.assertIn('A2 · 모델 ID b', text); self.assertNotIn('P2 · 모델 ID b', text)
             # Each actor's windows sit under its own heading, so A2 restarting at the shot's first second reads as a new person.
@@ -549,6 +553,16 @@ class MultipleActors(unittest.TestCase):
             self.assertIn('사람별 분석(장면마다 최대 2명): A1·A2…는', text)
             self.assertIn('P1…은 화면 기준 문맥 순서로 A와 별개', text)
             self.assertIn('32/32프레임', text)
+            from image_lens import digest
+            self.assertIn(digest.POSE_BASIS,text)
+            self.assertIn(digest.POSE_BASIS,(Path(directory)/'look/look-full.md').read_text())
+            import copy
+            diagnostic=dict(window=dict(seed=0,end=15),groups=[],phases=[dict(frames=[0,14],moved=[])],
+                            facing='back',arms=[dict(frame=0,l='down',r='down'),dict(frame=14,l='up',r='up')])
+            before=copy.deepcopy(diagnostic)
+            self.assertIn('원본 화면·미보정',digest.window_line(diagnostic,10))
+            self.assertIn('자세 단계(원본 화면·미보정)',digest.phase_lines(diagnostic,10)[0])
+            self.assertEqual(diagnostic,before)
             self.assertNotIn('64/32프레임', text)
 
     def test_missing_selected_seed_stays_unknown_and_never_substitutes_another_id(self):
