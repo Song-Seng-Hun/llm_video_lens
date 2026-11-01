@@ -42,28 +42,79 @@ TRAILS = dict(parts=6, dot=2, tick=5, tick_seconds=.1, start=9, end=8, line=2, b
               names=('노랑', '자홍', '파랑', '주황', '흰색', '보라'))  # BGR; not cyan, red or green, which the onion already uses
 
 
-def trails(packets, points, seed, end, camera=None, limit=None):
+def trails(packets, points, seed, end, camera=None, limit=None, body=None):
     """[{point, xy: [(frame, x, y)]}] for up to TRAILS['parts'] point ids, visible frames after the seed, in screen
     coordinates minus the camera shift since the seed (`camera` is camera.path; None = no camera move). With a camera
-    move, frames whose camera shift is unknown are left out rather than drawn in the wrong place."""
+    move, frames whose camera shift is unknown are left out rather than drawn in the wrong place. `body` (body_path)
+    instead takes out the body centre's move since its first frame (camera included: the centre is on screen)."""
     out = []
+    shift = camera
+    if body:
+        b0 = body[min(body)]; shift = {n: (x-b0[0], y-b0[1]) for n, (x, y) in body.items()}
     for pid in points[:limit or TRAILS['parts']]:
         xy = []
         for packet in packets:
             for frame in packet['frames']:
                 n = frame['frame']
-                if not seed < n <= end or (camera is not None and n not in camera):
+                if not seed < n <= end or (shift is not None and n not in shift):
                     continue
                 for q in frame['points']:
                     if q['point_id'] == pid and q['visible']:
-                        dx, dy = camera[n][:2] if camera is not None else (0., 0.)
+                        dx, dy = shift[n][:2] if shift is not None else (0., 0.)
                         xy.append((n, q['xy'][0]-dx, q['xy'][1]-dy))
         if xy:
             out.append(dict(point=pid, xy=sorted(xy)))
     return out
 
 
-def bands(video, start, end, bbox, camera=None, image=None, trails=(), colors=None, named=False):
+# A whole-body move (Live2D wave sliding 300 px, 2026-11-01) split the onion in two and buried the hand's wave in a
+# long sideways line, while look.md read both well ("전체" and "몸 기준"). When the body centre moves at least
+# min_share of the picture width, the picture follows the text: the end frame and the trails are moved back by the
+# body centre's shift, and the move itself goes to the chart's top "body" row and the small whole frame.
+# Only a move of the whole figure counts: most tracked points (agree_share), and as many of the lowest quarter of them,
+# must have gone at least half the centre's shift its way. A lunge drops the shoulders while the feet stay; drawn
+# against the body, the planted foot moved 117 px (dancer f54..213), and the upper-body points alone still agreed.
+BODY_VIEW = dict(min_share=.15, agree_share=.6, smooth=5, color=(60, 60, 220))
+
+
+def body_path(packets, seed, end):
+    """{frame: (x, y)} body centre after the seed (body_motion.reference: shoulder midpoint, else face), median of 3
+    then mean of BODY_VIEW['smooth'] frames, so pose jitter does not shake every trail drawn against it."""
+    from image_lens import body_motion
+    window = dict(seed=seed, end=end)
+    kind, centre, _ = body_motion.reference(body_motion.series(packets, window), window)
+    if not kind:
+        return {}
+    ns = sorted(centre); path = body_motion._median3([centre[n] for n in ns]); r = BODY_VIEW['smooth']//2
+    out = {}
+    for i, n in enumerate(ns):
+        q = min(r, i, len(ns)-1-i)  # symmetric near the ends, so a steady slide keeps its full length
+        run = [path[j] for j in range(i-q, i+q+1) if abs(ns[j]-n) <= q]
+        out[n] = (sum(p[0] for p in run)/len(run), sum(p[1] for p in run)/len(run))
+    return out
+
+
+def body_basis(video, bbox, path, packets):
+    """(dx, dy) of the body centre over the window when the whole figure moved that way far enough to draw against
+    the body, else None."""
+    import cv2
+    from image_lens import body_motion
+    if not path or not bbox:
+        return None
+    capture = cv2.VideoCapture(str(video)); w, h = int(capture.get(cv2.CAP_PROP_FRAME_WIDTH)), int(capture.get(cv2.CAP_PROP_FRAME_HEIGHT)); capture.release()
+    x0, _, x1, _ = _view(bbox, w, h); a, b = path[min(path)], path[max(path)]
+    shift = (b[0]-a[0], b[1]-a[1]); size = math.hypot(*shift)
+    if size < BODY_VIEW['min_share']*(x1-x0):
+        return None
+    points = [q for q in body_motion.series(packets, dict(seed=min(path)-1, end=max(path))).values() if len(q) > 1]
+    moves = sorted(((q[min(q)][1], ((q[max(q)][0]-q[min(q)][0])*shift[0]+(q[max(q)][1]-q[min(q)][1])*shift[1])/size**2)
+                    for q in points), reverse=True)  # lowest start first
+    def agree(group):
+        return bool(group) and sum(v >= .5 for _, v in group) >= BODY_VIEW['agree_share']*len(group)
+    return shift if agree(moves) and agree(moves[:max(1, len(moves)//4)]) else None
+
+
+def bands(video, start, end, bbox, camera=None, image=None, trails=(), colors=None, named=False, view_shift=None):
     """[{band, y, dx, dy, features}] of the median feature shift start->end per band, minus the camera shift.
     A band with too few surviving features gets dx=dy=None. Writes the onion image when `image` is a path, with
     `trails` (see `trails`) drawn on it and the end frame moved back by the camera shift, so the overlay and the
@@ -104,10 +155,14 @@ def bands(video, start, end, bbox, camera=None, image=None, trails=(), colors=No
         mx, my = np.median(d, 0)
         result.append(dict(band=name, y=[top, bottom], dx=round(float(mx)-cam[0], 1), dy=round(float(my)-cam[1], 1), features=int(len(d))))
     if image:
-        if camera:  # trails have the camera taken out; without this the overlay showed a pan as motion (anime clip f180..209)
+        drawn = result
+        if view_shift:  # body basis: the overlay and the arrows leave the body centre's move out; the text above does not
+            last = cv2.warpAffine(last, np.float32([[1, 0, -view_shift[0]], [0, 1, -view_shift[1]]]), (w, h), borderMode=cv2.BORDER_REPLICATE)
+            drawn = [dict(b, dx=b['dx']+cam[0]-view_shift[0], dy=b['dy']+cam[1]-view_shift[1]) if b['dx'] is not None else b for b in result]
+        elif camera:  # trails have the camera taken out; without this the overlay showed a pan as motion (anime clip f180..209)
             last = cv2.warpAffine(last, np.float32([[1, 0, -cam[0]], [0, 1, -cam[1]]]), (w, h), borderMode=cv2.BORDER_REPLICATE)
         capture = cv2.VideoCapture(str(video)); fps = capture.get(cv2.CAP_PROP_FPS); capture.release()
-        _image(cv2, np, first, last, _view(bbox, w, h), result, image, trails, colors, named, fps, (x0+x1)//2)
+        _image(cv2, np, first, last, _view(bbox, w, h), drawn, image, trails, colors, named, fps, (x0+x1)//2)
     return result
 
 
@@ -158,6 +213,30 @@ def ticks(frames, fps):
 SPACING = dict(width=420, height=680, row=70, min_px=15., margin=30)
 
 
+# The whole frame's and the body centre's own moves as the chart's top rows, so a part's ease is read against them.
+REFERENCE = dict(names=('camera', 'body'), colors=((130, 130, 130), BODY_VIEW['color']))
+
+
+def references(trails, seed, end, camera=None, body=None):
+    """(trails, colours) with `camera` (camera.path) and `body` (body_path) put first as rows. The body row leaves
+    the camera out when it is given, as look.md's body numbers do; frames missing from either are left out."""
+    rows, colors = [], []
+    if camera:
+        rows.append(dict(point='camera', xy=[(n, camera[n][0], camera[n][1]) for n in sorted(camera) if seed <= n <= end]))
+        colors.append(REFERENCE['colors'][0])
+    if body:
+        xy = [(n, x-camera[n][0], y-camera[n][1]) if camera else (n, x, y) for n, (x, y) in sorted(body.items())
+              if not camera or n in camera]
+        rows.append(dict(point='body', xy=xy)); colors.append(REFERENCE['colors'][1])
+    return rows+list(trails), colors+list(TRAILS['colors'])
+
+
+def moved(camera):
+    """camera (camera.path) when it travelled enough for a chart row, else None."""
+    rows, _ = spacing_rows([dict(point='camera', xy=[(n, v[0], v[1]) for n, v in sorted(camera.items())])], None)
+    return camera if rows else None
+
+
 def spacing_rows(trails, fps):
     """[{point, length, ticks: [(fraction, timed)]}, ...] and the names of parts too still to chart. Path length grows
     only by steps of at least motion_report STROKE['hold_step_px'], so a held part's jitter does not read as motion."""
@@ -169,7 +248,9 @@ def spacing_rows(trails, fps):
         for (a, b), (n, m) in zip(zip(xy, xy[1:]), zip(frames, frames[1:])):
             d = math.dist(a, b) if m == n+1 else 0.; cum.append(cum[-1]+(d if d >= still else 0.))
         if cum[-1] < SPACING['min_px']:
-            skipped.append(t['point']); continue
+            if t['point'] not in REFERENCE['names']:  # a still camera or body is not a still part: just no row
+                skipped.append(t['point'])
+            continue
         timed = ticks(frames, fps)
         rows.append(dict(point=t['point'], length=cum[-1], ticks=[(c/cum[-1], i in timed or i == 0) for i, c in enumerate(cum)]))
     return rows, skipped
@@ -218,25 +299,65 @@ def spacing(video, image, trails, colors=None, context=None):
     return dict(rows=[r['point'] for r in rows], still=skipped)
 
 
+def _views(camera, w, h):
+    """{frame: (x0, y0, x1, y1)} of the view on each frame in the first frame's pixels. camera.path is how the
+    content moved (a pan right reads dx < 0, scale > 1 = zoom in), so the view went the other way: centre c - d/s."""
+    out = {}
+    for n, (dx, dy, k) in camera.items():
+        cx, cy = w/2-dx/k, h/2-dy/k
+        out[n] = (cx-w/2/k, cy-h/2/k, cx+w/2/k, cy+h/2/k)
+    return out
+
+
+def _dashed(cv2, panel, a, b, color, t):
+    (x0, y0), (x1, y1) = a, b; dash = 4*t
+    for p, q in (((x0, y0), (x1, y0)), ((x1, y0), (x1, y1)), ((x1, y1), (x0, y1)), ((x0, y1), (x0, y0))):
+        n = max(1, int(math.dist(p, q)//(2*dash)))
+        for i in range(n):
+            f, g = 2*i*dash/max(1., math.dist(p, q)), (2*i+1)*dash/max(1., math.dist(p, q))
+            u = (round(p[0]+(q[0]-p[0])*f), round(p[1]+(q[1]-p[1])*f)); v = (round(p[0]+(q[0]-p[0])*min(g, 1)), round(p[1]+(q[1]-p[1])*min(g, 1)))
+            cv2.line(panel, u, v, (255, 255, 255), t+2); cv2.line(panel, u, v, color, t)
+
+
 def _context(cv2, video, context, panel, area):
     """The whole frame, fitted into `area` of the chart panel, with the onion's view outlined: a crop alone hid that
-    mikumiku is a character inside a square card on a phone player (2026-11-01). Costs no width: the panel is there."""
+    mikumiku is a character inside a square card on a phone player (2026-11-01). Costs no width: the panel is there.
+    context=(frame, bbox, body path, camera path): with a camera path the view's centre path and the last frame's
+    view (dashed) are drawn too, and the picture shrinks so that view fits beside it."""
     from image_lens import frames
-    frame, bbox = context
+    frame, bbox, path, camera = (tuple(context)+(None, None))[:4]
     got = frames.window(video, frame, frame)
     if not got:
         return
     image = got[0]; h, w = image.shape[:2]; ax0, ay0, ax1, ay1 = area
-    k = min((ax1-ax0)/w, (ay1-ay0)/h)
+    views = _views(camera, w, h) if camera else {}
+    end = views[max(views)] if views else (0, 0, w, h)
+    ux0, uy0, ux1, uy1 = min(0, end[0]), min(0, end[1]), max(w, end[2]), max(h, end[3])
+    k = min((ax1-ax0)/(ux1-ux0), (ay1-ay0)/(uy1-uy0))
     if k <= 0:
         return
     small = cv2.resize(image, (max(1, int(w*k)), max(1, int(h*k))), interpolation=cv2.INTER_AREA)
-    sx, sy = ax0+(ax1-ax0-small.shape[1])//2, ay1-small.shape[0]
+    ox, oy = ax0+(ax1-ax0-round((ux1-ux0)*k))//2-round(ux0*k), ay1-round((uy1-uy0)*k)-round(uy0*k)
+    sx, sy = ox, oy
     panel[sy:sy+small.shape[0], sx:sx+small.shape[1]] = small
     vx0, vy0, vx1, vy1 = (_view(bbox, w, h) if bbox else (0, 0, w, h))
     t = max(2, round(small.shape[0]/200))  # 1 px of colour did not survive JPEG
     corners = ((sx+int(vx0*k), sy+int(vy0*k)), (sx+int(vx1*k)-1, sy+int(vy1*k)-1))
     cv2.rectangle(panel, *corners, (0, 0, 0), t+2); cv2.rectangle(panel, *corners, (0, 220, 255), t)
+    capture = cv2.VideoCapture(str(video)); fps = capture.get(cv2.CAP_PROP_FPS); capture.release()
+
+    def line(points, color):  # a path in first-frame pixels: white rim, 0.1 s dots, square at the end
+        ns = sorted(points); at = [(sx+round(points[n][0]*k), sy+round(points[n][1]*k)) for n in ns]
+        for a, b in zip(at, at[1:]):
+            cv2.line(panel, a, b, (255, 255, 255), t+2); cv2.line(panel, a, b, color, t)
+        for i in sorted(ticks(ns, fps) | {0}):
+            cv2.circle(panel, at[i], t+2, (255, 255, 255), -1); cv2.circle(panel, at[i], t+1, color, -1)
+        e = t+3; cv2.rectangle(panel, (at[-1][0]-e, at[-1][1]-e), (at[-1][0]+e, at[-1][1]+e), color, t)
+    if views:  # where the camera ended up, and how its centre got there
+        _dashed(cv2, panel, (sx+round(end[0]*k), sy+round(end[1]*k)), (sx+round(end[2]*k)-1, sy+round(end[3]*k)-1), REFERENCE['colors'][0], t)
+        line({n: ((v[0]+v[2])/2, (v[1]+v[3])/2) for n, v in views.items()}, REFERENCE['colors'][0])
+    if path:  # body basis: the body centre's own move, on screen
+        line(path, BODY_VIEW['color'])
 
 
 def _image(cv2, np, first, last, box, result, path, trails=(), colors=None, named=False, fps=None, centre=None):
@@ -474,7 +595,7 @@ def sheets(root, items):
     return written
 
 
-def lines(result, image_name=None, screen=False, peak=False):
+def lines(result, image_name=None, screen=False, peak=False, body=None):
     from image_lens import motion_report
     parts = []
     for band in result:
@@ -490,7 +611,11 @@ def lines(result, image_name=None, screen=False, peak=False):
     out = [f'- 높이별 흐름 (사람 상자 5등분, {basis}): ' + ' · '.join(parts)]
     if image_name:
         out.append(f"  - 어니언 그림: {image_name} (청록=시작, 빨강=끝(진한 윤곽선 기준; 배경보다 밝은 면은 띠 색이 반대(청록 띠=간 쪽); 카메라가 움직였으면 끝 프레임을 카메라만큼 되돌려 겹침), 초록 화살표=띠별 이동 ×{ONION['arrow_scale']}(그림 밖으로 나가면 줄임, 머리보다 짧으면 생략); {'왼쪽 회색=시작과 가장 다른 가운데 프레임; ' if peak else ''}"
-                   f"색 점선=부위별 대표 점(몸 기준이 없으면 '화면'에 적힌 점)의 프레임마다 위치({'·'.join(TRAILS['names'])} 순, {basis}), 큰 원·네모=각 연속 관측의 시작·끝, 선 끊김=관측 누락, 이어진 점 간격이 좁으면 느림·넓으면 빠름, 조금 큰 점={TRAILS['tick_seconds']:g}초마다(그 간격이 좁아지면 느려짐); 맨 오른쪽 spacing=부위마다 지나온 길이를 같은 길이 줄로 펼친 것, 굵은 눈금={TRAILS['tick_seconds']:g}초마다·가는 눈금=프레임마다, 눈금이 모이면 느림·벌어지면 빠름(작은 이동도 같은 크기로 보임, {SPACING['min_px']:g}px 미만 부위는 still), 그 아래 작은 그림=구간 첫 프레임 전체(노란 테두리=어니언이 잘라 보여 준 범위))")
+                   f"색 점선=부위별 대표 점(몸 기준이 없으면 '화면'에 적힌 점)의 프레임마다 위치({'·'.join(TRAILS['names'])} 순, {basis}), 큰 원·네모=각 연속 관측의 시작·끝, 선 끊김=관측 누락, 이어진 점 간격이 좁으면 느림·넓으면 빠름, 조금 큰 점={TRAILS['tick_seconds']:g}초마다(그 간격이 좁아지면 느려짐); 맨 오른쪽 spacing=부위마다 지나온 길이를 같은 길이 줄로 펼친 것, 굵은 눈금={TRAILS['tick_seconds']:g}초마다·가는 눈금=프레임마다, 눈금이 모이면 느림·벌어지면 빠름(작은 이동도 같은 크기로 보임, {SPACING['min_px']:g}px 미만 부위는 still), 맨 위 camera 줄=화면 전체 이동·body 줄=몸 중심 이동(카메라 추정 시 카메라 제외; {SPACING['min_px']:g}px 미만이면 줄 없음), 그 아래 작은 그림=구간 첫 프레임 전체(노란 테두리=어니언이 잘라 보여 준 범위, 카메라가 움직였으면 회색 선=화면 중심의 궤적·회색 점선 사각형=구간 끝의 화면))")
+    if image_name and body:
+        out.append(f"  - 몸 기준 그림: 몸 중심이 {motion_report.KO[motion_report.direction(*body)].replace('화면 ', '')} {math.hypot(*body):.0f}px "
+                   "움직여 끝 프레임과 궤적을 그만큼 되돌려 겹침(몸은 포개지고 팔다리 움직임만 갈라짐, 배경은 반대로 갈라짐; "
+                   "높이별 흐름 숫자는 위 기준 그대로). 몸 이동 자체는 차트의 body 줄과 그 아래 작은 그림의 빨간 선(점=0.1초마다, 네모=끝)")
     return out
 
 

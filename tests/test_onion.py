@@ -147,6 +147,22 @@ class Trails(unittest.TestCase):
         lost=dict(point='corner',xy=[(0,0.,0.),(1,2.,0.),(9,300.,0.)])
         self.assertEqual(onion.spacing_rows([lost],30),([],['corner']))  # a jump over missing frames is not travel
 
+    def test_camera_and_body_rows_lead_and_drop_out_when_still(self):
+        camera={n:(4.*n,0.,1.) for n in range(11)}; body={n:(100.+4.*n,50.) for n in range(11)}  # body rides the pan only
+        charted,colors=onion.references([],0,10,camera,body)
+        self.assertEqual([t['point'] for t in charted],['camera','body']); self.assertEqual(charted[1]['xy'][-1],(10,100.,50.))
+        rows,still=onion.spacing_rows(charted,30)
+        self.assertEqual(([r['point'] for r in rows],still),(['camera'],[]))  # a still body is no row and not 'still'
+        self.assertEqual(colors[:2],list(onion.REFERENCE['colors']))
+        self.assertEqual([t['point'] for t in onion.references([],0,10,None,body)[0]],['body'])  # no camera: screen basis
+
+    def test_camera_view_goes_against_the_content(self):
+        # camera.path on a view panning 114 px right read dx=-114 (synthetic crop pan, 2026-11-01)
+        self.assertEqual(onion._views({0:(0.,0.,1.),9:(-114.,0.,1.)},320,240)[9],(114.,0.,434.,240.))
+        self.assertEqual(onion._views({9:(0.,0.,2.)},320,240)[9],(80.,60.,240.,180.))  # zoom in: half the view
+        self.assertIsNone(onion.moved({n:(.5*n,0.,1.) for n in range(10)}))
+        self.assertIsNotNone(onion.moved({n:(-6.*n,0.,1.) for n in range(10)}))
+
     def test_timing_dot_is_drawn_larger(self):
         import tempfile
         import cv2
@@ -292,6 +308,30 @@ class Peak(unittest.TestCase):
             self.assertIsNone(onion.spacing(video, Path(d)/'missing.jpg', []))
             onion.still(video, 2, bbox, Path(d)/'s.jpg')
             self.assertEqual(cv2.imread(str(Path(d)/'s.jpg')).shape[:2], (240, 320))
+
+
+    def test_body_basis_only_for_a_whole_figure_move(self):
+        import cv2
+        import numpy as np
+        def packets(feet_move):
+            frames = []
+            for n in range(0, 31):
+                dx = 4*n  # 120 px right over the window
+                pts = {'shoulder-l': (100+dx, 60), 'shoulder-r': (140+dx, 60), 'wrist-l': (90+dx, 100), 'wrist-r': (150+dx, 100),
+                       'ankle-l': (110+(dx if feet_move else 0), 200), 'ankle-r': (130+(dx if feet_move else 0), 200)}
+                frames.append(dict(frame=n, points=[dict(point_id=k, xy=list(v), visible=True) for k, v in pts.items()]))
+            return [dict(frames=frames)]
+        with tempfile.TemporaryDirectory() as d:
+            video = Path(d)/'v.avi'; out = cv2.VideoWriter(str(video), cv2.VideoWriter_fourcc(*'MJPG'), 10, (320, 240))
+            out.write(np.full((240, 320, 3), 255, np.uint8)); out.release()
+            bbox = (80, 40, 160, 210)
+            slide = packets(True); path = onion.body_path(slide, 0, 30)
+            shift = onion.body_basis(video, bbox, path, slide)
+            self.assertIsNotNone(shift); self.assertAlmostEqual(shift[0], 116, delta=6)
+            trail, = onion.trails(slide, ['wrist-l'], 0, 30, body=path)
+            self.assertLess(max(x for _, x, _ in trail['xy'])-min(x for _, x, _ in trail['xy']), 3)  # the wrist rode along
+            lunge = packets(False)  # shoulders and hands go, feet stay: not a whole-figure move
+            self.assertIsNone(onion.body_basis(video, bbox, onion.body_path(lunge, 0, 30), lunge))
 
 
 if __name__ == '__main__': unittest.main()

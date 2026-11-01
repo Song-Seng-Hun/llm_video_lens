@@ -466,19 +466,28 @@ def _run(video, detector, pose_model, checkpoint, out, max_shots=LOOK['max_shots
                 # No trusted body: the "화면" moves stand in, in the order that line lists them (one trail per point).
                 leads = ([f['point'] for f in digest.limbs(done['body'])] if done.get('body')
                          else list(dict.fromkeys(m['point'] for m in digest._screen(done.get('groups', [])))))
-                done['trails'] = onion.trails(raw_packets, leads, w['seed'], end, None if screen else frame_motion or None)
-                done['bands'] = onion.bands(source, w['seed'], end, person['bbox'], moving, picture, done['trails'])
+                centre = path = onion.body_path(raw_packets, w['seed'], end)
+                body_shift = onion.body_basis(source, person['bbox'], path, raw_packets)
+                if body_shift:
+                    done['picture_basis'] = 'body'; done['body_shift'] = [round(v, 1) for v in body_shift]  # onion_basis stays: it names the text's numbers
+                    done['trails'] = onion.trails(raw_packets, leads, w['seed'], end, body=path)
+                else:
+                    path = None
+                    done['trails'] = onion.trails(raw_packets, leads, w['seed'], end, None if screen else frame_motion or None)
+                done['bands'] = onion.bands(source, w['seed'], end, person['bbox'], moving, picture, done['trails'], view_shift=body_shift)
                 if not done.get('body') and done['trails']:
                     hint = dict(frame=w['seed'], end=end, points=_seed_xy(raw_packets, [t['point'] for t in done['trails']], w['seed']))
                     if hint['points']:
                         done['mark_hint'] = hint; slot.append('  '+_mark_hint(hint, source, root/'shots.json'))
                 done['onion'] = picture.name
                 done['peak'] = onion.peak(source, w['seed'], end, person['bbox'], picture)
-                done['spacing'] = onion.spacing(source, picture, done['trails'], context=(w['seed'], person['bbox']))
+                known = frame_motion if frame_motion and not screen and not done.get('camera', {}).get('unknown') else None
+                charted, palette = onion.references(done['trails'], w['seed'], end, known, centre)
+                done['spacing'] = onion.spacing(source, picture, charted, palette, context=(w['seed'], person['bbox'], path, known and onion.moved(known)))
                 turns = [e['share'] for e in (done.get('events') or {}).get('width', []) if e['share'] >= body_motion.EVENTS['turn']]
                 if turns:
                     done['turn_share'] = max(turns); stripping.append((done, end, person['bbox'], base))
-                slot += ['  '+l for l in onion.lines(done['bands'], picture.name, screen=done.get('onion_basis') == 'screen', peak=bool(done.get('peak')))]
+                slot += ['  '+l for l in onion.lines(done['bands'], picture.name, screen=done.get('onion_basis') == 'screen', peak=bool(done.get('peak')), body=body_shift)]
             except Exception as error:  # OpenCV raises its own error type; the view is optional
                 errors.append(dict(window=w, step='onion', error=str(error)[:300]))
         if end < w['end']:
