@@ -130,11 +130,14 @@ def plain(video, frame, person=None):
     return len(cv2.ORB_create(CAMERA['features']).detect(gray, mask)) < CAMERA['background_features']
 
 
-def complete(camera, start, end):
-    """Whether every requested frame has a finite translation; unknown is never zero motion."""
-    return bool(camera) and all(n in camera and len(camera[n]) >= 2
-                                and all(math.isfinite(x) for x in camera[n][:2])
-                                for n in range(start, end+1))
+def supported(camera, start, end):
+    """A correction needs known endpoints and sufficient camera evidence; interior gaps stay unsupported."""
+    if not camera or start not in camera or end not in camera:
+        return False
+    if any(len(v) < 3 or not all(math.isfinite(x) for x in v) or v[2] <= 0
+           for n, v in camera.items() if start <= n <= end):
+        return False
+    return not describe(camera, start, end, 0).get('unknown', False)
 
 
 def between(camera, a, b):

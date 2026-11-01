@@ -123,8 +123,8 @@ def run(video, shots, frame, points, checkpoint, out, end=None, snap_points=True
     paths.write(root/'mark.report.md', motion_report.markdown(report))
     frame_motion = camera.path(source, frame, stop)
     cam = camera.between(frame_motion, frame, stop)
-    camera_complete = camera.complete(frame_motion, frame, stop)
-    known = frame_motion if camera_complete else None
+    camera_supported = camera.supported(frame_motion, frame, stop)
+    known = frame_motion if camera_supported else None
     view = look._motion_view(report, tracks, bindings, frame_motion)
     relative = paths.write_json(root/'mark.relative.json', view) if view is not report else None
     text = [f'# 찍은 점 추적 f{frame}..{stop}', '',
@@ -134,17 +134,17 @@ def run(video, shots, frame, points, checkpoint, out, end=None, snap_points=True
     text += [f"- {p['point_id']}: 준 위치 {p['given'][0]:.0f},{p['given'][1]:.0f} → 놓은 위치 {p['seed'][0]:.0f},{p['seed'][1]:.0f}"
              + (f" ({p['snapped_px']:.0f}px 옮김)" if p['snapped_px'] else '') for p in placed]
     if cam and math.hypot(*cam) >= motion_report.STROKE['major_min_px']:
-        basis_note = ('(카메라·배경 이동 추정; 아래 수치·그림에서 뺌)' if camera_complete
+        basis_note = ('(카메라·배경 이동 추정; 아래 수치·그림에서 뺌)' if camera_supported
                       else '(카메라·배경 이동 추정, 일부 프레임 모름; 아래 수치·그림은 화면 기준)')
         text.append(f"- 화면 전체: {motion_report.KO[motion_report.direction(*cam)]} {math.hypot(*cam):.0f}px {basis_note}")
     text.append(f'- 움직임 수치 기준: {motion_report.coordinate_label(view)}. 원시 보고서·trajectory는 화면 좌표다.')
     if relative:text.append('- 카메라 보정 수치 근거: mark.relative.json')
-    # End-frame camera unknown: draw in screen coordinates and say so, as look does (the onion used to be skipped).
-    screen = bool(frame_motion) and cam is None
+    # Use the same supported-camera decision for the numerical view and the camera-only picture.
+    camera_unknown = camera.describe(frame_motion, frame, stop, motion_report.STROKE['major_min_px']).get('unknown', False)
     onion_image, colors, peaked, basis_shift = _onion(source, frame, stop, [n for n, _ in parsed], tracks,
-                                                    cam if camera_complete else None, known, root/'mark-onion.jpg', subject)
+                                                    cam if camera_supported else None, known, root/'mark-onion.jpg', subject)
     if onion_image:
-        basis = ('카메라 이동 제외(평행이동 추정)' if known else '카메라 모름: 화면 좌표 그대로' if screen
+        basis = ('카메라 이동 제외(평행이동 추정)' if known else '카메라 모름: 화면 좌표 그대로' if frame_motion and camera_unknown
                  else '카메라 일부 모름: 화면 좌표 그대로' if frame_motion else '화면')
         text.append(f"- 어니언 그림: {onion_image} (청록=f{frame}, 빨강=f{stop}(진한 윤곽선 기준; 배경보다 밝은 면은 띠 색이 반대(청록 띠=간 쪽); 카메라 이동을 뺀 그림이면 끝 프레임을 카메라만큼 되돌려 겹침), 색 점선=찍은 점의 프레임마다 위치({basis}; "
                     + ', '.join(f'{c}={n}' for n, c in colors) + "), "

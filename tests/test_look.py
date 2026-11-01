@@ -231,8 +231,8 @@ class Camera(unittest.TestCase):
         _,summary=look._summary(view,dict(seed=0,end=25),'marked','x','y')
         self.assertEqual(summary['coordinate_scope'],'screen_2d')
 
-    def test_selected_view_preserves_observations_when_camera_support_is_partial(self):
-        """Default look/mark scope must not turn visible raw frames into camera-induced observation gaps."""
+    def test_selected_view_preserves_observations_without_supported_camera_endpoints(self):
+        """Unknown endpoints or insufficient camera support keep the full raw screen report."""
         from unittest.mock import patch
         from image_lens import paths
         packet,raw,_=self.view([(400+3*n,300) for n in range(26)],None,missing=18)
@@ -241,12 +241,12 @@ class Camera(unittest.TestCase):
         full={n:(float(n),0.,1.) for n in range(26)}
         invalid=dict(full);invalid[12]=(float('nan'),0.,1.)
         partials=[('none',None),('empty',{}),('seed_only',{0:full[0]}),
-                  ('middle_gap',{n:v for n,v in full.items() if n!=12}),
+                  ('sparse_endpoints',{n:full[n] for n in (0,25)}),
                   ('end_gap',{n:v for n,v in full.items() if n!=25}),('nonfinite',invalid)]
         for name,shifts in partials:
             with self.subTest(case=name),patch.object(paths,'load',side_effect=[(packet,None),(binding,None)]):
                 selected=look._motion_view(raw,'tracks','binding',shifts)
-                self.assertTrue(selected is raw,'incomplete camera must retain the raw screen report')
+                self.assertTrue(selected is raw,'unsupported camera must retain the raw screen report')
                 self.assertEqual(selected['coordinate_scope'],'screen_2d')
                 self.assertEqual(selected['features'][0]['usable_prediction_frames'],24)
                 self.assertEqual([r['frames'] for r in selected['features'][0]['continuous_runs']],[[1,17],[19,25]])
@@ -254,6 +254,12 @@ class Camera(unittest.TestCase):
             selected=look._motion_view(raw,'tracks','binding',full)
         self.assertEqual(selected['coordinate_scope'],'camera_translation_relative_2d')
         self.assertEqual(selected['features'][0]['usable_prediction_frames'],24)
+        with patch.object(paths,'load',side_effect=[(packet,None),(binding,None)]):
+            selected=look._motion_view(raw,'tracks','binding',{n:v for n,v in full.items() if n!=12})
+        self.assertEqual(selected['coordinate_scope'],'camera_translation_relative_2d')
+        self.assertEqual(selected['coordinate_transform']['unsupported_frames'],[[12,12]])
+        self.assertEqual([r['frames'] for r in selected['features'][0]['continuous_runs']],[[1,11],[13,17],[19,25]])
+        self.assertEqual(raw['features'][0]['usable_prediction_frames'],24)
 
 
 if __name__ == '__main__': unittest.main()
