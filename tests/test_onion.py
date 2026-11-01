@@ -294,4 +294,28 @@ class Peak(unittest.TestCase):
             self.assertEqual(cv2.imread(str(Path(d)/'s.jpg')).shape[:2], (240, 320))
 
 
+    def test_body_basis_only_for_a_whole_figure_move(self):
+        import cv2
+        import numpy as np
+        def packets(feet_move):
+            frames = []
+            for n in range(0, 31):
+                dx = 4*n  # 120 px right over the window
+                pts = {'shoulder-l': (100+dx, 60), 'shoulder-r': (140+dx, 60), 'wrist-l': (90+dx, 100), 'wrist-r': (150+dx, 100),
+                       'ankle-l': (110+(dx if feet_move else 0), 200), 'ankle-r': (130+(dx if feet_move else 0), 200)}
+                frames.append(dict(frame=n, points=[dict(point_id=k, xy=list(v), visible=True) for k, v in pts.items()]))
+            return [dict(frames=frames)]
+        with tempfile.TemporaryDirectory() as d:
+            video = Path(d)/'v.avi'; out = cv2.VideoWriter(str(video), cv2.VideoWriter_fourcc(*'MJPG'), 10, (320, 240))
+            out.write(np.full((240, 320, 3), 255, np.uint8)); out.release()
+            bbox = (80, 40, 160, 210)
+            slide = packets(True); path = onion.body_path(slide, 0, 30)
+            shift = onion.body_basis(video, bbox, path, slide)
+            self.assertIsNotNone(shift); self.assertAlmostEqual(shift[0], 116, delta=6)
+            trail, = onion.trails(slide, ['wrist-l'], 0, 30, body=path)
+            self.assertLess(max(x for _, x, _ in trail['xy'])-min(x for _, x, _ in trail['xy']), 3)  # the wrist rode along
+            lunge = packets(False)  # shoulders and hands go, feet stay: not a whole-figure move
+            self.assertIsNone(onion.body_basis(video, bbox, onion.body_path(lunge, 0, 30), lunge))
+
+
 if __name__ == '__main__': unittest.main()
