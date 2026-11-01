@@ -36,7 +36,7 @@ LLM Video Lens는 이를 돕는 보조 도구입니다. 프레임 사이의 움�
    pip install -r requirements/pose.txt -r requirements/tracking.txt
    ```
 
-2. 모델 파일 세 개를 직접 준비합니다. 사람 검출(YOLOX HumanArt, ONNX), 전신 자세(RTMW 133 키포인트, ONNX), 점 추적(CoTracker 체크포인트)입니다. 저장소에 들어 있지 않고, 자동으로 내려받지도 않습니다.
+2. 모델 파일 세 개를 직접 준비합니다. 사람 검출(YOLOX HumanArt, ONNX), 전신 자세(RTMW 133 키포인트, ONNX), 점 추적(CoTracker 체크포인트)입니다. 저장소에 들어 있지 않고, 자동으로 내려받지도 않습니다. 사람 검출은 그림체용 DeepGHS나 SAM3 묶음으로 바꿀 수도 있습니다([사용 모델과 라이선스](#사용-모델과-라이선스), [모델 선택과 고정 파일 목록](docs/person-detectors.md)).
 3. 작업 공간 폴더(기본값은 저장소 안의 `workspace/`)에 영상을 복사하고, `workspace/models.json`에 모델 경로를 적습니다.
 
    ```json
@@ -50,8 +50,6 @@ LLM Video Lens는 이를 돕는 보조 도구입니다. 프레임 사이의 움�
    ```
 
 5. 결과 폴더의 `look.md`를 엽니다. 맨 위 "먼저 확인할 곳"부터 보세요.
-
-사람 검출에는 기존 HumanArt 외에 고정된 DeepGHS ONNX나 Apple Silicon용 SAM3+DeepGHS 묶음을 `--detector`로 선택할 수 있습니다. SAM3 경로는 더 느리며 외부 모델 파일과 추가 패키지가 필요합니다. [모델 선택과 고정 파일 목록](docs/person-detectors.md)을 확인하세요.
 
 ## 사용 예
 
@@ -150,9 +148,21 @@ python -m image_lens --workspace W redo --look W/look --window shot-0000-w0 --de
 
 이 프로젝트는 사람이 방향을 정하고 AI 에이전트들이 함께 만든 결과물입니다. 무엇을 만들지, 어떤 정확도를 목표로 할지, 무엇을 채택할지는 사람이 정했고, 구현·측정·코드 리뷰는 Claude(Anthropic)와 Codex(OpenAI) 에이전트가 나눠 맡았습니다. [look 노트](docs/look-notes.md)는 이 과정에서 에이전트가 남긴 측정 기록입니다.
 
-## 라이선스
+## 사용 모델과 라이선스
 
-이 프로젝트의 코드와 문서는 [MIT](LICENSE)입니다. 함께 들어 있는 외부 코드는 각자의 조건을 따릅니다: `image_lens/vendor/shot-detector`(PySceneDetect)는 BSD 3-Clause, `image_lens/vendor/source`(CoTracker)는 CC-BY-NC 4.0으로 비상업적 이용만 허용됩니다. 모델 가중치는 들어 있지 않습니다.
+| 구성 | 쓰는 곳 | 라이선스 |
+|---|---|---|
+| YOLOX HumanArt (ONNX, 직접 준비) | 사람 검출 (기본) | 가중치 라이선스 확인 안 됨 |
+| [DeepGHS anime_person_detection](https://huggingface.co/deepghs/anime_person_detection) (ONNX, 직접 준비) | 그림체 사람 검출 (선택) | MIT |
+| [SAM3](https://huggingface.co/mlx-community/sam3-image) MLX 가중치 (직접 준비)와 `image_lens/_sam3_mlx`(포함) | 사람 검출 (선택, Apple Silicon) | Meta SAM License |
+| RTMW-l 384 133 키포인트 (ONNX, 직접 준비) | 전신 자세 | 가중치 라이선스 확인 안 됨 |
+| [CoTracker](https://github.com/facebookresearch/co-tracker) (`image_lens/vendor/source`에 소스 포함, 체크포인트는 직접 준비) | 점 추적 | CC-BY-NC 4.0 |
+| [PySceneDetect](https://www.scenedetect.com/) (`image_lens/vendor/shot-detector`에 포함) | 장면 전환 찾기 | BSD 3-Clause |
+| rtmlib 검출기 후처리 (`pose.py`) · ONNX Runtime · MLX | 모델 실행 | Apache-2.0 · MIT · MIT |
+
+- 이 프로젝트의 코드와 문서는 [MIT](LICENSE)입니다. 함께 들어 있는 외부 코드는 각자의 조건을 따릅니다.
+- CoTracker 소스와 체크포인트는 비상업적 이용만 허용됩니다. SAM3는 SAM License를 따르며, 연구에 쓰면 SAM3를 밝혀야 합니다.
+- 모델 가중치는 저장소에 들어 있지 않습니다. SAM3 가중치는 올린 곳(mlx-community)에 apache-2.0으로 적혀 있지만, 원본(facebook/sam3)의 SAM License를 따릅니다.
 
 ## 더 보기
 

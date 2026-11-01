@@ -35,7 +35,7 @@ LLM Video Lens はそれを助ける補助ツールです。フレーム間の�
    pip install -r requirements/pose.txt -r requirements/tracking.txt
    ```
 
-2. モデルファイルを 3 つ自分で用意します。人物検出（YOLOX HumanArt、ONNX）、全身の姿勢（RTMW 133 キーポイント、ONNX）、点の追跡（CoTracker のチェックポイント）です。リポジトリには入っておらず、自動でダウンロードもしません。
+2. モデルファイルを 3 つ自分で用意します。人物検出（YOLOX HumanArt、ONNX）、全身の姿勢（RTMW 133 キーポイント、ONNX）、点の追跡（CoTracker のチェックポイント）です。リポジトリには入っておらず、自動でダウンロードもしません。人物検出は、絵柄向けの DeepGHS や SAM3 バンドルに切り替えることもできます（[使用モデルとライセンス](#使用モデルとライセンス)、[検出器の選び方と固定ファイル一覧](person-detectors.md)）。
 3. 作業スペースのフォルダー（既定はリポジトリ内の `workspace/`）に動画をコピーし、`workspace/models.json` にモデルのパスを書きます。
 
    ```json
@@ -129,7 +129,7 @@ look が別の人を追っていたときや、人以外の対象を見たいと
 python -m image_lens --workspace W box --video V --look W/look --frame 0 --end 119 --box 0,300,880,1440 --checkpoint C --out W/box-f0
 ```
 
-枠は正しい人を捉えているのに形が不十分なとき(頭が切れる、画面の UI が入る)は、その区間だけ別の人物検出器でやり直します。`redo` は最初の look をそのまま残し、その区間のフレームだけを新しい look フォルダで見直します。`redo-boxes.jpg` には最初(赤)と今回(緑)の枠が同じフレームに描かれます。区間名はその区間のファイル名の先頭(`shot-0000-w0`)です。SAM3 バンドルは動画全体だと遅いですが(39 秒のクリップで約 15 分)、1 区間なら短く済みます(30 フレームで 33 秒)。
+枠は正しい人を捉えているのに形が不十分なとき（頭が切れる、画面の UI が入る）は、その区間だけ別の人物検出器でやり直します。`redo` は最初の look をそのまま残し、その区間のフレームだけを新しい look フォルダで見直します。`redo-boxes.jpg` には最初（赤）と今回（緑）の枠が同じフレームに描かれます。区間名はその区間のファイル名の先頭（`shot-0000-w0`）です。SAM3 バンドルは動画全体だと遅いですが（39 秒のクリップで約 15 分）、1 区間なら短く済みます（30 フレームで 33 秒）。
 
 ```bash
 python -m image_lens --workspace W redo --look W/look --window shot-0000-w0 --detector /models/sam3-bundle --out W/redo-w0 --checkpoint C
@@ -147,9 +147,21 @@ python -m image_lens --workspace W redo --look W/look --window shot-0000-w0 --de
 
 方向は人が決め、AIエージェントたちが一緒に作ったプロジェクトです。何を作るか、どの精度を目指すか、何を採用するかは人が決め、実装・計測・コードレビューは Claude（Anthropic）と Codex（OpenAI）のエージェントが分担しました。[look ノート](look-notes.md)はその過程でエージェントが残した計測記録です。
 
-## ライセンス
+## 使用モデルとライセンス
 
-このプロジェクトのコードと文書は [MIT](../LICENSE) です。同梱の外部コードはそれぞれの条件に従います。`image_lens/vendor/shot-detector`（PySceneDetect）は BSD 3-Clause、`image_lens/vendor/source`（CoTracker）は CC-BY-NC 4.0 で非商用利用のみです。モデルの重みは含まれていません。
+| 構成 | 使う場所 | ライセンス |
+|---|---|---|
+| YOLOX HumanArt（ONNX、自分で用意） | 人物検出（既定） | 重みのライセンスは未確認 |
+| [DeepGHS anime_person_detection](https://huggingface.co/deepghs/anime_person_detection)（ONNX、自分で用意） | 絵柄の人物検出（任意） | MIT |
+| [SAM3](https://huggingface.co/mlx-community/sam3-image) MLX の重み（自分で用意）と `image_lens/_sam3_mlx`（同梱） | 人物検出（任意、Apple Silicon） | Meta SAM License |
+| RTMW-l 384、133 キーポイント（ONNX、自分で用意） | 全身の姿勢 | 重みのライセンスは未確認 |
+| [CoTracker](https://github.com/facebookresearch/co-tracker)（ソースは `image_lens/vendor/source` に同梱、チェックポイントは自分で用意） | 点の追跡 | CC-BY-NC 4.0 |
+| [PySceneDetect](https://www.scenedetect.com/)（`image_lens/vendor/shot-detector` に同梱） | カットの検出 | BSD 3-Clause |
+| rtmlib の検出器後処理（`pose.py`）・ONNX Runtime・MLX | モデルの実行 | Apache-2.0・MIT・MIT |
+
+- このプロジェクトのコードと文書は [MIT](../LICENSE) です。同梱の外部コードはそれぞれの条件に従います。
+- CoTracker のソースとチェックポイントは非商用利用のみです。SAM3 は SAM License に従い、研究で使う場合は SAM3 を明記する必要があります。
+- モデルの重みはリポジトリに含まれていません。SAM3 の重みはアップロード先（mlx-community）では apache-2.0 と書かれていますが、元（facebook/sam3）の SAM License に従います。
 
 ## もっと見る
 

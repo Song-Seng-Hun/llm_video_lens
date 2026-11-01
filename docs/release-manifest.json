@@ -21,7 +21,7 @@
   ],
   "manifest_self_excluded": true,
   "file_count": 167,
-  "total_bytes": 2213125,
+  "total_bytes": 2217135,
   "files": [
     {
       "path": ".gitattributes",
@@ -40,8 +40,8 @@
     },
     {
       "path": "README.md",
-      "bytes": 16368,
-      "sha256": "4ba6b319241e88800280db47bd13c916e6fef6d4a771513402256c00cf9d1fe3"
+      "bytes": 17445,
+      "sha256": "a8d293d27dca41cd2dbef413eb66d3cf946405d6a138c557f502bc98ecde9328"
     },
     {
       "path": "assets/banner-dark.svg",
@@ -65,13 +65,13 @@
     },
     {
       "path": "docs/README.en.md",
-      "bytes": 13827,
-      "sha256": "fbbf25f101a2396ddca37fa43f95b7b5080048d945b001fb0896f887268edaa0"
+      "bytes": 15155,
+      "sha256": "b2cb86cf203ab0db47e94ffd4b19c2de10544d7238b2ea8420550e12d148863f"
     },
     {
       "path": "docs/README.ja.md",
-      "bytes": 16858,
-      "sha256": "8d7b9b0cd2d7794f44f94965657aad4a0c80ead9a5f688674fb26b46b692de5f"
+      "bytes": 18463,
+      "sha256": "e71d20692a45f84588c59406369a36e9b3f6ac0f55821c41ad3176a5bb82d53c"
     },
     {
       "path": "docs/guide.md",
