@@ -1,0 +1,4 @@
+# Optional SAM3 image path, Apple Silicon only. Also install pose.txt.
+mlx==0.32.4; sys_platform == 'darwin' and platform_machine == 'arm64'
+ftfy==6.3.1
+regex==2026.9.29

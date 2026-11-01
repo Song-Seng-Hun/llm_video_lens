@@ -1,11 +1,11 @@
-"""Optional local whole-body pose: YOLOX HumanArt detector + RTMW133 (rtmlib, ONNX Runtime on CoreML) with per-shot ByteTrack IDs.
+"""Optional local whole-body pose: selectable pinned HumanArt, DeepGHS or SAM3+DeepGHS detection + RTMW133, with per-shot ByteTrack IDs.
 User-supplied weights are pinned by size and SHA256; nothing is downloaded or bundled (weight license unestablished).
 Pose output is a model estimate on screen 2D: seeds and overlap flags, never verified anatomy, identity or redraw decisions."""
 import math
 from pathlib import Path
-from image_lens import paths, shot_boundaries
+from image_lens import paths, shot_boundaries, person_models
 
-MODELS = dict(detector=(101400344, '3dea6513388889f0fff4b77bf7a26013600321b9eb9ceb0e9a400a82572f5f23'),
+MODELS = dict(detector=person_models.PINS['humanart'],
               pose=(229320930, 'bd033156e5104c4f5d2edfe0453e02661e30a2f3da453ec93c8764d561b83054'))
 PARAMS = dict(det_score=.10, det_nms=.45, det_input=[640, 640], pose_input=[288, 384], track_activation=.25,
               lost_track_buffer=30, minimum_matching_threshold=.8, tracker_reset='every canonical shot',
@@ -97,7 +97,8 @@ def run(shots, detector, pose_model, start=0, end=None, part=None):
     end = last if end is None else end
     if type(start) is not int or type(end) is not int or not 0 <= start <= end <= last or end-start+1 > PARAMS['max_frames']:
         raise ValueError('bounded native range required')
-    models = dict(detector=_model(detector, 'detector'), pose=_model(pose_model, 'pose'))
+    selection = person_models.resolve(detector)
+    models = dict(detector=Path(selection['path']), pose=_model(pose_model, 'pose'))
     import time
     import cv2
     import numpy as np
@@ -105,20 +106,25 @@ def run(shots, detector, pose_model, start=0, end=None, part=None):
     import supervision
     from rtmlib import RTMPose
     started = time.monotonic()
-    det = _detector_class()(str(models['detector']), model_input_size=tuple(PARAMS['det_input']), score_thr=PARAMS['det_score'],
-                            nms_thr=PARAMS['det_nms'], backend='onnxruntime', device='cpu')
     # The detector's CoreML part needs static input shapes; without them every CoreML format fails on the dynamic NMS
     # input. Clip B, 390 frames: 104 -> 11 ms a frame, the same box count on every frame, boxes within 0.01 px of CPU.
     # The compiled CoreML models are kept per pinned model hash (fresh process: pose 2.0 -> 0.1 s, detector 0.5 -> 0.1 s,
     # the same outputs). The pose session is rtmlib's 'mps' one (CoreML default options) plus the cache.
-    det.session = onnxruntime.InferenceSession(str(models['detector']), providers=[
-        ('CoreMLExecutionProvider', dict(ModelFormat='MLProgram', RequireStaticInputShapes='1', ModelCacheDirectory=_coreml_cache('detector'))),
-        'CPUExecutionProvider'])
+    if selection['kind'] == 'humanart':
+        det = _detector_class()(str(models['detector']), model_input_size=tuple(PARAMS['det_input']), score_thr=PARAMS['det_score'],
+                                nms_thr=PARAMS['det_nms'], backend='onnxruntime', device='cpu')
+        det.session = onnxruntime.InferenceSession(str(models['detector']), providers=[
+            ('CoreMLExecutionProvider', dict(ModelFormat='MLProgram', RequireStaticInputShapes='1', ModelCacheDirectory=_coreml_cache('detector'))),
+            'CPUExecutionProvider'])
+        if det.session.get_providers() != ['CoreMLExecutionProvider', 'CPUExecutionProvider']:
+            raise ValueError('unexpected execution provider')
+    else:
+        det = person_models.create(selection)
     estimator = RTMPose(str(models['pose']), model_input_size=tuple(PARAMS['pose_input']), to_openpose=False, backend='onnxruntime', device='cpu')
     estimator.session = onnxruntime.InferenceSession(str(models['pose']), providers=[
         ('CoreMLExecutionProvider', dict(ModelCacheDirectory=_coreml_cache('pose'))), 'CPUExecutionProvider'])
     # Pose on CoreML (29 -> 8 ms a crop, keypoints within 0.01).
-    if any(m.session.get_providers() != ['CoreMLExecutionProvider', 'CPUExecutionProvider'] for m in (det, estimator)):
+    if estimator.session.get_providers() != ['CoreMLExecutionProvider', 'CPUExecutionProvider']:
         raise ValueError('unexpected execution provider')
     # RTMW-l 384 scores run about 6.2x the earlier RTMW 256x192 ones at every quantile (seven clips, 90k body joints), so they
     # are divided back to the 0..1 scale every score threshold was calibrated on.
@@ -131,9 +137,15 @@ def run(shots, detector, pose_model, start=0, end=None, part=None):
         return dict(schema='image-lens.pose/1', source_video=str(video), source_sha256=scan['source_sha256'],
                     width=scan['width'], height=scan['height'], fps=fps, native_range=[rows[0]['frame'], rows[-1]['frame']],
                     canonical_shots=dict(path=str(scan_path), sha256=paths.sha(scan_path)),
-                    models={k: dict(path=str(v), sha256=MODELS[k][1]) for k, v in models.items()}, params=dict(PARAMS, split=SPLIT),
-                    runtime=dict(onnxruntime=onnxruntime.__version__, supervision=supervision.__version__, opencv=cv2.__version__),
-                    pose_module_sha256=paths.sha(__file__), elapsed_seconds=round(time.monotonic()-started, 3),
+                    models=dict(detector=selection, pose=dict(path=str(models['pose']), sha256=MODELS['pose'][1])),
+                    params=dict(PARAMS, split=SPLIT, **({} if selection['kind'] == 'humanart' else dict(
+                        det_score=.5 if selection['kind'] == 'sam3-deepghs' else .3,
+                        det_input=[1008, 1008] if selection['kind'] == 'sam3-deepghs' else [640, 640],
+                        det_nms=None if selection['kind'] == 'sam3-deepghs' else .5, detector_recipe=selection['recipe']))),
+                    runtime=dict(onnxruntime=onnxruntime.__version__, supervision=supervision.__version__, opencv=cv2.__version__,
+                                 **getattr(det, 'runtime', {})),
+                    pose_module_sha256=paths.sha(__file__), detector_module_sha256=paths.sha(person_models.__file__),
+                    elapsed_seconds=round(time.monotonic()-started, 3),
                     flags=flags(rows), frames=rows,
                     limitations=['human-trained model on drawn characters: face/hand points are rough; hair and pupils are not modelled',
                                  'overlapping copies (echo, afterimage) can merge into one wrong skeleton without any flag',
@@ -145,7 +157,8 @@ def run(shots, detector, pose_model, start=0, end=None, part=None):
         if abs(cap.get(cv2.CAP_PROP_POS_MSEC)/1000.-scan['native_pts_seconds'][n]) > .002:
             raise ValueError('decoder PTS differs from canonical scan')
         boxes, conf = det(image)
-        return image, np.asarray(boxes, np.float32).reshape(-1, 4), np.asarray(conf, np.float32)
+        diagnostics = [dict(item) for item in getattr(det, 'diagnostics', [])]
+        return image, np.asarray(boxes, np.float32).reshape(-1, 4), np.asarray(conf, np.float32), diagnostics
     from concurrent.futures import ThreadPoolExecutor
     cap = cv2.VideoCapture(str(video))
     try:
@@ -157,7 +170,7 @@ def run(shots, detector, pose_model, start=0, end=None, part=None):
         with ThreadPoolExecutor(1) as ahead:
             following = ahead.submit(detected, start)
             for n in range(start, end+1):
-                image, boxes, conf = following.result()
+                image, boxes, conf, diagnostics = following.result()
                 if n < end:
                     following = ahead.submit(detected, n+1)
                 if segments[n] != segment:
@@ -180,7 +193,8 @@ def run(shots, detector, pose_model, start=0, end=None, part=None):
                     raise ValueError('nonfinite model output')
                 tracks = tracker.update_with_detections(supervision.Detections(
                     xyxy=boxes, confidence=conf, class_id=np.zeros(len(boxes), int), data=dict(keypoints=keypoints, scores=scores)))
-                frames.append(dict(frame=n, pts_seconds=scan['native_pts_seconds'][n], segment_id=segment, detections=len(boxes)-split, split_boxes=split, tracks=[
+                frames.append(dict(frame=n, pts_seconds=scan['native_pts_seconds'][n], segment_id=segment, detections=len(boxes)-split, split_boxes=split,
+                    **(dict(detector_diagnostics=diagnostics) if diagnostics else {}), tracks=[
                     dict(track_id=f'{segment}/{int(tracks.tracker_id[j])}', bbox=[round(float(v), 2) for v in tracks.xyxy[j]],
                          detection_score=round(float(tracks.confidence[j]), 4),
                          keypoints=[[round(float(x), 2), round(float(y), 2)] for x, y in tracks.data['keypoints'][j]],
@@ -222,8 +236,8 @@ def _iou(a, b):
 
 
 def flags(frames):
-    """Frames where the pose layer itself looks unreliable: overlapping people, or a body skeleton jump within one track."""
-    rows = []; previous = {}
+    """Keep overlap/jump seed warnings separate from detector truncation diagnostics."""
+    rows = []; truncations = []; previous = {}
     for f in frames:
         tracks = f['tracks']
         overlap = any(_iou(a['bbox'], b['bbox']) >= FLAGS['overlap_iou'] for i, a in enumerate(tracks) for b in tracks[i+1:])
@@ -238,9 +252,12 @@ def flags(frames):
             if moves and diagonal > 0 and moves[len(moves)//2]/diagonal > FLAGS['jump_diagonals']:
                 jump = dict(track_id=t['track_id'], median_move_diagonals=round(moves[len(moves)//2]/diagonal, 3))
         previous.update({t['track_id']: (f['frame'], t) for t in tracks})
+        diagnostics = f.get('detector_diagnostics', [])
+        if diagnostics:
+            truncations.append(dict(frame=f['frame'], detector_diagnostics=diagnostics))
         if overlap or jump:
             rows.append(dict(frame=f['frame'], people=len(tracks), overlapping_people=overlap, skeleton_jump=jump))
-    return dict(params=FLAGS, frames=rows,
+    return dict(params=FLAGS, frames=rows, **(dict(detector_truncations=truncations) if truncations else {}),
                 basis='person boxes overlapping, or median body-joint move between consecutive frames of one track; diagnostic only')
 
 

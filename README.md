@@ -51,6 +51,8 @@ LLM Video Lens는 이를 돕는 보조 도구입니다. 프레임 사이의 움�
 
 5. 결과 폴더의 `look.md`를 엽니다. 맨 위 "먼저 확인할 곳"부터 보세요.
 
+사람 검출에는 기존 HumanArt 외에 고정된 DeepGHS ONNX나 Apple Silicon용 SAM3+DeepGHS 묶음을 `--detector`로 선택할 수 있습니다. SAM3 경로는 더 느리며 외부 모델 파일과 추가 패키지가 필요합니다. [모델 선택과 고정 파일 목록](docs/person-detectors.md)을 확인하세요.
+
 ## 사용 예
 
 ### 영상 하나를 요약해서 읽기
