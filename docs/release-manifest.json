@@ -21,7 +21,7 @@
   ],
   "manifest_self_excluded": true,
   "file_count": 167,
-  "total_bytes": 2218537,
+  "total_bytes": 2250235,
   "files": [
     {
       "path": ".gitattributes",
@@ -95,8 +95,8 @@
     },
     {
       "path": "docs/look-notes.md",
-      "bytes": 74710,
-      "sha256": "792bd7705293e6c297f65ff1a67b133cf546dba94b3a578100bbec2445fedf33"
+      "bytes": 76482,
+      "sha256": "5db11356e626df188fa3d30ca53d7e20f3e9be35ed615329a030500ac5fa05bd"
     },
     {
       "path": "docs/person-detectors.md",
@@ -260,8 +260,8 @@
     },
     {
       "path": "image_lens/check.py",
-      "bytes": 9235,
-      "sha256": "e9b7702785f485e344b62232381f734c84e99cb4e175c6776d480cbf19cd3de8"
+      "bytes": 9945,
+      "sha256": "8a23eaf4acdab24e23a2a8553033eb4a1ef0b6ba66ece64e8c9a819ab625f45a"
     },
     {
       "path": "image_lens/checkpoint-manifest.json",
@@ -270,13 +270,13 @@
     },
     {
       "path": "image_lens/cli.py",
-      "bytes": 23161,
-      "sha256": "f5459f905f66cf2f62ed05cb8385fccc07c00aae2ba19cb1069264cbd88aa805"
+      "bytes": 23492,
+      "sha256": "870704e84447e650154a9b7803c7fb38ab2e34241f91c0452dedf094b4528fbf"
     },
     {
       "path": "image_lens/digest.py",
-      "bytes": 36404,
-      "sha256": "f994c9f116f66563ae1b67b7b52032991de642fa9a3814a92f2a4a4e4c9cda19"
+      "bytes": 37456,
+      "sha256": "deb86e2cca8fda992ebc1734105a989e701d2c1a3bddd1fac2eb03f2f6dde20b"
     },
     {
       "path": "image_lens/foreground_regions.py",
@@ -300,8 +300,8 @@
     },
     {
       "path": "image_lens/look.py",
-      "bytes": 45879,
-      "sha256": "583980a17113e39e69e5b3fa2ebdbbf3b31c56ff13bbd087985a834f7f1ac741"
+      "bytes": 53530,
+      "sha256": "ceb36271937b9b8a062aaef7cbb1b52fc63979274f0cf37f24a91e37609ff221"
     },
     {
       "path": "image_lens/mark.py",
@@ -355,8 +355,8 @@
     },
     {
       "path": "image_lens/redo.py",
-      "bytes": 3983,
-      "sha256": "dff667134e869bae432b8e456e5cbd3051b317a7261504b850f51481a9c00a46"
+      "bytes": 4372,
+      "sha256": "ad6abf731b626e19a597545d674efa14e7e02d421aa9fc61c18708cf5234bb80"
     },
     {
       "path": "image_lens/run_point_tracker.py",
@@ -780,8 +780,8 @@
     },
     {
       "path": "tests/test_check.py",
-      "bytes": 14167,
-      "sha256": "07c57731d2587c4442035d61c05fdb85340127f685de975b17b0271b19a6a2e3"
+      "bytes": 16164,
+      "sha256": "bc7dca6542c71df574e5d1496fcde6249780498c61e3e57cb1ce845c21165f6c"
     },
     {
       "path": "tests/test_contracts.py",
@@ -805,8 +805,8 @@
     },
     {
       "path": "tests/test_look.py",
-      "bytes": 21300,
-      "sha256": "47c77c8d454e9b269b260ab00cb321a021c399837ada783b83e68c5c1e2e6118"
+      "bytes": 36842,
+      "sha256": "d47eb12dfa256cf17785c27f25d99ecd98d2e9bf027bcb9c41dc0210d1e73a48"
     },
     {
       "path": "tests/test_mark.py",
@@ -840,8 +840,8 @@
     },
     {
       "path": "tests/test_redo.py",
-      "bytes": 4934,
-      "sha256": "41e966d40cd9a56ee95eaf3e8e541fbdb25279018262ee40d6a6d1e3cc47b9ee"
+      "bytes": 7188,
+      "sha256": "8bbd903aef6db845fb3269587c9a6badf2a0f7a7ae6326fe07feb696120a2ec5"
     },
     {
       "path": "tests/test_zoom.py",

@@ -20,12 +20,18 @@ def signs(record, fps):
     """[(first frame, last frame, score, [reasons], anchor frames)] from look.json, one per window or skipped range."""
     found = []; shorts = []
     for s in record['shots']:
+        short_added = False
         for k in s['skipped']:
             a, b = k['frames']
             if k['reason'] == 'no unflagged pose track' and b-a+1 >= CHECK['no_pose_frames']:
                 found.append((a, b, CHECK['no_pose'], ['포즈 없어 글에 없음'], []))
             elif k['reason'] != 'no unflagged pose track':  # too short to track: a still at most
-                shorts.append((a, b))
+                if record.get('max_people', 1) > 1:
+                    from image_lens import look
+                    if not short_added and s['frames'][1]-s['frames'][0]+1 < look.LOOK['min_frames']:
+                        shorts.append(tuple(s['frames'])); short_added = True
+                else:
+                    shorts.append((a, b))
         for d in s['windows']:
             a, b = d['window']['seed'], _end(d); score = 0; why = []; anchors = []
             def add(weight, text, frames=()):
@@ -77,13 +83,18 @@ def _clip(a, b, anchors, fps):
 def spans(record, fps):
     """The CHECK['spans'] highest-scoring windows or ranges at CHECK['min_score'] or more, each cut to at most
     zoom.ZOOM['span_s'], in time order. Windows touch each other, so signs are ranked one by one, not merged."""
-    out = []
+    out = []; multiperson = record.get('max_people', 1) > 1
     for a, b, score, why, anchors in sorted(signs(record, fps), key=lambda m: (-m[2], m[0])):
-        if score < CHECK['min_score'] or len(out) == CHECK['spans']:
+        if score < CHECK['min_score'] or not multiperson and len(out) == CHECK['spans']:
             break
         first, last = _clip(a, b, anchors, fps)
+        duplicate = next((item for item in out if item['frames'] == [first, last]), None) if multiperson else None
+        if duplicate is not None:
+            duplicate['score'] = max(duplicate['score'], score)
+            duplicate['reasons'] += [reason for reason in why if reason not in duplicate['reasons']]
+            continue
         out.append(dict(frames=[first, last], seconds=[round(first/fps, 2), round((last+1)/fps, 2)], score=score, reasons=why))
-    return sorted(out, key=lambda c: c['frames'])
+    return sorted(out[:CHECK['spans']], key=lambda c: c['frames'])
 
 
 def sheets(video, root, found):
@@ -137,7 +148,7 @@ def at(look_dir, span, out):
         body.append(f"## {s['segment_id']} {s['seconds'][0]:.2f}–{s['seconds'][1]:.2f}s")
         for k in s['skipped']:
             if overlaps(*k['frames']):
-                body.append(f"- 건너뜀 f{k['frames'][0]}..{k['frames'][1]}: {k['reason']}" + (f" (사진 {k['still']}: 자세만)" if k.get('still') else ''))
+                body.append(digest.skipped_line(k) + (f" (사진 {k['still']}: 자세만)" if k.get('still') else ''))
                 if k.get('still'):
                     pictures.append(k['still'])
         for d in s['windows']:

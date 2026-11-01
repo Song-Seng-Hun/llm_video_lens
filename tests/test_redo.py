@@ -38,6 +38,35 @@ class Redo(unittest.TestCase):
             finally:
                 paths.configure(previous)
 
+    def test_actor_redo_refuses_before_models_and_default_route_remains(self):
+        from unittest.mock import patch
+        from image_lens import person_models
+        previous = paths.workspace_root()
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory).resolve(); paths.configure(root)
+            try:
+                first = root/'first'; first.mkdir()
+                for metadata, window_metadata in ((dict(max_people=2), {}), ({}, dict(source_track_id='shot-0000/2'))):
+                    record = dict(metadata, shots=[dict(segment_id='shot-0000', windows=[dict(window_metadata, window=dict(seed=0, end=9))])])
+                    (first/'look.json').write_text(__import__('json').dumps(record))
+                    # No pose/model files exist: the identity guard must fire first.
+                    with patch.object(person_models, 'resolve') as resolve, patch.object(look, 'run') as run:
+                        with self.assertRaisesRegex(ValueError, 'redo cannot preserve the selected actor'):
+                            redo.run(first, 'shot-0000-w0', 'detector', 'pose', 'checkpoint', root/'out')
+                        resolve.assert_not_called(); run.assert_not_called()
+                video = root/'v.avi'; video.write_bytes(b'original')
+                record = dict(max_people=1, source_video=str(video), source_sha256=paths.sha(video),
+                              shots=[dict(segment_id='shot-0000', windows=[dict(window=dict(seed=0, end=9))])])
+                (first/'look.json').write_text(__import__('json').dumps(record))
+                paths.write_json(first/'pose.json', dict(packet({}), source_sha256=paths.sha(video)))
+                with patch.object(person_models, 'resolve', return_value=dict(kind='deepghs')) as resolve, \
+                     patch.object(look, 'run', side_effect=ValueError('default route reached')) as run:
+                    with self.assertRaisesRegex(ValueError, 'default route reached'):
+                        redo.run(first, 'shot-0000-w0', 'detector', 'pose', 'checkpoint', root/'out')
+                    resolve.assert_called_once_with('detector'); run.assert_called_once()
+            finally:
+                paths.configure(previous)
+
     def test_old_pose_packets_were_humanart(self):
         self.assertEqual(redo.kind(packet({})), 'humanart')
         self.assertEqual(redo.kind(packet({}, 'sam3-deepghs')), 'sam3-deepghs')

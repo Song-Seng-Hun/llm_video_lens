@@ -76,7 +76,7 @@ def _stop_pose():
         poser.communicate()
 
 
-def next_window(segment, start, pose_frames, flagged, length=LOOK['window_frames'], min_frames=LOOK['min_frames'], frame_size=None):
+def next_window(segment, start, pose_frames, flagged, length=LOOK['window_frames'], min_frames=LOOK['min_frames'], frame_size=None, context_frames=None):
     """The next tracking window at or after `start`, seeded on the first frame with a pose track that is not pose-flagged."""
     skipped = []; end = segment['end_frame']
     while start <= end:
@@ -95,14 +95,15 @@ def next_window(segment, start, pose_frames, flagged, length=LOOK['window_frames
             # A later reliable observation can seed names forward, never backfill the weak prefix.
             # Keep the old close-frame retry first; the extended search is solo/full-body only.
             first = body_motion.largest(pose_frames[original])
-            if seed == original and frame_size is not None and len(pose_frames[original]) == 1 and body_motion.framing(first, *frame_size) == 'full':
+            solo_frames = pose_frames if context_frames is None else context_frames
+            if seed == original and frame_size is not None and len(solo_frames.get(original, [])) == 1 and body_motion.framing(first, *frame_size) == 'full':
                 identity = first['track_id']
                 context = [p for n in range(original, min(end,original+length-1)+1)
                            for p in pose_frames.get(n,[]) if p['track_id'] == identity]
                 if not body_motion.chibi(context):
                     old_stop = min(end,original+length-1)
                     for n in range(original+1, min(old_stop-2,old_stop-min_frames+1,original+LOOK['seed_retry_frames'])+1):
-                        prefix = [pose_frames.get(f,[]) for f in range(original,n+3)]
+                        prefix = [solo_frames.get(f,[]) for f in range(original,n+3)]
                         if any(len(ps) != 1 or ps[0]['track_id'] != identity or f in flagged
                                for f,ps in zip(range(original,n+3),prefix)):
                             break
@@ -119,15 +120,50 @@ def next_window(segment, start, pose_frames, flagged, length=LOOK['window_frames
     return None, skipped
 
 
-def windows(segment, pose_frames, flagged, length=LOOK['window_frames'], min_frames=LOOK['min_frames'], frame_size=None):
+def windows(segment, pose_frames, flagged, length=LOOK['window_frames'], min_frames=LOOK['min_frames'], frame_size=None, context_frames=None):
     """Consecutive tracking windows inside one shot when nothing cuts them short."""
     result = []; skipped = []; start = segment['start_frame']
     while True:
-        window, more = next_window(segment, start, pose_frames, flagged, length, min_frames, frame_size)
+        window, more = next_window(segment, start, pose_frames, flagged, length, min_frames, frame_size, context_frames)
         skipped += more
         if window is None:
             return result, skipped
         result.append(window); start = window['end']+1
+
+
+def select_actors(segment, pose_frames, maximum):
+    """Allocate observed shot-local IDs by first native observation, then mean box area."""
+    observations = {}
+    for n in range(segment['start_frame'], segment['end_frame']+1):
+        for person in pose_frames.get(n, []):
+            observations.setdefault(person['track_id'], {})[n] = person
+    actors = []
+    for identity, found in observations.items():
+        area = sum((p['bbox'][2]-p['bbox'][0])*(p['bbox'][3]-p['bbox'][1]) for p in found.values())/len(found)
+        actors.append(dict(track_id=identity, observations=len(found), mean_box_area=area,
+                           observed_frames=[min(found), max(found)], identity_scope='shot_local_model_id_unverified'))
+    ranked = sorted(actors, key=lambda actor: (actor['observed_frames'][0], -actor['mean_box_area']))
+    selected = []; omitted = []
+    for actor in ranked:
+        if actor['observations'] < 2:
+            omitted.append(dict(actor, reason='fewer than2 actual observations'))
+        elif len(selected) >= maximum:
+            omitted.append(dict(actor, reason='--max-people cap'))
+        else:
+            selected.append(dict(actor, label=f'A{len(selected)+1}', completed_windows=0, status='unknown'))
+    return selected, omitted
+
+
+def actor_packet(packet, segment, track_id):
+    """Exact observed geometry for one ID/range, with only that actor's jump diagnostics."""
+    from image_lens import pose
+    rows = [dict(row, tracks=[person for person in row['tracks'] if person['track_id'] == track_id])
+            for row in packet['frames'] if segment['start_frame'] <= row['frame'] <= segment['end_frame']]
+    if [row['frame'] for row in rows] != list(range(segment['start_frame'], segment['end_frame']+1)):
+        raise ValueError('actor pose requires complete native shot range')
+    return dict(packet, frames=rows, native_range=[segment['start_frame'], segment['end_frame']], flags=pose.flags(rows),
+                actor_selection=dict(track_id=track_id, identity_scope='shot_local_model_id_unverified',
+                                     context_pose_flags=packet['flags']))
 
 
 def cut_frame(track_packets, window, min_frames=LOOK['min_frames']):
@@ -292,8 +328,10 @@ def run(*args, **kwargs):
         _stop_pose()
 
 
-def _run(video, detector, pose_model, checkpoint, out, max_shots=LOOK['max_shots'], max_seconds=1800, frames=None, redo=None):
+def _run(video, detector, pose_model, checkpoint, out, max_shots=LOOK['max_shots'], max_seconds=1800, frames=None, redo=None, max_people=1):
     """frames=(first, last): look at that native range only; redo: what redo re-ran, for look.md's header."""
+    if type(max_people) is not int or not 1 <= max_people <= 8:
+        raise ValueError('--max-people integer1..8 required')
     started = time.monotonic()
     def remaining():
         return max_seconds-(time.monotonic()-started)
@@ -360,20 +398,22 @@ def _run(video, detector, pose_model, checkpoint, out, max_shots=LOOK['max_shots
             elif type(said) is dict and said.get('status') == 'failed':
                 failed.update(said)
         return covered(frame)
-    shots = []; lines = []; last_end = None; looks = []; stripping = []
+    shots = []; lines = []; last_end = None; looks = []; stripping = []; actor_ends = {}
     pending = None
     def report(window):
         """Everything after tracking for one window; look runs it while the child tracks the next window. Its lines and
         errors go where the window began, so look-full.md and look.json read as if it had run in order."""
         nonlocal last_end
-        entry, sid, w, end, base, people, receipt, tracked, done, slot, at = window
+        entry, sid, w, end, base, people, receipt, tracked, done, slot, at, view_frames, actor, selected_pose = window
         errors = []; quiet = []; fps = scan['fps']
         from image_lens import body_motion
-        if last_end is not None:
-            done['bridge'] = body_motion.bridge(body_motion.largest(pose_frames.get(last_end)), body_motion.largest(pose_frames.get(w['seed'])),
-                                                (last_end, w['seed']))
+        previous_end = actor_ends.get((sid, actor['track_id'])) if actor else last_end
+        if previous_end is not None:
+            done['bridge'] = body_motion.bridge(body_motion.largest(view_frames.get(previous_end)), body_motion.largest(view_frames.get(w['seed'])),
+                                                (previous_end, w['seed']))
             slot += body_motion.bridge_lines(done['bridge'])
-        slot.append(f"- 구간 f{w['seed']}..{end} (점 배치 f{w['seed']}" + (f", {people}명 중 가장 큰 사람" if people > 1 else '') + ')')
+        slot.append(f"- 구간 f{w['seed']}..{end} (점 배치 f{w['seed']}" +
+                    (f", {actor['label']} · 모델 ID {actor['track_id']}" if actor else f", {people}명 중 가장 큰 사람" if people > 1 else '') + ')')
         skeleton = receipt.get('skeleton') or dict(plausible=True); done['skeleton'] = skeleton['plausible']
         done['framing'] = skeleton.get('framing'); done['scope'] = skeleton.get('scope')
         done['chibi'] = skeleton.get('chibi')
@@ -384,7 +424,7 @@ def _run(video, detector, pose_model, checkpoint, out, max_shots=LOOK['max_shots
         from image_lens import camera, motion_report
         main = None
         try:
-            main = body_motion.largest(pose_frames.get(w['seed']))
+            main = body_motion.largest(view_frames.get(w['seed']))
             frame_motion = camera.path(source, w['seed'], end, main['bbox'] if main else None)
         except Exception as error:  # OpenCV raises its own error type; a missing estimate only disables the filter
             frame_motion = None; errors.append(dict(window=w, step='camera', error=str(error)[:300]))
@@ -426,19 +466,21 @@ def _run(video, detector, pose_model, checkpoint, out, max_shots=LOOK['max_shots
                 if group == 'move':
                     keep = {p['point_id'] for p in tracks['frames'][0]['points']}
                     bindings, _ = paths.load(binding)
-                    for actor in bindings['actors']:
-                        actor['features'] = [f for f in actor['features'] if f['point_id'] in keep]
+                    for binding_actor in bindings['actors']:
+                        binding_actor['features'] = [f for f in binding_actor['features'] if f['point_id'] in keep]
                     binding = paths.write_json(stem.with_name(stem.name+'-parts.bindings.json'), bindings)
                 _step('analyze', ['--tracks', raw_tracks, '--shots', root/'shots.json',
                                   '--report-bindings', binding, '--start', w['seed'], '--end', end,
                                   '--format', 'json', '--out', stem.with_suffix('.report.json'),
-                                  '--trajectory-dir', stem.with_name(stem.name+'-traj'), '--pose', pose_for(w['seed'])])
+                                  '--trajectory-dir', stem.with_name(stem.name+'-traj'), '--pose', selected_pose or pose_for(w['seed'])])
                 found, _ = paths.load(stem.with_suffix('.report.json'))
                 from image_lens import motion_report
                 md = paths.write(stem.with_suffix('.report.md'), motion_report.markdown(found))
                 view = _motion_view(found, raw_tracks, binding, frame_motion)
                 relative = paths.write_json(stem.with_suffix('.relative.json'), view) if view is not found else None
                 group_lines, summary = _summary(view, dict(w, end=end), group, md.relative_to(root), stem.with_name(stem.name+'-traj').relative_to(root)/'trajectory.png')
+                if actor:
+                    summary['source_track_id'] = actor['track_id']
                 if relative:
                     summary['relative_report']=str(relative.relative_to(root))
                     if group_lines:group_lines.append(f"  - 보정 수치: {relative.name}; 원시 .report.md·trajectory 그림은 화면 좌표.")
@@ -453,15 +495,17 @@ def _run(video, detector, pose_model, checkpoint, out, max_shots=LOOK['max_shots
             note = body_motion.geometry_note(done['body_geometry'])
             if note:
                 slot.append('  - '+note)
-            done['body'] = body_motion.describe([t[3] for t in tracked], dict(w, end=end), pose_frames,
+            done['body'] = body_motion.describe([t[3] for t in tracked], dict(w, end=end), view_frames,
                                                timing_packets=raw_packets)
             slot += ['  '+l for l in body_motion.lines(done['body'])]
-        done['events'] = body_motion.pose_events(pose_frames, dict(w, end=end), fps)
-        done['phases'] = body_motion.phases(pose_frames, dict(w, end=end), fps)
-        done['facing'] = body_motion.facing(pose_frames, dict(w, end=end))
-        done['arms'] = body_motion.arm_poses(pose_frames, dict(w, end=end),
+        done['events'] = body_motion.pose_events(view_frames, dict(w, end=end), fps)
+        done['phases'] = body_motion.phases(view_frames, dict(w, end=end), fps)
+        done['facing'] = body_motion.facing(view_frames, dict(w, end=end))
+        done['arms'] = body_motion.arm_poses(view_frames, dict(w, end=end),
                                              [w['seed']]+([p['frames'][1] for p in done['phases']] if done['phases'] else [end]))
         done['people'] = body_motion.people(pose_frames, dict(w, end=end), fps, cam)
+        if actor:
+            done['people_scope'] = 'full_frame_context; not the selected actor motion job'
         if len(done['people']['people']) > 1:
             from image_lens import onion
             try:
@@ -470,7 +514,7 @@ def _run(video, detector, pose_model, checkpoint, out, max_shots=LOOK['max_shots
                 errors.append(dict(window=w, step='who', error=str(error)[:300]))
         from image_lens import digest
         slot += ['  - '+f for f in digest.events(done['events'], fps)]
-        person = body_motion.largest(pose_frames.get(w['seed']))
+        person = body_motion.largest(view_frames.get(w['seed']))
         if tracked and person:
             from image_lens import onion
             picture = base.with_name(base.name+'-onion.jpg')
@@ -518,7 +562,16 @@ def _run(video, detector, pose_model, checkpoint, out, max_shots=LOOK['max_shots
                 errors.append(dict(window=w, step='cut_diff', error=str(error)[:300])); why = '그림 바뀜·가려짐·화면 밖'
             slot.append(f"  - f{end} 뒤 점이 한꺼번에 끊김({why}): f{end+1}부터 점을 다시 놓음")
         if done['groups']:slot.append(f"  - 자세히: {base.name}-<묶음>.report.md·<묶음>-traj/trajectory.png는 화면 좌표, .relative.json은 카메라 보정 수치(있을 때).")
-        last_end = end if done['groups'] else None
+        if actor:
+            actor_ends[(sid, actor['track_id'])] = end if done['groups'] else None
+            done['status'] = 'completed' if done['groups'] else 'unknown'
+            if done['groups']:
+                actor['completed_windows'] += 1; actor['status'] = 'partial' if actor.get('budget_exhausted') else 'completed'
+                if not actor.get('budget_exhausted'):
+                    actor.pop('reason', None)
+            entry['actor_accounting']['completed'] = sum(a['completed_windows'] > 0 for a in entry['actor_accounting']['actors'])
+        else:
+            last_end = end if done['groups'] else None
         if person:
             from image_lens import motif
             try:
@@ -527,10 +580,16 @@ def _run(video, detector, pose_model, checkpoint, out, max_shots=LOOK['max_shots
             except Exception as error:  # OpenCV raises its own error type; without thumbs the window is never a repeat
                 errors.append(dict(window=w, step='motif', error=str(error)[:300]))
         entry['errors'][at:at] = errors
-    def seed(sid, w, i):
+    def seed(sid, w, i, actor=None, selected_pose=None):
         base = root/f'{sid}-w{i}'
-        return _step('seed', ['--pose', pose_for(w['seed']), '--frame', w['seed'], '--job', f'{sid}-w{i}', '--length', w['end']-w['seed']+1,
-                              '--out', base.with_suffix('.obs.json'), '--evidence-dir', base.with_name(base.name+'-crops')])
+        receipt = _step('seed', ['--pose', selected_pose or pose_for(w['seed']), '--frame', w['seed'], '--job', f'{sid}-w{i}', '--length', w['end']-w['seed']+1,
+                              '--out', base.with_suffix('.obs.json'), '--evidence-dir', base.with_name(base.name+'-crops')]
+                             + (['--track', actor['track_id']] if actor else []))
+        if actor:
+            observations, _ = paths.load(base.with_suffix('.obs.json'))
+            if observations['seed_source']['track_id'] != actor['track_id']:
+                raise ValueError('seed selected a different actor ID')
+        return receipt
     def queue(base, receipt):
         queued = []
         for name in receipt['jobs']:
@@ -557,12 +616,20 @@ def _run(video, detector, pose_model, checkpoint, out, max_shots=LOOK['max_shots
         entry = dict(segment_id=sid, frames=[s0, s1], seconds=[round(s0/fps, 2), round((s1+1)/fps, 2)], windows=[], skipped=[], errors=[])
         shots.append(entry)
         lines.append(f"## {sid} {entry['seconds'][0]:.2f}–{entry['seconds'][1]:.2f}s (f{s0}..{s1})")
+        actors = [None]; view_frames = pose_frames; actor = None
+        if max_people > 1:
+            actors, omitted = select_actors(segment, pose_frames, max_people)
+            for selected in actors:
+                selected['reason'] = 'no completed raw-motion report'
+            entry['actor_accounting'] = dict(detected=len(actors)+len(omitted), selected=len(actors), completed=0,
+                                             omitted_count=len(omitted), omitted=omitted, actors=actors,
+                                             identity_warning='model IDs can be ghosts/duplicates; physical identity unverified')
         def still(k):
             # A cut too short to track still shows its pose (clip B: 83 skipped ranges, many whole cuts under 0.2 s).
             from image_lens import body_motion, onion
-            mid = (k['frames'][0]+k['frames'][1])//2; person = body_motion.largest(pose_frames.get(mid))
+            mid = (k['frames'][0]+k['frames'][1])//2; person = body_motion.largest(view_frames.get(mid))
             try:
-                k['still'] = onion.still(source, mid, person['bbox'] if person else None, root/f'{sid}-still-f{mid}.jpg')
+                k['still'] = onion.still(source, mid, person['bbox'] if person else None, root/f"{sid}{'-'+actor['label'] if actor else ''}-still-f{mid}.jpg")
             except Exception as error:  # OpenCV raises its own error type; the still is optional
                 entry['errors'].append(dict(frames=k['frames'], step='still', error=str(error)[:300]))
             return f" (사진 {k['still']}: 자세만, 움직임 모름)" if k.get('still') else ''
@@ -570,78 +637,107 @@ def _run(video, detector, pose_model, checkpoint, out, max_shots=LOOK['max_shots
             k = dict(frames=[s0, s1], reason='single-frame shot'); entry['skipped'].append(k)
             lines += ['- 건너뜀: 1프레임 장면'+still(k), '']
             continue
-        start = s0; i = 0
-        while start <= s1:
-            w, skipped = next_window(segment, start, pose_frames, flagged, frame_size=(scan['width'],scan['height']))
-            entry['skipped'] += skipped
-            lines += [f"- 건너뜀 f{k['frames'][0]}..{k['frames'][1]}: {k['reason']}" + ('' if entry['windows'] else still(k)) for k in skipped]
-            if w is None:
-                break
-            if remaining() < 60:
-                entry['errors'].append(dict(window=w, error='overall time budget exhausted')); lines.append('- 시간 예산 소진: 이후 장면 생략')
-                break
-            base = root/f'{sid}-w{i}'; i += 1; start = w['end']+1
-            people = len(pose_frames[w['seed']])
-            done = dict(window=w, groups=[]); tracked = []
-            queued = None
-            try:
-                if ahead and ahead[:2] == (sid, w):
-                    receipt, error, queued = ahead[2:]; ahead = None
-                    if error:
-                        raise error
-                else:
-                    receipt = seed(sid, w, i-1)
-            except STEP_ERRORS as error:
-                entry['errors'].append(dict(window=w, step='seed', error=str(error)[:300]))
-                lines += [f"- 구간 f{w['seed']}..{w['end']}", f'  - 점 배치 실패: {str(error)[:120]}']
-                entry['windows'].append(done)
-                continue
-            if queued is None:
-                queued = queue(base, receipt)
-            # The child tracks this window while the last one is reported (clip B: 44 s tracking, 45 s of CPU work around it).
-            if pending:
-                report(pending); pending = None
-            # A cut moves this shot's next window, but the next shot always starts at its first frame (clip B: 39 of 42
-            # windows): seed it while the child still tracks (25 s of waiting, 23 s of seeding), and queue its jobs so the
-            # child goes on to them while this window is reported (clip B: 11 s idle between short shots). A window after
-            # a cut in this shot is queued behind them; the worker keeps their replies until they are taken.
-            after = shown[order+1] if order+1 < len(shown) else None
-            if not ahead and after and after['end_frame'] > after['start_frame'] and pose_for(after['end_frame'], wait=False) and remaining() >= 60:
-                first, _ = next_window(after, after['start_frame'], pose_frames, flagged, frame_size=(scan['width'],scan['height']))
-                if first:
-                    try:
-                        receipt_ahead = seed(after['segment_id'], first, 0)
-                        ahead = (after['segment_id'], first, receipt_ahead, None, queue(root/f"{after['segment_id']}-w0", receipt_ahead))
-                    except STEP_ERRORS as error:
-                        ahead = (after['segment_id'], first, None, error, None)
-            for name, group, stem, handle, error in queued:
+        i = 0
+        for actor in actors:
+            selected_pose = None; view_frames = pose_frames; view_flagged = flagged
+            if actor:
+                context_packet, _ = paths.load(pose_for(s1), max_bytes=64*1024*1024)
+                selected_packet = actor_packet(context_packet, segment, actor['track_id'])
+                selected_pose = paths.write_json(root/f"{sid}-{actor['label']}.pose.json", selected_packet)
+                view_frames = {row['frame']: row['tracks'] for row in selected_packet['frames']}
+                view_flagged = {row['frame'] for row in selected_packet['flags']['frames']}
+                context_flags = context_packet['flags']['frames']
+                lines.append(f"### {actor['label']} · 모델 ID {actor['track_id']} (동일인 미검증)")
+            start = s0
+            while start <= s1:
+                w, skipped = next_window(segment, start, view_frames, view_flagged, frame_size=(scan['width'],scan['height']),
+                                         context_frames=pose_frames if actor else None)
+                if actor:
+                    for item in skipped:
+                        item.update(source_track_id=actor['track_id'], actor_label=actor['label'])
+                entry['skipped'] += skipped
+                from image_lens import digest
+                lines += [digest.skipped_line(k) + ('' if entry['windows'] else still(k)) for k in skipped]
+                if w is None:
+                    break
+                if remaining() < 60:
+                    error = dict(window=w, error='overall time budget exhausted')
+                    if actor:
+                        error.update(source_track_id=actor['track_id'], actor_label=actor['label'])
+                        actor.update(reason=error['error'], budget_exhausted=True,
+                                     status='partial' if actor['completed_windows'] else 'unknown')
+                    entry['errors'].append(error)
+                    lines.append(f"- 시간 예산 소진: {actor['label']} · 모델 ID {actor['track_id']} 이후 구간 생략" if actor else '- 시간 예산 소진: 이후 장면 생략')
+                    break
+                base = root/f'{sid}-w{i}'; i += 1; start = w['end']+1
+                people = len(pose_frames[w['seed']])
+                if actor:
+                    w = dict(w, track_id=actor['track_id'])
+                done = dict(window=w, groups=[]); tracked = []
+                if actor:
+                    done.update(source_track_id=actor['track_id'], actor_label=actor['label'],
+                                identity_scope=actor['identity_scope'], status='unknown',
+                                source_segment_id=sid, source_native_range=[s0, s1], actor_pose=selected_pose.name)
+                    done['context_pose_flags'] = [r for r in context_flags if w['seed'] <= r['frame'] <= w['end']]
+                queued = None
                 try:
-                    if error:
-                        raise error
-                    _finish(handle)
-                    tracked.append((name, group, stem, paths.load(joint_tracking.track_path(stem, group))[0]))
+                    if ahead and ahead[:2] == (sid, w):
+                        receipt, error, queued = ahead[2:]; ahead = None
+                        if error:
+                            raise error
+                    else:
+                        receipt = seed(sid, w, i-1, actor, selected_pose)
                 except STEP_ERRORS as error:
-                    entry['errors'].append(dict(window=w, job=name, error=str(error)[:300]))
-                    lines.append(f'  - {group} 실패: {str(error)[:120]}')
-            # A drawing change (costume, wipe) drops many points at once: analyze up to it and reseed right after.
-            # Hand tips flicker on drawn hands, so only head, arms and legs decide a cut.
-            cut = cut_frame([t[3] for t in tracked if t[1] != 'hands'], w)
-            end = w['end'] if cut is None else min(w['end'], max(cut, w['seed']+LOOK['min_frames']-1))
-            if end < w['end']:
-                done['cut_after'] = end; start = end+1
-            # Cuts/reseeding remain based on raw model visibility. The selected joint stream is separate;
-            # bind/analyze use the raw files so fusion never manufactures a surface ease measurement.
-            observations = None
-            for k, (name, group, stem, packet) in enumerate(tracked):
-                if group in joint_tracking.GROUPS:
-                    if observations is None:
-                        observations, _ = paths.load(base.with_suffix('.obs.json'))
-                    selected = joint_tracking.reconcile(packet, pose_frames, observations['seed_source']['track_id'],
-                                                       dict(w, end=end), joint_tracking.track_path(stem, group), pose_for(w['seed']))
-                    paths.write_json(stem.with_suffix('.tracks.json'), selected)
-                    tracked[k] = (name, group, stem, selected)
-            slot = []; lines.append(slot); entry['windows'].append(done)
-            pending = (entry, sid, w, end, base, people, receipt, tracked, done, slot, len(entry['errors']))
+                    entry['errors'].append(dict(window=w, step='seed', error=str(error)[:300]))
+                    lines += [f"- 구간 f{w['seed']}..{w['end']}", f'  - 점 배치 실패: {str(error)[:120]}']
+                    entry['windows'].append(done)
+                    continue
+                if queued is None:
+                    queued = queue(base, receipt)
+                # The child tracks this window while the last one is reported (clip B: 44 s tracking, 45 s of CPU work around it).
+                if pending:
+                    report(pending); pending = None
+                # A cut moves this shot's next window, but the next shot always starts at its first frame (clip B: 39 of 42
+                # windows): seed it while the child still tracks (25 s of waiting, 23 s of seeding), and queue its jobs so the
+                # child goes on to them while this window is reported (clip B: 11 s idle between short shots). A window after
+                # a cut in this shot is queued behind them; the worker keeps their replies until they are taken.
+                after = shown[order+1] if order+1 < len(shown) else None
+                if max_people == 1 and not ahead and after and after['end_frame'] > after['start_frame'] and pose_for(after['end_frame'], wait=False) and remaining() >= 60:
+                    first, _ = next_window(after, after['start_frame'], pose_frames, flagged, frame_size=(scan['width'],scan['height']))
+                    if first:
+                        try:
+                            receipt_ahead = seed(after['segment_id'], first, 0)
+                            ahead = (after['segment_id'], first, receipt_ahead, None, queue(root/f"{after['segment_id']}-w0", receipt_ahead))
+                        except STEP_ERRORS as error:
+                            ahead = (after['segment_id'], first, None, error, None)
+                for name, group, stem, handle, error in queued:
+                    try:
+                        if error:
+                            raise error
+                        _finish(handle)
+                        tracked.append((name, group, stem, paths.load(joint_tracking.track_path(stem, group))[0]))
+                    except STEP_ERRORS as error:
+                        entry['errors'].append(dict(window=w, job=name, error=str(error)[:300]))
+                        lines.append(f'  - {group} 실패: {str(error)[:120]}')
+                # A drawing change (costume, wipe) drops many points at once: analyze up to it and reseed right after.
+                # Hand tips flicker on drawn hands, so only head, arms and legs decide a cut.
+                cut = cut_frame([t[3] for t in tracked if t[1] != 'hands'], w)
+                end = w['end'] if cut is None else min(w['end'], max(cut, w['seed']+LOOK['min_frames']-1))
+                if end < w['end']:
+                    done['cut_after'] = end; start = end+1
+                # Cuts/reseeding remain based on raw model visibility. The selected joint stream is separate;
+                # bind/analyze use the raw files so fusion never manufactures a surface ease measurement.
+                observations = None
+                for k, (name, group, stem, packet) in enumerate(tracked):
+                    if group in joint_tracking.GROUPS:
+                        if observations is None:
+                            observations, _ = paths.load(base.with_suffix('.obs.json'))
+                        selected = joint_tracking.reconcile(packet, view_frames, observations['seed_source']['track_id'],
+                                                           dict(w, end=end), joint_tracking.track_path(stem, group), selected_pose or pose_for(w['seed']))
+                        paths.write_json(stem.with_suffix('.tracks.json'), selected)
+                        tracked[k] = (name, group, stem, selected)
+                slot = []; lines.append(slot); entry['windows'].append(done)
+                pending = (entry, sid, w, end, base, people, receipt, tracked, done, slot, len(entry['errors']), view_frames, actor, selected_pose)
         lines.append('')
     if pending:
         report(pending)
@@ -683,12 +779,20 @@ def _run(video, detector, pose_model, checkpoint, out, max_shots=LOOK['max_shots
     except Exception as error:  # OpenCV raises its own error type; the overview is optional
         frame_sheets = []; errors.append(dict(step='frame_sheets', error=str(error)[:300]))
     from image_lens import motif
-    for (done, _), label in zip(looks, motif.assign([l for _, l in looks])):
-        if label:
-            done['motif'] = label
+    motif_groups = {}
+    for done, thumbs in looks:
+        key = (done['source_segment_id'], done['source_track_id']) if max_people > 1 else None
+        motif_groups.setdefault(key, []).append((done, thumbs))
+    for grouped in motif_groups.values():
+        for (done, _), label in zip(grouped, motif.assign([thumbs for _, thumbs in grouped])):
+            if label:
+                done['motif'] = f"{done['source_segment_id']}/{done['actor_label']}-{label}" if max_people > 1 else label
     record = dict(schema='image-lens.look/1', source_video=str(source), source_sha256=scan['source_sha256'], params=LOOK,
                   max_shots=max_shots, scaled=scaled, onion_sheets=sheets, frame_sheets=frame_sheets, errors=errors, shots=shots,
                   joint_tracking=joint_tracking.PARAMS, **(dict(frames=list(frames)) if frames else {}), **(dict(redo=redo) if redo else {}))
+    if max_people > 1:
+        record.update(max_people=max_people, actor_selection=dict(ranking='first native observation, then descending mean bbox area; stable first-seen ties',
+                      minimum_observations=2, next_shot_prefetch=False, identity_scope='shot_local_model_id_unverified'))
     from image_lens import check
     record['check'] = check.spans(record, fps)
     try:

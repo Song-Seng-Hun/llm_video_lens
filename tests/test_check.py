@@ -184,6 +184,33 @@ def window(seed, end, **more):
 
 
 class Spans(unittest.TestCase):
+    def test_actor_skips_do_not_multiply_canonical_short_cuts(self):
+        def shot(start):
+            return dict(segment_id=f'shot-{start:04d}', frames=[start, start+4], windows=[],
+                        skipped=[dict(frames=[start, start+4], reason='fewer than 12 frames after the seed',
+                                      source_track_id=f'shot-{start:04d}/{n}', actor_label=f'A{n}') for n in range(1, 4)])
+        record = dict(max_people=3, shots=[shot(0)])
+        self.assertEqual(check.signs(record, 25), [])
+        self.assertIn('짧은 컷 3개', check.signs(dict(record, max_people=1), 25)[0][3][0])
+        record['shots'] += [shot(5), shot(10)]
+        self.assertEqual(check.signs(record, 25)[0][3], ['짧은 컷 3개: 사진만, 움직임 모름'])
+
+    def test_actor_full_frame_spans_deduplicate_before_cap_with_max_and_reasons(self):
+        def done(a, b, n):
+            return dict(window=dict(seed=a, end=b), skeleton=False, camera=dict(unknown=True),
+                        source_track_id=f'shot-0000/{n}', actor_label=f'A{n}')
+        record = dict(max_people=4, shots=[dict(skipped=[], windows=[done(0, 29, n) for n in range(1, 5)]+[done(30, 59, 1)])])
+        found = check.spans(record, 25)
+        self.assertEqual([span['frames'] for span in found], [[0, 29], [30, 59]])
+        self.assertEqual([span['score'] for span in found], [2, 2])
+        self.assertEqual([span['frames'] for span in check.spans(dict(record, max_people=1), 25)], [[0, 29]]*4)
+        overlap = dict(window=dict(seed=0, end=199), people=dict(relations=[dict(overlap=True)]))
+        record['shots'][0]['windows'] = [done(0, 99, 1), overlap, done(100, 129, 2)]
+        found = check.spans(record, 25)
+        self.assertEqual([span['frames'] for span in found], [[0, 99], [100, 129]])
+        self.assertEqual(found[0]['score'], 3)
+        self.assertEqual(set(found[0]['reasons']), {'사람 상자 겹침: 포즈 섞였을 수 있음', '골격 신뢰 낮음', '카메라 모름'})
+
     def record(self):
         return dict(source_video='v.mp4', shots=[
             dict(segment_id='shot-0000', frames=[0, 99], seconds=[0, 4.], skipped=[], errors=[],

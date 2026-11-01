@@ -91,6 +91,17 @@ class Windows(unittest.TestCase):
             with self.subTest(case=case):
                 self.assertEqual(self.retry(poses,flagged,end,size)[0],dict(seed=0,end=end))
 
+    def test_extended_actor_retry_checks_unfiltered_prefix_and_preserves_real_solo(self):
+        import copy
+        poses = self.frames(0, 99)
+        for n in range(8): poses[n] = self.sleeve()
+        segment = dict(start_frame=0, end_frame=99)
+        solo = look.next_window(segment, 0, poses, set(), frame_size=(1440, 1200), context_frames=poses)
+        self.assertEqual(solo[0], dict(seed=8, end=99))
+        context = copy.deepcopy(poses); context[4].append(track('other'))
+        crowded = look.next_window(segment, 0, poses, set(), frame_size=(1440, 1200), context_frames=context)
+        self.assertEqual(crowded[0], dict(seed=0, end=99))
+
 
 
 class Summary(unittest.TestCase):
@@ -344,3 +355,217 @@ class Ahead(unittest.TestCase):
         with tempfile.TemporaryDirectory(dir=REPO/'workspace') as d:
             with self.assertRaisesRegex(ValueError, 'pose wall budget exhausted'):
                 self.look(d, [json.dumps(dict(status='failed', error='pose wall budget exhausted'))], code=1)
+
+
+class MultipleActors(unittest.TestCase):
+    def test_observed_actor_ranking_cap_and_native_shot_scope(self):
+        import copy
+        a = track('a'); b = track('b'); c = track('ghost'); d = track('d'); late = track('late-large')
+        c['bbox'] = [0, 0, 2000, 2000]
+        late['bbox'] = [0, 0, 1500, 1500]
+        poses = {0: [a, b, c, d], 1: [a, b, d, late], 2: [a, b, d, late], 3: [track('next-shot')]}
+        before = copy.deepcopy(poses)
+        selected, omitted = look.select_actors(dict(start_frame=0, end_frame=2), poses, 2)
+        self.assertEqual([p['track_id'] for p in selected], ['a', 'b'])
+        self.assertEqual([p['label'] for p in selected], ['A1', 'A2'])
+        self.assertEqual({p['track_id']: p['reason'] for p in omitted},
+                         {'ghost': 'fewer than2 actual observations', 'd': '--max-people cap', 'late-large': '--max-people cap'})
+        self.assertEqual(poses, before)
+        selected, _ = look.select_actors(dict(start_frame=3, end_frame=3), poses, 2)
+        self.assertEqual(selected, [])
+
+    def test_actor_subset_ignores_overlap_and_other_actor_jumps_only(self):
+        import copy
+        rows = []
+        for n in range(16):
+            a, b = track('a'), track('b')
+            if n == 1:
+                b['keypoints'] = [[x+1000, y] for x, y in b['keypoints']]
+            rows.append(dict(frame=n, tracks=[a, b]))
+        packet = dict(native_range=[0, 15], frames=rows, flags=pose.flags(rows)); before = copy.deepcopy(packet)
+        segment = dict(start_frame=0, end_frame=15)
+        selected = look.actor_packet(packet, segment, 'a')
+        other = look.actor_packet(packet, segment, 'b')
+        self.assertTrue(any(r['overlapping_people'] for r in packet['flags']['frames']))
+        self.assertEqual(selected['flags']['frames'], [])
+        self.assertTrue(any(r.get('skeleton_jump') for r in other['flags']['frames']))
+        self.assertEqual(selected['actor_selection']['context_pose_flags'], packet['flags'])
+        frames = {r['frame']: r['tracks'] for r in selected['frames']}
+        self.assertEqual(look.next_window(segment, 1, frames, set(), min_frames=2)[0]['seed'], 1)
+        self.assertTrue(all([p['track_id'] for p in ps] == ['a'] for ps in frames.values()))
+        self.assertEqual(packet, before)
+
+    def run_people(self, directory, fail_second=False, weak_prefix=False, budget_after_first=False, short_second=False):
+        """Actual look.run routing with fake public inference steps; spies reject geometry borrowing."""
+        import copy, json, subprocess
+        from contextlib import ExitStack
+        from unittest.mock import patch
+        from image_lens import paths, body_motion, camera, onion, motif, zoom, check, motion_report
+        clock = dict(expired=False)
+        paths.configure(directory); root = Path(directory); video = root/'source.bin'; video.write_bytes(b'synthetic')
+        segments = [dict(segment_id=f'shot-{k:04d}', start_frame=16*k, end_frame=16*k+15) for k in range(2)]
+        rows = []
+        for n in range(32):
+            a, b = track('a'), track('b')  # Deliberately reuse strings across cuts: no reassociation/bridge allowed.
+            a['bbox'] = [0, 0, 300, 500]; b['bbox'] = [100, 0, 350, 500]
+            if weak_prefix and n%16 < 4:
+                a['keypoints'][pose.BODY['wrist_l']] = [900., 600.]
+                b['keypoints'][pose.BODY['wrist_l']] = [900., 600.]
+            rows.append(dict(frame=n, tracks=[a]+([b] if not short_second or n%16 >= 10 else [])))
+        packet = dict(schema='image-lens.pose/1', source_video=str(video), source_sha256='synthetic',
+                      width=1440, height=1200, fps=10, native_range=[0, 31], frames=rows, flags=pose.flags(rows))
+        original = copy.deepcopy(packet); seed_calls = []; geometry = []; onion_boxes = []
+        def value(arguments, flag): return arguments[arguments.index(flag)+1]
+        def step(command, arguments):
+            out = Path(value(arguments, '--out')) if '--out' in arguments else None
+            if command == 'scan':
+                out.write_text(json.dumps(dict(fps=10, width=1440, height=1200, source_frame_count=32,
+                                               source_sha256='synthetic', analysis_segments=segments)))
+            elif command == 'seed':
+                identity = value(arguments, '--track'); selected = json.loads(Path(value(arguments, '--pose')).read_text())
+                self.assertTrue(all(all(p['track_id'] == identity for p in r['tracks']) for r in selected['frames']))
+                seed_calls.append((identity, value(arguments, '--frame')))
+                if fail_second and identity == 'b': raise ValueError('no usable seeds for b')
+                out.write_text(json.dumps(dict(seed_source=dict(track_id=identity))))
+                return dict(jobs=[value(arguments, '--job')+'-'+group for group in ('arms', 'move')], skeleton=dict(plausible=True))
+            elif command == 'analyze':
+                selected = json.loads(Path(value(arguments, '--pose')).read_text())
+                self.assertEqual(len({p['track_id'] for r in selected['frames'] for p in r['tracks']}), 1)
+                out.write_text(json.dumps(dict(features=[])))
+            elif command == 'bind': out.write_text(json.dumps(dict(actors=[dict(features=[dict(point_id='wrist-l')])])))
+            return dict(jobs=[])
+        def child(arguments):
+            Path(value(arguments, '--out')).write_text(json.dumps(packet))
+            return subprocess.Popen([sys.executable, '-c', 'pass'], stdout=subprocess.PIPE, text=True)
+        def submit(arguments):
+            job = value(arguments, '--job'); lo = 0 if 'shot-0000' in job else 16
+            raw = dict(frames=[dict(frame=n, points=[dict(point_id='wrist-l', visible=True, xy=[100., 100.])]) for n in range(lo, lo+16)])
+            Path(value(arguments, '--out')).write_text(json.dumps(raw))
+            if budget_after_first and job == 'shot-0000-w0-move':
+                clock['expired'] = True
+            return job
+        def exact_view(view, window):
+            identities = {p['track_id'] for ps in view.values() for p in ps}
+            self.assertEqual(len(identities), 1)
+            self.assertEqual(identities, {window['track_id']})
+            geometry.append((next(iter(identities)), window['seed']))
+        def describe(packets, window, view, **kwargs): exact_view(view, window)
+        def events(view, window, fps): exact_view(view, window)
+        def phases(view, window, fps): exact_view(view, window); return []
+        def facing(view, window): exact_view(view, window)
+        def arms(view, window, frames): exact_view(view, window); return []
+        def reconcile(raw, view, identity, window, *args):
+            exact_view(view, window); self.assertEqual(identity, window['track_id']); return raw
+        def bands(source, seed, end, bbox, *args, **kwargs): onion_boxes.append((seed, bbox)); return []
+        with ExitStack() as stack:
+            replacements = [(look, '_step', step), (look, '_pose_child', child), (look, '_submit', submit),
+                            (look, '_finish', lambda handle: None), (look, 'fit', lambda source, root: (source, None)),
+                            (look, '_motion_view', lambda found, *args: found),
+                            (look, '_summary', lambda *args: ([], dict(group='arms', moves=[], major_moves=[], together=[], warnings=0, lost=None))),
+                            (look.joint_tracking, 'reconcile', reconcile), (body_motion, 'describe', describe),
+                            (body_motion, 'pose_events', events), (body_motion, 'phases', phases), (body_motion, 'facing', facing),
+                            (body_motion, 'arm_poses', arms), (body_motion, 'geometry_policy', lambda *args: {}),
+                            (body_motion, 'geometry_note', lambda *args: None),
+                            (body_motion, 'people', lambda *args: dict(people=[])),
+                            (camera, 'path', lambda *args: None), (camera, 'plain', lambda *args: False),
+                            (motion_report, 'markdown', lambda *args: 'raw report'),
+                            (onion, 'body_path', lambda *args: None), (onion, 'body_basis', lambda *args: None),
+                            (onion, 'parts', lambda *args: ['wrist-l']),
+                            (onion, 'trails', lambda *args: []), (onion, 'bands', bands), (onion, 'peak', lambda *args: None),
+                            (onion, 'references', lambda *args: ([], [])), (onion, 'spacing', lambda *args, **kwargs: None),
+                            (onion, 'lines', lambda *args, **kwargs: []), (onion, 'sheets', lambda *args: []),
+                            (motif, 'thumb', lambda *args: None), (zoom, 'overview', lambda *args: []),
+                            (check, 'sheets', lambda *args: None)]
+            for module, name, replacement in replacements: stack.enter_context(patch.object(module, name, replacement))
+            if budget_after_first:
+                stack.enter_context(patch.object(look.time, 'monotonic', side_effect=lambda: 1801. if clock['expired'] else 0.))
+            bridge = stack.enter_context(patch.object(body_motion, 'bridge', wraps=body_motion.bridge))
+            look.run(video, 'det', 'pose', 'checkpoint', root/'look', max_people=2)
+            bridge.assert_not_called()
+        self.assertEqual(packet, original)
+        return json.loads((root/'look/look.json').read_text()), seed_calls, geometry, onion_boxes
+
+    def test_actor_extended_retry_does_not_treat_crowd_as_solo(self):
+        import tempfile
+        with tempfile.TemporaryDirectory(dir=REPO/'workspace') as directory:
+            _, seeds, _, _ = self.run_people(directory, weak_prefix=True)
+            self.assertEqual(seeds, [('a', 0), ('b', 0), ('a', 16), ('b', 16)])
+
+    def test_actor_budget_reason_keeps_completed_window(self):
+        import tempfile
+        with tempfile.TemporaryDirectory(dir=REPO/'workspace') as directory:
+            record, seeds, _, _ = self.run_people(directory, budget_after_first=True)
+            self.assertEqual(seeds, [('a', 0)])
+            first = record['shots'][0]
+            self.assertEqual(len(first['windows']), 1)
+            self.assertEqual(first['windows'][0]['source_track_id'], 'a')
+            self.assertEqual(first['actor_accounting']['completed'], 1)
+            second = first['actor_accounting']['actors'][1]
+            self.assertEqual(second['status'], 'unknown')
+            self.assertEqual(second['reason'], 'overall time budget exhausted')
+            error, = first['errors']
+            self.assertEqual((error['source_track_id'], error['actor_label']), ('b', 'A2'))
+
+    def test_actor_skips_share_labels_in_summary_full_focus_and_at(self):
+        import cv2
+        import tempfile
+        from unittest.mock import Mock, patch
+        from image_lens import check, digest, zoom
+        with tempfile.TemporaryDirectory(dir=REPO/'workspace') as directory:
+            record, _, _, _ = self.run_people(directory, short_second=True)
+            skipped = record['shots'][0]['skipped'][0]
+            self.assertEqual((skipped['source_track_id'], skipped['actor_label']), ('b', 'A2'))
+            line = '- 건너뜀 A2 · 모델 ID b f10..15: fewer than 12 frames after the seed'
+            root = Path(directory)/'look'
+            text = (root/'look.md').read_text()
+            self.assertIn('한 사람 이상 추적된 구간 32/32프레임', text)
+            self.assertIn('사람별 건너뜀 2곳', text)
+            self.assertIn(line, text)
+            self.assertIn(line, (root/'look-full.md').read_text())
+            self.assertIn(line, digest.focus(root, 'shot-0000'))
+            with patch.object(cv2, 'VideoCapture', return_value=Mock()), \
+                 patch.object(zoom, '_write', return_value=[]):
+                receipt = check.at(root, '0-1.5', Path(directory)/'at')
+            self.assertIn(line, Path(receipt['output']).read_text())
+
+    def test_actual_entry_tracks_each_id_with_own_geometry_and_context(self):
+        import tempfile
+        with tempfile.TemporaryDirectory(dir=REPO/'workspace') as directory:
+            record, seeds, geometry, boxes = self.run_people(directory)
+            self.assertEqual(seeds, [('a', 0), ('b', 0), ('a', 16), ('b', 16)])
+            self.assertTrue(geometry)
+            self.assertEqual(boxes, [(0, [0, 0, 300, 500]), (0, [100, 0, 350, 500]),
+                                     (16, [0, 0, 300, 500]), (16, [100, 0, 350, 500])])
+            for shot in record['shots']:
+                self.assertEqual([w['source_track_id'] for w in shot['windows']], ['a', 'b'])
+                self.assertEqual(shot['actor_accounting']['completed'], 2)
+                self.assertTrue(all(w['context_pose_flags'] for w in shot['windows']))
+                self.assertTrue(all(w['source_native_range'] == shot['frames'] for w in shot['windows']))
+            text = (Path(directory)/'look/look.md').read_text()
+            self.assertIn('A2 · 모델 ID b', text); self.assertNotIn('P2 · 모델 ID b', text)
+            self.assertIn('32/32프레임', text)
+            self.assertNotIn('64/32프레임', text)
+
+    def test_missing_selected_seed_stays_unknown_and_never_substitutes_another_id(self):
+        import tempfile
+        with tempfile.TemporaryDirectory(dir=REPO/'workspace') as directory:
+            record, seeds, _, boxes = self.run_people(directory, fail_second=True)
+            self.assertEqual([identity for identity, _ in seeds], ['a', 'b', 'a', 'b'])
+            self.assertEqual([bbox for _, bbox in boxes], [[0, 0, 300, 500]]*2)
+            for shot in record['shots']:
+                self.assertEqual(shot['actor_accounting']['completed'], 1)
+                self.assertEqual(shot['actor_accounting']['actors'][1]['status'], 'unknown')
+                self.assertEqual(shot['windows'][1]['source_track_id'], 'b')
+                self.assertEqual(shot['windows'][1]['groups'], [])
+
+    def test_cli_default_and_opt_in_bounds(self):
+        from unittest.mock import patch
+        from image_lens import cli
+        args = ['--video', 'v', '--detector', 'd', '--pose-model', 'p', '--checkpoint', 'c', '--out', 'o']
+        with patch.object(cli, 'models', side_effect=lambda value, *roles: value), patch.object(look, 'run', return_value={}) as run:
+            cli.dispatch('look', args); self.assertEqual(run.call_args.kwargs, {})
+            cli.dispatch('look', args+['--max-people', '1']); self.assertEqual(run.call_args.kwargs, {})
+            cli.dispatch('look', args+['--max-people', '2']); self.assertEqual(run.call_args.kwargs, dict(max_people=2))
+            for value in ('0', '9'):
+                with self.assertRaisesRegex(ValueError, '--max-people'):
+                    cli.dispatch('look', args+['--max-people', value])
