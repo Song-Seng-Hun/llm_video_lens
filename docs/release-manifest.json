@@ -21,7 +21,7 @@
   ],
   "manifest_self_excluded": true,
   "file_count": 168,
-  "total_bytes": 2286416,
+  "total_bytes": 2287302,
   "files": [
     {
       "path": ".gitattributes",
@@ -95,8 +95,8 @@
     },
     {
       "path": "docs/look-notes.md",
-      "bytes": 81558,
-      "sha256": "aa0e95cd674b9502a7fb84b8556e0c88c89e2d3ed9b7942895640a55e31cf93a"
+      "bytes": 82444,
+      "sha256": "ad3949bab986d9ce780d9fc1137d057fd7f883fbe9603ed93eef6c7264475e77"
     },
     {
       "path": "docs/person-detectors.md",
