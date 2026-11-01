@@ -313,3 +313,11 @@ The authored return now retains90px and f9. Isolated-error, below-resolution and
 Every frame's trail dot looked evenly spaced even where the speed fell: in the Live2D sweep the hand point moved 18-21 px/f for ten frames and then 15, 11, 6, 7, 3, 0, and the last six dots merged into one blob. Trails now draw a slightly larger dot every 0.1 s (fps-derived, counted from the start of each continuous run); the same point's steps over three frames read 39, 61, 54, 32, 10 px, which shows the settle at a glance. Per-frame dots stay, smaller.
 
 The coordinate fix (#65) dropped the onion entirely when a camera path existed but its end-frame translation was unknown. On plain backgrounds that is the usual case (both README examples), and the picture the summary calls the main evidence disappeared. Such windows now draw the onion and trails in screen coordinates, record `onion_basis: "screen"`, and say so in the line (`높이별(화면 좌표, 카메라 모름)`) and in the onion captions.
+
+## Spacing chart, unlabelled mark trails, peak panel off (2026-11-01)
+
+The 0.1 s dots still merged where a part moved only a little: in both README examples most steps were shorter than a dot. Each onion now ends with an animator-style spacing chart: one equal-length line per trail, the path length laid out along it (steps under `hold_step_px` 0.75 px/f add nothing, so a held part's jitter does not read as ease; a jump over missing frames adds nothing either: a lost hammer corner first read 326 px), a thick tick every 0.1 s and a thin one per frame. Parts under 15 px are listed as still in their trail colour. On the Live2D sweep the hand rows read bunched -> wide -> bunched (hold, fast start, settle), which the 30 px trail itself did not show.
+
+Mark trails lost their on-picture names: the large labels covered the trails and outlines the reader needs. The chart rows carry the names in trail colour order, and mark.md lists colour = name.
+
+The frame-most-unlike-the-start panel is now off by default and `--peak` turns it on (placed left of the onion when on). It was added because the onion only overlays the ends and a spin read as still (clip B); the turn-candidate strip, the per-frame trails and the chart now cover that, and the panel cost a third of the picture width. The camera-unknown mark onion is drawn in screen coordinates like look's, instead of being skipped.

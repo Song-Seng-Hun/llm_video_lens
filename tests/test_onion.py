@@ -133,6 +133,19 @@ class Trails(unittest.TestCase):
         self.assertTrue(all('평행이동 제외' not in l for l in onion.lines(bands,'x-onion.jpg',screen=True)))
         self.assertIn('카메라 추정 시 평행이동 제외',onion.lines(bands,'x-onion.jpg')[0])
 
+    def test_spacing_rows_stretch_the_path_and_ignore_held_jitter(self):
+        slowing=dict(point='hand',xy=[(n,x,0.) for n,x in enumerate((0,20,38,52,62,68,71))])
+        jitter=dict(point='hip',xy=[(n,10+.5*(n%2),0.) for n in range(20)])
+        small=dict(point='toe',xy=[(n,4.*n,0.) for n in range(3)])
+        rows,still=onion.spacing_rows([slowing,jitter,small],30)
+        self.assertEqual([r['point'] for r in rows],['hand']); self.assertEqual(still,['hip','toe'])
+        hand=rows[0]; self.assertAlmostEqual(hand['length'],71.)
+        self.assertEqual([round(f,3) for f,timed in hand['ticks'] if timed],[0.,round(52/71,3),1.])
+        held=dict(point='arm',xy=[(n,(0,0,.3,.6,.9,30,60)[n],0.) for n in range(7)])
+        self.assertEqual(onion.spacing_rows([held],30)[0][0]['ticks'][4][0],0.)  # sub-threshold steps add nothing
+        lost=dict(point='corner',xy=[(0,0.,0.),(1,2.,0.),(9,300.,0.)])
+        self.assertEqual(onion.spacing_rows([lost],30),([],['corner']))  # a jump over missing frames is not travel
+
     def test_timing_dot_is_drawn_larger(self):
         import tempfile
         import cv2
@@ -218,7 +231,14 @@ class Peak(unittest.TestCase):
             out.release()
             bbox = (40, 60, 280, 180); image = Path(d)/'o.jpg'
             onion.bands(video, 0, 20, bbox, None, image); width = cv2.imread(str(image)).shape[1]
-            self.assertIn(onion.peak(video, 0, 20, bbox, image), (9, 10, 11))
+            self.assertIsNone(onion.peak(video, 0, 20, bbox, image))  # off by default: the picture is left alone
+            self.assertEqual(cv2.imread(str(image)).shape[1], width)
+            self.assertIn(onion.peak(video, 0, 20, bbox, None), (9, 10, 11))
+            onion.PEAK['draw'] = True
+            try:
+                self.assertIn(onion.peak(video, 0, 20, bbox, image), (9, 10, 11))
+            finally:
+                onion.PEAK['draw'] = False
             self.assertGreater(cv2.imread(str(image)).shape[1], 2*width)
             self.assertEqual(onion.still(video, 3, None, Path(d)/'s.jpg'), 's.jpg')
             self.assertEqual(onion.strip(video, 0, 20, bbox, Path(d)/'t.jpg')['frames'][0], 0)

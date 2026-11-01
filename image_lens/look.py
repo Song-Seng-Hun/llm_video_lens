@@ -471,10 +471,11 @@ def _run(video, detector, pose_model, checkpoint, out, max_shots=LOOK['max_shots
                         done['mark_hint'] = hint; slot.append('  '+_mark_hint(hint, source, root/'shots.json'))
                 done['onion'] = picture.name
                 done['peak'] = onion.peak(source, w['seed'], end, person['bbox'], picture)
+                done['spacing'] = onion.spacing(source, picture, done['trails'])
                 turns = [e['share'] for e in (done.get('events') or {}).get('width', []) if e['share'] >= body_motion.EVENTS['turn']]
                 if turns:
                     done['turn_share'] = max(turns); stripping.append((done, end, person['bbox'], base))
-                slot += ['  '+l for l in onion.lines(done['bands'], picture.name, screen=done.get('onion_basis') == 'screen')]
+                slot += ['  '+l for l in onion.lines(done['bands'], picture.name, screen=done.get('onion_basis') == 'screen', peak=bool(done.get('peak')))]
             except Exception as error:  # OpenCV raises its own error type; the view is optional
                 errors.append(dict(window=w, step='onion', error=str(error)[:300]))
         if end < w['end']:

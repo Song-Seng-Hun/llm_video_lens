@@ -149,8 +149,11 @@ def dispatch(command, arguments):
         ap.add_argument('--frame', type=int, required=True); ap.add_argument('--end', type=int)
         ap.add_argument('--point', action='append', required=True, help='name=x,y in source pixels; repeat up to 8 times')
         ap.add_argument('--no-snap', action='store_true', help='keep the given positions instead of the nearest corner')
+        ap.add_argument('--peak', action='store_true', help='add the frame most unlike the start left of the onion')
         ap.add_argument('--checkpoint', help='default: models.json'); ap.add_argument('--out', required=True, help='new output directory')
         a = models(ap.parse_args(arguments), 'checkpoint')
+        from image_lens import onion
+        onion.PEAK['draw'] = a.peak
         return mark.run(a.video, a.shots, a.frame, a.point, a.checkpoint, a.out, a.end, not a.no_snap)
     if command == 'focus':
         from image_lens import digest
@@ -180,9 +183,12 @@ def dispatch(command, arguments):
         ap.add_argument('--pose-model', help='default: models.json'); ap.add_argument('--checkpoint', help='default: models.json')
         ap.add_argument('--out', required=True, help='new output directory inside the workspace')
         ap.add_argument('--max-shots', type=int, default=look.LOOK['max_shots']); ap.add_argument('--max-seconds', type=int, default=1800)
+        ap.add_argument('--peak', action='store_true', help='add the frame most unlike the start left of each onion')
         a = models(ap.parse_args(arguments), 'detector', 'pose_model', 'checkpoint')
         if not 1 <= a.max_shots <= 256 or not 60 <= a.max_seconds <= 7200:
             raise ValueError('--max-shots 1..256 and --max-seconds 60..7200')
+        from image_lens import onion
+        onion.PEAK['draw'] = a.peak
         return look.run(a.video, a.detector, a.pose_model, a.checkpoint, a.out, a.max_shots, a.max_seconds)
     if command == 'pose':
         from image_lens import pose
