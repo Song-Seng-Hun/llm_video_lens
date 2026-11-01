@@ -12,8 +12,8 @@ def window(record, name):
     shot = next((s for s in record['shots'] if s['segment_id'] == sid), None)
     if shot is None or not i.isdigit() or int(i) >= len(shot['windows']):
         raise ValueError(f'no window {name} in that look; names are <shot id>-w<i> as in its file names')
-    w = shot['windows'][int(i)]['window']
-    return w['seed'], w['end']
+    done = shot['windows'][int(i)]; w = done['window']
+    return w['seed'], min(done.get('cut_after', w['end']), w['end'])  # a cut ends the window early, as look reported it
 
 
 def kind(pose):
@@ -59,8 +59,10 @@ def run(look_dir, name, detector, pose_model, checkpoint, out, max_seconds=1800)
     record, _ = paths.load(paths.confined(root/'look.json', exists=True), max_bytes=64*1024*1024)
     before, _ = paths.load(paths.confined(root/'pose.json', exists=True), max_bytes=64*1024*1024)
     first, last = window(record, name)
-    now = person_models.resolve(detector)['kind']
     video = paths.confined(record['source_video'], exists=True, max_bytes=512*1024*1024)
+    if not paths.sha(video) == record['source_sha256'] == before['source_sha256']:
+        raise ValueError('look run, its pose.json and the video on disk differ; redo needs the video that look saw')
+    now = person_models.resolve(detector)['kind']
     result = look.run(video, detector, pose_model, checkpoint, out, max_seconds=max_seconds, frames=(first, last),
                       redo=dict(look=root.name, window=name, detector=now, was=kind(before), boxes=REDO['picture']))
     after, _ = paths.load(paths.confined(Path(out)/'pose.json', exists=True), max_bytes=64*1024*1024)

@@ -21,7 +21,7 @@
   ],
   "manifest_self_excluded": true,
   "file_count": 167,
-  "total_bytes": 2217135,
+  "total_bytes": 2218537,
   "files": [
     {
       "path": ".gitattributes",
@@ -355,8 +355,8 @@
     },
     {
       "path": "image_lens/redo.py",
-      "bytes": 3680,
-      "sha256": "d21d0e3be793b38e0782a0efc15877e91242b5a4193c763946268bdfeedd42fd"
+      "bytes": 3983,
+      "sha256": "dff667134e869bae432b8e456e5cbd3051b317a7261504b850f51481a9c00a46"
     },
     {
       "path": "image_lens/run_point_tracker.py",
@@ -840,8 +840,8 @@
     },
     {
       "path": "tests/test_redo.py",
-      "bytes": 3835,
-      "sha256": "c92434e089f21b36b3c1c42b716926dc2c531e734c195b7de9dba0c86bda43ba"
+      "bytes": 4934,
+      "sha256": "41e966d40cd9a56ee95eaf3e8e541fbdb25279018262ee40d6a6d1e3cc47b9ee"
     },
     {
       "path": "tests/test_zoom.py",

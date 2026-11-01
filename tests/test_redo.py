@@ -15,9 +15,28 @@ class Redo(unittest.TestCase):
     def test_window_names_follow_the_file_names(self):
         record = dict(shots=[dict(segment_id='shot-0002', windows=[dict(window=dict(seed=40, end=199)), dict(window=dict(seed=200, end=230))])])
         self.assertEqual(redo.window(record, 'shot-0002-w1'), (200, 230))
+        record['shots'][0]['windows'][0]['cut_after'] = 131
+        self.assertEqual(redo.window(record, 'shot-0002-w0'), (40, 131))
         for bad in ('shot-0002-w2', 'shot-0003-w0', 'shot-0002'):
             with self.assertRaises(ValueError):
                 redo.window(record, bad)
+
+    def test_a_different_video_is_refused_before_look_runs(self):
+        from unittest.mock import patch
+        previous = paths.workspace_root()
+        with tempfile.TemporaryDirectory() as d:
+            root = Path(d).resolve(); paths.configure(root)
+            try:
+                video = root/'v.avi'; video.write_bytes(b'now')
+                first = root/'first'; first.mkdir()
+                shots = [dict(segment_id='s', windows=[dict(window=dict(seed=0, end=9))])]
+                paths.write_json(first/'look.json', dict(source_video=str(video), source_sha256=paths.sha(video), shots=shots))
+                paths.write_json(first/'pose.json', dict(packet({}), source_sha256='other'))
+                with patch('image_lens.look.run') as run, self.assertRaises(ValueError):
+                    redo.run(first, 's-w0', 'd', 'p', 'c', root/'out')
+                run.assert_not_called()
+            finally:
+                paths.configure(previous)
 
     def test_old_pose_packets_were_humanart(self):
         self.assertEqual(redo.kind(packet({})), 'humanart')
