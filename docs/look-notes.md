@@ -321,3 +321,18 @@ The 0.1 s dots still merged where a part moved only a little: in both README exa
 Mark trails lost their on-picture names: the large labels covered the trails and outlines the reader needs. The chart rows carry the names in trail colour order, and mark.md lists colour = name.
 
 The frame-most-unlike-the-start panel is now off by default and `--peak` turns it on (placed left of the onion when on). It was added because the onion only overlays the ends and a spin read as still (clip B); the turn-candidate strip, the per-frame trails and the chart now cover that, and the panel cost a third of the picture width. The camera-unknown mark onion is drawn in screen coordinates like look's, instead of being skipped.
+
+## Onion sheet tiles share one height (2026-11-01)
+
+The contact sheet fitted every tile to a 360 px width. Since the spacing chart made onions about 1.4x as wide as tall, an onion shrank to 360x262 next to a 360x414 single-frame still (Live2D sliding wave). Tiles now share one height and fill rows left to right; a tile that would pass the 1440 px sheet width starts the next row.
+
+Cost on mikumiku (50 tiles; tokens estimated as image area after the reader's 1568 px / 1.15 MP downscale, over 750):
+
+| Tile height | Sheets | Image tokens | Onion height as read |
+|---|---|---|---|
+| old (360 wide) | 5 | ~6,900 | 153-210 px |
+| 360 (chosen) | 6 | ~9,200 | 232-274 px |
+| 400 | 7 | ~10,400 | 246-400 px |
+| 540 | 9 | ~13,800 | 287-540 px |
+
+Larger tiles gain less than their cost because tall sheets are downscaled when read. The user picked 360 (same reasoning as the peak panel: tokens against information). A row with a tile that does not fit leaves a black gap on its right.

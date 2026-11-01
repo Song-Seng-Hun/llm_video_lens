@@ -1,4 +1,5 @@
 from pathlib import Path
+import tempfile
 import unittest
 from image_lens import onion
 
@@ -244,7 +245,21 @@ class Peak(unittest.TestCase):
             self.assertEqual(onion.strip(video, 0, 20, bbox, Path(d)/'t.jpg')['frames'][0], 0)
             onion.still(video, 5, None, Path(d)/'s2.jpg')
             sheets = onion.sheets(Path(d), [(0, .5, 'o.jpg', ''), (.5, .6, 's.jpg', 'still'), (.6, .7, 's2.jpg', 'still'), (0, .5, 't.jpg', 'strip')])
-            self.assertEqual(cv2.imread(str(Path(d)/sheets[0])).shape[1], onion.SHEET['tile']*onion.SHEET['columns'])
+            self.assertEqual(cv2.imread(str(Path(d)/sheets[0])).shape[1], onion.SHEET['width'])
+
+
+    def test_sheet_tiles_share_one_height(self):
+        import cv2
+        import numpy as np
+        with tempfile.TemporaryDirectory() as d:
+            cv2.imwrite(str(Path(d)/'wide.jpg'), np.full((1247, 1716, 3), 90, np.uint8))  # onion + spacing chart
+            cv2.imwrite(str(Path(d)/'tall.jpg'), np.full((1242, 1080, 3), 160, np.uint8))  # a single-frame still
+            name, = onion.sheets(Path(d), [(0, .03, 'tall.jpg', 'still'), (.03, 4, 'wide.jpg', '')])
+            sheet = cv2.imread(str(Path(d)/name))
+            self.assertEqual(sheet.shape[:2], (onion.SHEET['tile_height']+onion.SHEET['label'], onion.SHEET['width']))
+            row = sheet[onion.SHEET['label']+10]
+            cols = np.flatnonzero(np.abs(row.astype(int)-90).max(1) < 8)
+            self.assertGreater(cols.size, 1.3*onion.SHEET['tile_height'])  # beside the still at full height, wider than tall
 
 
 if __name__ == '__main__': unittest.main()
