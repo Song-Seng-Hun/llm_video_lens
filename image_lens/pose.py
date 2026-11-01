@@ -1,4 +1,4 @@
-"""Optional local whole-body pose: YOLOX HumanArt detector + RTMW133 (rtmlib, ONNX Runtime on CoreML) with per-shot ByteTrack IDs.
+"""Optional local whole-body pose: selectable pinned HumanArt, DeepGHS or SAM3+DeepGHS detection + RTMW133, with per-shot ByteTrack IDs.
 User-supplied weights are pinned by size and SHA256; nothing is downloaded or bundled (weight license unestablished).
 Pose output is a model estimate on screen 2D: seeds and overlap flags, never verified anatomy, identity or redraw decisions."""
 import math
@@ -157,7 +157,8 @@ def run(shots, detector, pose_model, start=0, end=None, part=None):
         if abs(cap.get(cv2.CAP_PROP_POS_MSEC)/1000.-scan['native_pts_seconds'][n]) > .002:
             raise ValueError('decoder PTS differs from canonical scan')
         boxes, conf = det(image)
-        return image, np.asarray(boxes, np.float32).reshape(-1, 4), np.asarray(conf, np.float32)
+        diagnostics = [dict(item) for item in getattr(det, 'diagnostics', [])]
+        return image, np.asarray(boxes, np.float32).reshape(-1, 4), np.asarray(conf, np.float32), diagnostics
     from concurrent.futures import ThreadPoolExecutor
     cap = cv2.VideoCapture(str(video))
     try:
@@ -169,7 +170,7 @@ def run(shots, detector, pose_model, start=0, end=None, part=None):
         with ThreadPoolExecutor(1) as ahead:
             following = ahead.submit(detected, start)
             for n in range(start, end+1):
-                image, boxes, conf = following.result()
+                image, boxes, conf, diagnostics = following.result()
                 if n < end:
                     following = ahead.submit(detected, n+1)
                 if segments[n] != segment:
@@ -192,7 +193,8 @@ def run(shots, detector, pose_model, start=0, end=None, part=None):
                     raise ValueError('nonfinite model output')
                 tracks = tracker.update_with_detections(supervision.Detections(
                     xyxy=boxes, confidence=conf, class_id=np.zeros(len(boxes), int), data=dict(keypoints=keypoints, scores=scores)))
-                frames.append(dict(frame=n, pts_seconds=scan['native_pts_seconds'][n], segment_id=segment, detections=len(boxes)-split, split_boxes=split, tracks=[
+                frames.append(dict(frame=n, pts_seconds=scan['native_pts_seconds'][n], segment_id=segment, detections=len(boxes)-split, split_boxes=split,
+                    **(dict(detector_diagnostics=diagnostics) if diagnostics else {}), tracks=[
                     dict(track_id=f'{segment}/{int(tracks.tracker_id[j])}', bbox=[round(float(v), 2) for v in tracks.xyxy[j]],
                          detection_score=round(float(tracks.confidence[j]), 4),
                          keypoints=[[round(float(x), 2), round(float(y), 2)] for x, y in tracks.data['keypoints'][j]],
@@ -234,8 +236,8 @@ def _iou(a, b):
 
 
 def flags(frames):
-    """Frames where the pose layer itself looks unreliable: overlapping people, or a body skeleton jump within one track."""
-    rows = []; previous = {}
+    """Keep overlap/jump seed warnings separate from detector truncation diagnostics."""
+    rows = []; truncations = []; previous = {}
     for f in frames:
         tracks = f['tracks']
         overlap = any(_iou(a['bbox'], b['bbox']) >= FLAGS['overlap_iou'] for i, a in enumerate(tracks) for b in tracks[i+1:])
@@ -250,9 +252,12 @@ def flags(frames):
             if moves and diagonal > 0 and moves[len(moves)//2]/diagonal > FLAGS['jump_diagonals']:
                 jump = dict(track_id=t['track_id'], median_move_diagonals=round(moves[len(moves)//2]/diagonal, 3))
         previous.update({t['track_id']: (f['frame'], t) for t in tracks})
+        diagnostics = f.get('detector_diagnostics', [])
+        if diagnostics:
+            truncations.append(dict(frame=f['frame'], detector_diagnostics=diagnostics))
         if overlap or jump:
             rows.append(dict(frame=f['frame'], people=len(tracks), overlapping_people=overlap, skeleton_jump=jump))
-    return dict(params=FLAGS, frames=rows,
+    return dict(params=FLAGS, frames=rows, **(dict(detector_truncations=truncations) if truncations else {}),
                 basis='person boxes overlapping, or median body-joint move between consecutive frames of one track; diagnostic only')
 
 

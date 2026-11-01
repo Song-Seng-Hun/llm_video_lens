@@ -21,7 +21,7 @@
   ],
   "manifest_self_excluded": true,
   "file_count": 165,
-  "total_bytes": 2190192,
+  "total_bytes": 2199480,
   "files": [
     {
       "path": ".gitattributes",
@@ -100,8 +100,8 @@
     },
     {
       "path": "docs/person-detectors.md",
-      "bytes": 4712,
-      "sha256": "50b1b8aec800e8af1fb843c7d88c26c31a841e5574b4efd07e13e2df92f8d4c2"
+      "bytes": 6485,
+      "sha256": "cce855d6a1131daf620d745d56faab76fc8d336fec30f77bb930eb8a7ac8fb46"
     },
     {
       "path": "docs/provenance.md",
@@ -345,13 +345,13 @@
     },
     {
       "path": "image_lens/person_models.py",
-      "bytes": 8675,
-      "sha256": "a70c40e07c84400831a131f7bf37e6f84703b9556eefd8c31954c738a9c03e0f"
+      "bytes": 9250,
+      "sha256": "2e615732bd02632534af601fa0d8533c1021cf687ba66660d5edaaf421a34660"
     },
     {
       "path": "image_lens/pose.py",
-      "bytes": 27366,
-      "sha256": "7178500c9ca61e6bf3ab6f81b32806a10e72e57f65d3ac9319dd1e24395ae389"
+      "bytes": 27782,
+      "sha256": "9ce2d4c5793a0b33ff57a2ba461a670594e9b4cb3b4243448ab2ae02b86843c3"
     },
     {
       "path": "image_lens/run_point_tracker.py",
@@ -825,8 +825,8 @@
     },
     {
       "path": "tests/test_person_models.py",
-      "bytes": 4991,
-      "sha256": "328c1a5230053031fbf3520d9684f72a47ea650dddb2bc61ac108b742fea828c"
+      "bytes": 11515,
+      "sha256": "294df3ea59b37913173c79fe08e6d3026fb2c0b6d1947e21c8916425a94c8817"
     },
     {
       "path": "tests/test_pose.py",

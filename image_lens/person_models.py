@@ -10,7 +10,8 @@ PINS = {
 }
 DEEPGHS_RECIPE = dict(input=[640, 640], color='RGB', resize='PIL bicubic stretch', scale='1/255',
                       confidence_strictly_above=.3, nms='inclusive pixel area', nms_threshold=.5,
-                      coordinates='native resize, round, clip', provider='CPUExecutionProvider', cpu_threads=4)
+                      coordinates='native resize, round, clip', provider='CPUExecutionProvider', cpu_threads=4,
+                      maximum_instances=32, overflow='stable highest-score32; native-frame diagnostic')
 SAM3_RECIPE = dict(prompt='person', input=[1008, 1008], confidence_strictly_above=.5,
                    boxes='native xyxy clipped to frame', coverage='DeepGHS zero positive-area intersection with every original SAM3 box',
                    masks='no pixel filtering', strict_checkpoint=True, inactive_neck_keys=22, generated_buffers=5)
@@ -94,8 +95,6 @@ def anime_boxes(output, width, height):
     boxes[:, [1, 3]] = np.clip(boxes[:, [1, 3]], 0, height)
     good = (boxes[:, 2] > boxes[:, 0]) & (boxes[:, 3] > boxes[:, 1])
     boxes, scores = boxes[good], scores[good]
-    if len(boxes) > 32:
-        raise ValueError('DeepGHS detector instance budget exceeded; no silent truncation')
     return boxes.astype(np.float32), scores.astype(np.float32)
 
 
@@ -120,7 +119,15 @@ class DeepGHS:
         resized = np.asarray(rgb.resize((640, 640), Image.Resampling.BICUBIC), dtype=np.float32)/255.
         tensor = np.ascontiguousarray(resized.transpose(2, 0, 1)[None])
         output, = self.session.run(None, {self.input_name: tensor})
-        return anime_boxes(output, image.shape[1], image.shape[0])
+        boxes, scores = anime_boxes(output, image.shape[1], image.shape[0])
+        self.diagnostics = []
+        if len(boxes) > 32:
+            count = len(boxes)
+            keep = np.argsort(-scores, kind='stable')[:32]
+            boxes, scores = boxes[keep], scores[keep]
+            self.diagnostics = [dict(detector='deepghs', role='primary', original_count=count, kept_count=32,
+                                     dropped_count=count-32, basis='post-NMS native valid boxes; stable highest-score32 resource bound')]
+        return boxes, scores
 
 
 class Sam3Coverage:
@@ -147,6 +154,7 @@ class Sam3Coverage:
         boxes[:, [0, 2]] = np.clip(boxes[:, [0, 2]], 0, width)
         boxes[:, [1, 3]] = np.clip(boxes[:, [1, 3]], 0, height)
         secondary, secondary_scores = self.supplement(image)
+        self.diagnostics = [dict(item, role='supplement') for item in self.supplement.diagnostics]
         return add_disjoint(boxes, scores, secondary, secondary_scores)
 
 
