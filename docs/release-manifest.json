@@ -19,8 +19,8 @@
     "historical experiment outputs"
   ],
   "manifest_self_excluded": true,
-  "file_count": 138,
-  "total_bytes": 1790404,
+  "file_count": 140,
+  "total_bytes": 1958366,
   "files": [
     {
       "path": ".gitattributes",
@@ -144,8 +144,8 @@
     },
     {
       "path": "image_lens/camera.py",
-      "bytes": 10360,
-      "sha256": "e77e5f2515e23538b045e283d4c07b86cff1a5d4ae176a232ff1201e661251bd"
+      "bytes": 10920,
+      "sha256": "9ce5b3c92c8a853020726da1bd274cd983647289c28d907baea84b6e228f4a6c"
     },
     {
       "path": "image_lens/check.py",
@@ -189,13 +189,13 @@
     },
     {
       "path": "image_lens/look.py",
-      "bytes": 44391,
-      "sha256": "7e147e2858fde4a02e3462ed11518a96581f8520504ffb4ce13da6af5a3e5524"
+      "bytes": 44974,
+      "sha256": "291233e03a763df1d2006a87c2be2580338e9f51d57530359694edeb89503bec"
     },
     {
       "path": "image_lens/mark.py",
-      "bytes": 15604,
-      "sha256": "6cedc583ab9741fc7cce5804d6704205ffa94b5790ad19f50bed3d0a83e404f5"
+      "bytes": 16076,
+      "sha256": "631689ba26aae7396d2630bf9e2dd85d77a20edd2f586a8d940b9fe89fcb7b4c"
     },
     {
       "path": "image_lens/motif.py",
@@ -654,8 +654,8 @@
     },
     {
       "path": "tests/test_check.py",
-      "bytes": 12829,
-      "sha256": "f3099c40459562c431daaca60e30c41fab9119981bcc28c47dbf53d3248f532a"
+      "bytes": 14167,
+      "sha256": "07c57731d2587c4442035d61c05fdb85340127f685de975b17b0271b19a6a2e3"
     },
     {
       "path": "tests/test_contracts.py",
@@ -679,13 +679,13 @@
     },
     {
       "path": "tests/test_look.py",
-      "bytes": 18882,
-      "sha256": "ac9ff5e04066a88a1d27575d7d972741f6eccd99b7e6cfe81c694dbae8bb2b20"
+      "bytes": 20755,
+      "sha256": "28350500e0c6030731fee13223d48a47e4cd6b27bb8f4f2cd9452e9b8aa0328f"
     },
     {
       "path": "tests/test_mark.py",
-      "bytes": 1479,
-      "sha256": "b074dd0cb4ec4e03963d11e4ca0d4a9177e217af36449097c8d6c291b0d98bcc"
+      "bytes": 4451,
+      "sha256": "6ad3bb9046fbc69460bcbe41e084fe4ae6ed2b10ef7c2359aa7c50409d20d53f"
     },
     {
       "path": "tests/test_motif.py",

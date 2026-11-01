@@ -36,6 +36,8 @@ def _step(cv2, np, matcher, base, keys, desc, shape, spread_min=CAMERA['min_spre
 def path(video, start, end, person=None):
     """{frame: (dx, dy, scale)} of the frame centre relative to `start`; frames that could not be matched are left out.
     With `person` (the main person's box on the start frame) a frame is matched on the background around it first.
+    When the seed has enough background features, only that background may establish the camera path: a failed
+    background fit stays unknown, rather than borrowing the moving subject's full-frame fit.
     Frames are matched to the start frame. When one does not match and the last matched frame is CAMERA['rekey_px'] or
     more away, it is matched to that frame instead and the steps are chained, so a pan stays known after the start
     frame has left the view (clip D 70-100 s: a 680 px pan at 23.35 s was unknown). A chained step needs matches over
@@ -67,8 +69,8 @@ def _path(video, start, end, person=None):
     # window: 0.14 -> 0.02 s); matching and RANSAC stay in frame order.
     # A big textured figure over a plain room takes most of the 2000 points, and its moves outvote the background
     # (3D dance clip, fixed camera: 101 of 130 frames unknown); with the person masked out the room alone gives
-    # 300-900 agreeing matches at 0-1 px. A frame the background does not place is matched on the whole frame as before,
-    # and so is every frame when the background has too few points (a close-up).
+    # 300-900 agreeing matches at 0-1 px. Use the whole frame only when the seed background has too few features;
+    # once a background was admitted, a failed fit must not promote the moving figure to a camera estimate.
     def detect(mask):
         with ThreadPoolExecutor(8) as pool:
             return list(pool.map(lambda gray: cv2.ORB_create(CAMERA['features']).detectAndCompute(gray, mask), grays))
@@ -80,7 +82,7 @@ def _path(video, start, end, person=None):
              max(0, int((x0-px)*CAMERA['scale'])):max(0, int((x1+px)*CAMERA['scale']))] = 0
         background = detect(mask)
         if len(background[0][0]) >= CAMERA['background_features']:
-            kinds.insert(0, background)
+            kinds = [background]
     matcher = cv2.BFMatcher(cv2.NORM_HAMMING, crossCheck=True)
     result = {}
     start_ref = last = None
@@ -126,6 +128,13 @@ def plain(video, frame, person=None):
         mask[max(0, int((y0-py)*CAMERA['scale'])):max(0, int((y1+py)*CAMERA['scale'])),
              max(0, int((x0-px)*CAMERA['scale'])):max(0, int((x1+px)*CAMERA['scale']))] = 0
     return len(cv2.ORB_create(CAMERA['features']).detect(gray, mask)) < CAMERA['background_features']
+
+
+def complete(camera, start, end):
+    """Whether every requested frame has a finite translation; unknown is never zero motion."""
+    return bool(camera) and all(n in camera and len(camera[n]) >= 2
+                                and all(math.isfinite(x) for x in camera[n][:2])
+                                for n in range(start, end+1))
 
 
 def between(camera, a, b):
