@@ -123,6 +123,12 @@ python -m image_lens --workspace W grid --video V --frame 572 --box 100,250,1000
 python -m image_lens --workspace W mark --video V --shots W/look/shots.json --frame 572 --end 599 --point hammer-stripe=430,680 --point eye=322,738 --checkpoint C --out W/mark-s19
 ```
 
+If look followed the wrong person, or you want something that is not a person, give `box` a box. The green outline on the small frame under the onion chart is the person look tracked. When the box covers a person, that person's joints are tracked; otherwise up to 8 clear corners inside the box, the same way as `mark`.
+
+```bash
+python -m image_lens --workspace W box --video V --look W/look --frame 0 --end 119 --box 0,300,880,1440 --checkpoint C --out W/box-f0
+```
+
 ## Status and limits
 
 - Limb positions are estimated from the pose model and point tracking together; where they are unsure, the line says "모름" (unknown). Comparisons and limits are in the [look notes](look-notes.md).

@@ -319,13 +319,16 @@ def _dashed(cv2, panel, a, b, color, t):
             cv2.line(panel, u, v, (255, 255, 255), t+2); cv2.line(panel, u, v, color, t)
 
 
+SUBJECT_COLOR = (60, 200, 60)  # green: the tracked person, or the box given to `box`
+
+
 def _context(cv2, video, context, panel, area):
     """The whole frame, fitted into `area` of the chart panel, with the onion's view outlined: a crop alone hid that
     mikumiku is a character inside a square card on a phone player (2026-11-01). Costs no width: the panel is there.
-    context=(frame, bbox, body path, camera path): with a camera path the view's centre path and the last frame's
+    context=(frame, bbox, body path, camera path, subject box): with a camera path the view's centre path and the last frame's
     view (dashed) are drawn too, and the picture shrinks so that view fits beside it."""
     from image_lens import frames
-    frame, bbox, path, camera = (tuple(context)+(None, None))[:4]
+    frame, bbox, path, camera, subject = (tuple(context)+(None, None, None))[:5]
     got = frames.window(video, frame, frame)
     if not got:
         return
@@ -344,6 +347,9 @@ def _context(cv2, video, context, panel, area):
     t = max(2, round(small.shape[0]/200))  # 1 px of colour did not survive JPEG
     corners = ((sx+int(vx0*k), sy+int(vy0*k)), (sx+int(vx1*k)-1, sy+int(vy1*k)-1))
     cv2.rectangle(panel, *corners, (0, 0, 0), t+2); cv2.rectangle(panel, *corners, (0, 220, 255), t)
+    if subject:  # who was tracked: the agent can tell a wrong pick and hand `box` a better one
+        a, b = (sx+int(subject[0]*k), sy+int(subject[1]*k)), (sx+int(subject[2]*k)-1, sy+int(subject[3]*k)-1)
+        cv2.rectangle(panel, a, b, (0, 0, 0), t+2); cv2.rectangle(panel, a, b, SUBJECT_COLOR, t)
     capture = cv2.VideoCapture(str(video)); fps = capture.get(cv2.CAP_PROP_FPS); capture.release()
 
     def line(points, color):  # a path in first-frame pixels: white rim, 0.1 s dots, square at the end
@@ -611,7 +617,7 @@ def lines(result, image_name=None, screen=False, peak=False, body=None):
     out = [f'- 높이별 흐름 (사람 상자 5등분, {basis}): ' + ' · '.join(parts)]
     if image_name:
         out.append(f"  - 어니언 그림: {image_name} (청록=시작, 빨강=끝(진한 윤곽선 기준; 배경보다 밝은 면은 띠 색이 반대(청록 띠=간 쪽); 카메라가 움직였으면 끝 프레임을 카메라만큼 되돌려 겹침), 초록 화살표=띠별 이동 ×{ONION['arrow_scale']}(그림 밖으로 나가면 줄임, 머리보다 짧으면 생략); {'왼쪽 회색=시작과 가장 다른 가운데 프레임; ' if peak else ''}"
-                   f"색 점선=부위별 대표 점(몸 기준이 없으면 '화면'에 적힌 점)의 프레임마다 위치({'·'.join(TRAILS['names'])} 순, {basis}), 큰 원·네모=각 연속 관측의 시작·끝, 선 끊김=관측 누락, 이어진 점 간격이 좁으면 느림·넓으면 빠름, 조금 큰 점={TRAILS['tick_seconds']:g}초마다(그 간격이 좁아지면 느려짐); 맨 오른쪽 spacing=부위마다 지나온 길이를 같은 길이 줄로 펼친 것, 굵은 눈금={TRAILS['tick_seconds']:g}초마다·가는 눈금=프레임마다, 눈금이 모이면 느림·벌어지면 빠름(작은 이동도 같은 크기로 보임, {SPACING['min_px']:g}px 미만 부위는 still), 맨 위 camera 줄=화면 전체 이동·body 줄=몸 중심 이동(카메라 추정 시 카메라 제외; {SPACING['min_px']:g}px 미만이면 줄 없음), 그 아래 작은 그림=구간 첫 프레임 전체(노란 테두리=어니언이 잘라 보여 준 범위, 카메라가 움직였으면 회색 선=화면 중심의 궤적·회색 점선 사각형=구간 끝의 화면))")
+                   f"색 점선=부위별 대표 점(몸 기준이 없으면 '화면'에 적힌 점)의 프레임마다 위치({'·'.join(TRAILS['names'])} 순, {basis}), 큰 원·네모=각 연속 관측의 시작·끝, 선 끊김=관측 누락, 이어진 점 간격이 좁으면 느림·넓으면 빠름, 조금 큰 점={TRAILS['tick_seconds']:g}초마다(그 간격이 좁아지면 느려짐); 맨 오른쪽 spacing=부위마다 지나온 길이를 같은 길이 줄로 펼친 것, 굵은 눈금={TRAILS['tick_seconds']:g}초마다·가는 눈금=프레임마다, 눈금이 모이면 느림·벌어지면 빠름(작은 이동도 같은 크기로 보임, {SPACING['min_px']:g}px 미만 부위는 still), 맨 위 camera 줄=화면 전체 이동·body 줄=몸 중심 이동(카메라 추정 시 카메라 제외; {SPACING['min_px']:g}px 미만이면 줄 없음), 그 아래 작은 그림=구간 첫 프레임 전체(노란 테두리=어니언이 잘라 보여 준 범위, 초록 테두리=추적한 사람(틀렸으면 box 명령에 상자를 주어 다시), 카메라가 움직였으면 회색 선=화면 중심의 궤적·회색 점선 사각형=구간 끝의 화면))")
     if image_name and body:
         out.append(f"  - 몸 기준 그림: 몸 중심이 {motion_report.KO[motion_report.direction(*body)].replace('화면 ', '')} {math.hypot(*body):.0f}px "
                    "움직여 끝 프레임과 궤적을 그만큼 되돌려 겹침(몸은 포개지고 팔다리 움직임만 갈라짐, 배경은 반대로 갈라짐; "

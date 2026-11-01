@@ -483,7 +483,7 @@ def _run(video, detector, pose_model, checkpoint, out, max_shots=LOOK['max_shots
                 done['peak'] = onion.peak(source, w['seed'], end, person['bbox'], picture)
                 known = frame_motion if frame_motion and not screen and not done.get('camera', {}).get('unknown') else None
                 charted, palette = onion.references(done['trails'], w['seed'], end, known, centre)
-                done['spacing'] = onion.spacing(source, picture, charted, palette, context=(w['seed'], person['bbox'], path, known and onion.moved(known)))
+                done['spacing'] = onion.spacing(source, picture, charted, palette, context=(w['seed'], person['bbox'], path, known and onion.moved(known), person['bbox']))
                 turns = [e['share'] for e in (done.get('events') or {}).get('width', []) if e['share'] >= body_motion.EVENTS['turn']]
                 if turns:
                     done['turn_share'] = max(turns); stripping.append((done, end, person['bbox'], base))
