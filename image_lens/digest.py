@@ -502,6 +502,8 @@ def markdown(record, scan, full_name):
                     out.append(line)
                 if bridge and bridge['limbs'] and all(pair):
                     switches[pair] = bridge['frames']
+            if done.get('actor_label') and done['actor_label'] != (prev or {}).get('actor_label'):
+                out.append(f"### {done['actor_label']} · 모델 ID {done['source_track_id']} (동일인 미검증)")
             label = done.get('motif')
             out.append(window_line(done, fps, first.get(label)))
             out += phase_lines(done, fps)

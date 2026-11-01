@@ -18,7 +18,7 @@ def _box(bbox, w, h):
 
 # The pictures (onion, still, strip, peak panel) show at least half the frame's shorter side each way, between 1.6:1
 # and 1:1.6 (wide or tall, the same limit):
-# a pose box around the visible part of a character in a square card (mikumiku) cut 1372x395 strips of one body part.
+# a pose box around the visible part of a character in a square card (clip B, look-notes) cut 1372x395 strips of one body part.
 # Measurements (bands, gaps, peak's difference) stay on the padded box.
 VIEW = dict(min_side=.5, max_aspect=1.6)
 
@@ -74,7 +74,7 @@ def trails(packets, points, seed, end, camera=None, limit=None, body=None):
 # Only a move of the whole figure counts: most tracked points (agree_share), and as many of the lowest quarter of them,
 # must have gone at least half the centre's shift its way. A lunge drops the shoulders while the feet stay; drawn
 # against the body, the planted foot moved 117 px (dancer f54..213), and the upper-body points alone still agreed.
-# Points an agent placed are not a body: a hammer swing in mikumiku s19 moved 4 of 6 points and their median 179 px,
+# Points an agent placed are not a body: a hammer swing in clip B s19 moved 4 of 6 points and their median 179 px,
 # so the barely moving eye (16 px) was drawn as 477 px. Against their median, nearly every point must agree.
 BODY_VIEW = dict(min_share=.15, agree_share=.6, subject_agree_share=.85, smooth=5, color=(60, 60, 220))
 
@@ -346,7 +346,7 @@ SUBJECT_COLOR = (60, 200, 60)  # green: the tracked person, or the box given to 
 
 def _context(cv2, video, context, panel, area):
     """The whole frame, fitted into `area` of the chart panel, with the onion's view outlined: a crop alone hid that
-    mikumiku is a character inside a square card on a phone player (2026-11-01). Costs no width: the panel is there.
+    clip B (look-notes) is a character inside a square card on a phone player (2026-11-01). Costs no width: the panel is there.
     context=(frame, bbox, body path, camera path, subject box): with a camera path the view's centre path and the last frame's
     view (dashed) are drawn too, and the picture shrinks so that view fits beside it."""
     from image_lens import frames
@@ -519,7 +519,7 @@ def still(video, frame, bbox, image):
 
 # Tiles share one height, not one width: fitted to a 360 px width, an onion with its spacing chart (about 1.4x as
 # wide as tall) shrank to 360x262 next to a 360x414 still (Live2D sliding wave, 2026-11-01). 360 high: about 1.3x
-# the image tokens of the old layout on mikumiku (540 high: 2x), onions 1.3-1.5x taller as read; docs/look-notes.md.
+# the image tokens of the old layout on clip B (540 high: 2x), onions 1.3-1.5x taller as read; docs/look-notes.md.
 SHEET = dict(width=1440, tile_height=360, label=24, rows=5, strip_height=200, gap_s=.05)
 
 
