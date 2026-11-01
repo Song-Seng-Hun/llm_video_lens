@@ -3,6 +3,7 @@ import hashlib
 import http.client
 import json
 import os
+import socket
 import ssl
 import subprocess
 import sys
@@ -27,6 +28,10 @@ if cmd == 'look':
     open(os.path.join(out, 'frame-sheet-1.jpg'), 'wb').write(b'\xff\xd8fake')
     open(os.path.join(out, 'steps.log'), 'w').write('not listed\n')
     print(json.dumps(dict(status='written', output=out, shots=1, windows=1, errors=0, elapsed_seconds=0.1)))
+elif cmd == 'hang':
+    import signal, time
+    signal.signal(signal.SIGTERM, lambda *_: (open(out, 'w').write('term'), sys.exit(143)))
+    time.sleep(60)
 elif cmd == 'at':
     os.makedirs(out)
     open(os.path.join(out, 'at.md'), 'w').write('# ' + a[a.index('--span')+1] + '\n')
@@ -57,7 +62,7 @@ class Lan(unittest.TestCase):
         cls.cfg_raw = dict(bind=['127.0.0.1'], port=0, allow='127.0.0.0/8', clients=clients, cert=str(d/'tls.pem'),
                            key=str(d/'tls.key'), root=str(d/'root'), python=sys.executable, repo=str(d/'repo'),
                            detector=str(d/'det.onnx'), pose_model=str(d/'pose.onnx'), checkpoint=str(d/'ck.pth'),
-                           test_mode=True, limits=dict(max_queue=2))
+                           test_mode=True, limits=dict(max_queue=2, auth_deadline=2.0, term_grace=5))
         cls.cfg_path = private(d/'api.json', json.dumps(cls.cfg_raw))
         cls.app = server.App(server.load_config(cls.cfg_path))
         cls.listeners = server.start(cls.app, ['127.0.0.1'], 0)
@@ -160,6 +165,31 @@ class Lan(unittest.TestCase):
             self.assertEqual(again.commit, 'abc1234')
         finally:
             again.close(); commit.unlink()
+
+    def test_a_peer_trickling_headers_is_cut_at_the_auth_deadline(self):
+        raw = socket.create_connection(('127.0.0.1', self.port), timeout=10)
+        s = self.ctx.wrap_socket(raw, server_hostname='127.0.0.1')
+        s.sendall(b'GET /status HTTP/1.1\r\nHost: x\r\n')
+        started = time.monotonic(); closed = False
+        while time.monotonic() - started < 8:
+            try:
+                s.sendall(b'X-Slow: 1\r\n')  # each byte restarts read_timeout, not the auth deadline
+                s.settimeout(.5)
+                if s.recv(1) == b'':
+                    closed = True; break
+            except socket.timeout:
+                continue
+            except (OSError, ssl.SSLError):
+                closed = True; break
+        s.close()
+        self.assertTrue(closed)
+        self.assertLess(time.monotonic() - started, 6)
+
+    def test_timeout_sends_sigterm_before_sigkill(self):
+        marker = Path(self.tmp.name)/'hang-term'
+        code, _, _ = self.app.run_cli(['hang', '--out', str(marker)], 1)
+        self.assertIsNone(code)
+        self.assertEqual(marker.read_text(), 'term')
 
     def test_production_config_refuses_loopback_and_overrides(self):
         d = Path(self.tmp.name)

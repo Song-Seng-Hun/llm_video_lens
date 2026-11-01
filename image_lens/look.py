@@ -271,6 +271,9 @@ def run(*args, **kwargs):
     watchdog.shared = watchdog.Worker()
     try:
         return _run(*args, **kwargs)
+    except BaseException:
+        watchdog.shared._drop()  # interrupted or failed: kill the tracker now instead of waiting out its current job
+        raise
     finally:
         watchdog.shared.close(); watchdog.shared = None
         _stop_pose()

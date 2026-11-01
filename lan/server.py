@@ -35,9 +35,10 @@ VERSION = "0.1.0"
 HOME = os.path.expanduser("~")
 MiB = 1024 * 1024
 DEFAULT_LIMITS = {
-    "skew": 120, "max_conns": 8, "read_timeout": 30.0, "handshake_timeout": 10.0, "upload_deadline": 900.0,
-    "max_body": 512 * MiB, "disk_floor": 4 * 1024 * MiB, "max_queue": 3, "look_seconds": 1800, "kill_grace": 300,
-    "at_timeout": 180, "retention_days": 7, "jobs_listed": 20, "stdout_bytes": 4 * MiB, "log_bytes": 5 * MiB,
+    "skew": 120, "max_conns": 8, "read_timeout": 30.0, "handshake_timeout": 10.0, "auth_deadline": 20.0,
+    "upload_deadline": 900.0, "max_body": 512 * MiB, "disk_floor": 4 * 1024 * MiB, "max_queue": 3,
+    "look_seconds": 1800, "kill_grace": 300, "term_grace": 10, "at_timeout": 180, "retention_days": 7,
+    "jobs_listed": 20, "stdout_bytes": 4 * MiB, "log_bytes": 5 * MiB,
 }
 CONFIG_KEYS = {"bind", "port", "allow", "clients", "cert", "key", "root", "python", "repo", "detector", "pose_model",
                "checkpoint", "test_mode", "limits"}
@@ -407,8 +408,17 @@ class App:
             try:
                 code = p.wait(timeout=timeout)
             except subprocess.TimeoutExpired:
-                os.killpg(p.pid, signal.SIGKILL)
-                p.wait()
+                # SIGTERM first: look's finally then stops its pose and tracker children, which run in their own
+                # sessions and would outlive a SIGKILL of this group.
+                os.killpg(p.pid, signal.SIGTERM)
+                try:
+                    p.wait(timeout=self.limits["term_grace"])
+                except subprocess.TimeoutExpired:
+                    try:
+                        os.killpg(p.pid, signal.SIGKILL)
+                    except OSError:  # gone, or only a zombie leader left (macOS: EPERM)
+                        pass
+                    p.wait()
                 code = None
             finally:
                 with self.lock:
@@ -528,6 +538,7 @@ class Handler(BaseHTTPRequestHandler):
         route = "-"
         try:
             client, target, cl = self.authenticate(app, method)
+            self.request.auth_timer.cancel()
             path, _, query = target.partition("?")
             route = re.sub(r"[0-9a-f]{32}", "<id>", path.split("/files/")[0])
             self.route(app, client, method, path, query, cl)
@@ -770,15 +781,25 @@ class Listener(ThreadingHTTPServer):
 
     def finish_request(self, request, client_address):
         lim = self.app.limits
+        # read_timeout restarts on every byte; this one bounds handshake plus headers, so a peer trickling bytes
+        # cannot hold a connection slot until it authenticates.
+        held = [request]
+        timer = threading.Timer(lim["auth_deadline"], _cut, (held,))
+        timer.daemon = True
+        timer.start()
         request.settimeout(lim["handshake_timeout"])
         try:
             sock = self.app.ssl_ctx.wrap_socket(request, server_side=True)
         except (OSError, ValueError):
+            timer.cancel()
             return
+        held[0] = sock
+        sock.auth_timer = timer
         sock.settimeout(lim["read_timeout"])
         try:
             Handler(sock, client_address, self)
         finally:
+            timer.cancel()
             try:
                 sock.close()
             except OSError:
@@ -792,6 +813,13 @@ class Listener(ThreadingHTTPServer):
             super().process_request_thread(request, client_address)
         finally:
             self.app.release_conn()
+
+
+def _cut(held):
+    try:
+        socket.socket.shutdown(held[0], socket.SHUT_RDWR)  # the plain socket call: the TLS layer is mid-read elsewhere
+    except OSError:
+        pass
 
 
 def start(app, addresses, port):
