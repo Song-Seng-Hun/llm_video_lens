@@ -82,4 +82,7 @@ To update: unload, replace `~/tools/image-lens/app` with a fresh archive of mast
 ## Stopping
 
 SIGTERM closes the listeners and sends SIGTERM to the running look's process group. Its state file stays `running`
-and reads `interrupted` after the next start. Whether every tracking grandchild ends with it is untested.
+and reads `interrupted` after the next start. look stops its pose and tracker children on SIGTERM (checked on the
+Mac, 2026-11-01: none left running). A look past its time limit gets the same SIGTERM, then SIGKILL 10 s later.
+
+A connection must finish the TLS handshake and send signed headers within 20 s, or it is closed.
