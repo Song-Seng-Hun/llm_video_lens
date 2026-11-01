@@ -147,6 +147,15 @@ class Trails(unittest.TestCase):
         lost=dict(point='corner',xy=[(0,0.,0.),(1,2.,0.),(9,300.,0.)])
         self.assertEqual(onion.spacing_rows([lost],30),([],['corner']))  # a jump over missing frames is not travel
 
+    def test_camera_and_body_rows_lead_and_drop_out_when_still(self):
+        camera={n:(4.*n,0.,1.) for n in range(11)}; body={n:(100.+4.*n,50.) for n in range(11)}  # body rides the pan only
+        charted,colors=onion.references([],0,10,camera,body)
+        self.assertEqual([t['point'] for t in charted],['camera','body']); self.assertEqual(charted[1]['xy'][-1],(10,100.,50.))
+        rows,still=onion.spacing_rows(charted,30)
+        self.assertEqual(([r['point'] for r in rows],still),(['camera'],[]))  # a still body is no row and not 'still'
+        self.assertEqual(colors[:2],list(onion.REFERENCE['colors']))
+        self.assertEqual([t['point'] for t in onion.references([],0,10,None,body)[0]],['body'])  # no camera: screen basis
+
     def test_timing_dot_is_drawn_larger(self):
         import tempfile
         import cv2

@@ -466,7 +466,7 @@ def _run(video, detector, pose_model, checkpoint, out, max_shots=LOOK['max_shots
                 # No trusted body: the "화면" moves stand in, in the order that line lists them (one trail per point).
                 leads = ([f['point'] for f in digest.limbs(done['body'])] if done.get('body')
                          else list(dict.fromkeys(m['point'] for m in digest._screen(done.get('groups', [])))))
-                path = onion.body_path(raw_packets, w['seed'], end)
+                centre = path = onion.body_path(raw_packets, w['seed'], end)
                 body_shift = onion.body_basis(source, person['bbox'], path, raw_packets)
                 if body_shift:
                     done['picture_basis'] = 'body'; done['body_shift'] = [round(v, 1) for v in body_shift]  # onion_basis stays: it names the text's numbers
@@ -481,10 +481,8 @@ def _run(video, detector, pose_model, checkpoint, out, max_shots=LOOK['max_shots
                         done['mark_hint'] = hint; slot.append('  '+_mark_hint(hint, source, root/'shots.json'))
                 done['onion'] = picture.name
                 done['peak'] = onion.peak(source, w['seed'], end, person['bbox'], picture)
-                charted = done['trails']; palette = None
-                if path:  # the body centre's own move on top, in its own colour
-                    charted = [dict(point='body', xy=[(n, *path[n]) for n in sorted(path)])]+done['trails']
-                    palette = [onion.BODY_VIEW['color']]+list(onion.TRAILS['colors'])
+                known = frame_motion if frame_motion and not screen and not done.get('camera', {}).get('unknown') else None
+                charted, palette = onion.references(done['trails'], w['seed'], end, known, centre)
                 done['spacing'] = onion.spacing(source, picture, charted, palette, context=(w['seed'], person['bbox'], path))
                 turns = [e['share'] for e in (done.get('events') or {}).get('width', []) if e['share'] >= body_motion.EVENTS['turn']]
                 if turns:

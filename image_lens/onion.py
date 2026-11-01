@@ -213,6 +213,24 @@ def ticks(frames, fps):
 SPACING = dict(width=420, height=680, row=70, min_px=15., margin=30)
 
 
+# The whole frame's and the body centre's own moves as the chart's top rows, so a part's ease is read against them.
+REFERENCE = dict(names=('camera', 'body'), colors=((130, 130, 130), BODY_VIEW['color']))
+
+
+def references(trails, seed, end, camera=None, body=None):
+    """(trails, colours) with `camera` (camera.path) and `body` (body_path) put first as rows. The body row leaves
+    the camera out when it is given, as look.md's body numbers do; frames missing from either are left out."""
+    rows, colors = [], []
+    if camera:
+        rows.append(dict(point='camera', xy=[(n, camera[n][0], camera[n][1]) for n in sorted(camera) if seed <= n <= end]))
+        colors.append(REFERENCE['colors'][0])
+    if body:
+        xy = [(n, x-camera[n][0], y-camera[n][1]) if camera else (n, x, y) for n, (x, y) in sorted(body.items())
+              if not camera or n in camera]
+        rows.append(dict(point='body', xy=xy)); colors.append(REFERENCE['colors'][1])
+    return rows+list(trails), colors+list(TRAILS['colors'])
+
+
 def spacing_rows(trails, fps):
     """[{point, length, ticks: [(fraction, timed)]}, ...] and the names of parts too still to chart. Path length grows
     only by steps of at least motion_report STROKE['hold_step_px'], so a held part's jitter does not read as motion."""
@@ -224,7 +242,9 @@ def spacing_rows(trails, fps):
         for (a, b), (n, m) in zip(zip(xy, xy[1:]), zip(frames, frames[1:])):
             d = math.dist(a, b) if m == n+1 else 0.; cum.append(cum[-1]+(d if d >= still else 0.))
         if cum[-1] < SPACING['min_px']:
-            skipped.append(t['point']); continue
+            if t['point'] not in REFERENCE['names']:  # a still camera or body is not a still part: just no row
+                skipped.append(t['point'])
+            continue
         timed = ticks(frames, fps)
         rows.append(dict(point=t['point'], length=cum[-1], ticks=[(c/cum[-1], i in timed or i == 0) for i, c in enumerate(cum)]))
     return rows, skipped
@@ -553,11 +573,11 @@ def lines(result, image_name=None, screen=False, peak=False, body=None):
     out = [f'- 높이별 흐름 (사람 상자 5등분, {basis}): ' + ' · '.join(parts)]
     if image_name:
         out.append(f"  - 어니언 그림: {image_name} (청록=시작, 빨강=끝(진한 윤곽선 기준; 배경보다 밝은 면은 띠 색이 반대(청록 띠=간 쪽); 카메라가 움직였으면 끝 프레임을 카메라만큼 되돌려 겹침), 초록 화살표=띠별 이동 ×{ONION['arrow_scale']}(그림 밖으로 나가면 줄임, 머리보다 짧으면 생략); {'왼쪽 회색=시작과 가장 다른 가운데 프레임; ' if peak else ''}"
-                   f"색 점선=부위별 대표 점(몸 기준이 없으면 '화면'에 적힌 점)의 프레임마다 위치({'·'.join(TRAILS['names'])} 순, {basis}), 큰 원·네모=각 연속 관측의 시작·끝, 선 끊김=관측 누락, 이어진 점 간격이 좁으면 느림·넓으면 빠름, 조금 큰 점={TRAILS['tick_seconds']:g}초마다(그 간격이 좁아지면 느려짐); 맨 오른쪽 spacing=부위마다 지나온 길이를 같은 길이 줄로 펼친 것, 굵은 눈금={TRAILS['tick_seconds']:g}초마다·가는 눈금=프레임마다, 눈금이 모이면 느림·벌어지면 빠름(작은 이동도 같은 크기로 보임, {SPACING['min_px']:g}px 미만 부위는 still), 그 아래 작은 그림=구간 첫 프레임 전체(노란 테두리=어니언이 잘라 보여 준 범위))")
+                   f"색 점선=부위별 대표 점(몸 기준이 없으면 '화면'에 적힌 점)의 프레임마다 위치({'·'.join(TRAILS['names'])} 순, {basis}), 큰 원·네모=각 연속 관측의 시작·끝, 선 끊김=관측 누락, 이어진 점 간격이 좁으면 느림·넓으면 빠름, 조금 큰 점={TRAILS['tick_seconds']:g}초마다(그 간격이 좁아지면 느려짐); 맨 오른쪽 spacing=부위마다 지나온 길이를 같은 길이 줄로 펼친 것, 굵은 눈금={TRAILS['tick_seconds']:g}초마다·가는 눈금=프레임마다, 눈금이 모이면 느림·벌어지면 빠름(작은 이동도 같은 크기로 보임, {SPACING['min_px']:g}px 미만 부위는 still), 맨 위 camera 줄=화면 전체 이동·body 줄=몸 중심 이동(카메라 추정 시 카메라 제외; {SPACING['min_px']:g}px 미만이면 줄 없음), 그 아래 작은 그림=구간 첫 프레임 전체(노란 테두리=어니언이 잘라 보여 준 범위))")
     if image_name and body:
         out.append(f"  - 몸 기준 그림: 몸 중심이 {motion_report.KO[motion_report.direction(*body)].replace('화면 ', '')} {math.hypot(*body):.0f}px "
                    "움직여 끝 프레임과 궤적을 그만큼 되돌려 겹침(몸은 포개지고 팔다리 움직임만 갈라짐, 배경은 반대로 갈라짐; "
-                   "높이별 흐름 숫자는 위 기준 그대로). 몸 이동 자체는 차트 맨 위 body 줄과 그 아래 작은 그림의 빨간 선(점=0.1초마다, 네모=끝)")
+                   "높이별 흐름 숫자는 위 기준 그대로). 몸 이동 자체는 차트의 body 줄과 그 아래 작은 그림의 빨간 선(점=0.1초마다, 네모=끝)")
     return out
 
 
