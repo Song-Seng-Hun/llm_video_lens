@@ -237,40 +237,43 @@ TOGETHER=dict(min_overlap=.5,max_distance_ratio=1.25)
 COMPACT_ABOVE_FEATURES=2
 
 def camera_relative(report,packet,binding,frame_motion,collect,infer):
-    """Derived translation-relative report; retain raw evidence and the collector's continuity guards.
-    A missing camera observation breaks the run. No endpoint subtraction, gap filling, scale or rotation correction.
-    """
+    """Inverse-transform validated native observations; source evidence and continuity stay intact."""
     if not frame_motion:return report
+    from image_lens import camera
     start,end=report['requested_frames']
-    # camera.path returns NumPy scalar translations after its matrix fit; store plain finite JSON numbers.
-    shifts={n:tuple(float(x) for x in v[:2]) for n,v in frame_motion.items() if type(n) is int and start<=n<=end
-            and len(v)>=2 and all(math.isfinite(x) for x in v[:2])}
+    path=camera.normalize(frame_motion);matrices=camera.transforms(path,start)
+    full=path.kind=='similarity'
+    shifts={n:v[:2] for n,v in camera.centre_path(path,start).items() if start<=n<=end}
     def relative_collect(packet,pid,a,b,**kwargs):
         source=collect(packet,pid,a,b,**kwargs)
         if type(source) is dict:return source
         rows=[]
         for n,t,points in source[1]:
-            if n not in shifts:return dict(reasons=['camera_translation_unknown'])
-            dx,dy=shifts[n];point=points[pid]
-            rows.append((n,t,{pid:dict(point,xy=[point['xy'][0]-dx,point['xy'][1]-dy])}))
+            if n not in matrices:return dict(reasons=['camera_transform_unknown' if full else 'camera_translation_unknown'])
+            point=points[pid]
+            rows.append((n,t,{pid:dict(point,xy=list(camera.apply(matrices[n],point['xy'])))}))
         return source[0],rows,*source[2:]
     derived=dict(report,**build_report(packet,binding,start,end,relative_collect,infer))
-    derived.update(coordinate_scope='camera_translation_relative_2d',
-        coordinate_transform=dict(kind='subtract_estimated_camera_translation',
+    derived.update(coordinate_scope=camera.scope(path),
+        coordinate_transform=dict(kind='inverse_estimated_camera_similarity' if full else 'subtract_estimated_camera_translation',
+            reference_frame=start,
             source_tracks_sha256=binding['source_tracks_sha256'],
             camera_path=[[n,*shifts[n]] for n in sorted(shifts)],
-            unsupported_frames=ranges(set(range(start,end+1))-set(shifts)),
-            scale_rotation_corrected=False),
-        limitations=['Coordinates subtract estimated camera translation only; tracking, camera fit, scale and rotation errors remain.']+report['limitations'][1:])
+            camera=camera.record(path,packet.get('job',{}).get('source_sha256')),
+            unsupported_frames=ranges(set(range(start,end+1))-set(matrices)),
+            scale_rotation_corrected=full),
+        limitations=[('Coordinates inverse-transform estimated camera similarity; tracking and camera fit errors remain.' if full else
+                      'Coordinates subtract legacy camera translation only; diagnostic scale is not correction evidence.')]+report['limitations'][1:])
     for feature in derived['features']:
         for run in feature['continuous_runs']:
-            run['strokes']['basis']=run['strokes']['basis'].replace('screen path','camera-translation-relative path')
+            run['strokes']['basis']=run['strokes']['basis'].replace('screen path','camera-similarity-relative path' if full else 'camera-translation-relative path')
     if report.get('trajectory_view'):
         derived['trajectory_view']=dict(report['trajectory_view'],coordinate_scope='screen_2d')
     return derived
 
 
 def coordinate_label(report):
+    if report.get('coordinate_scope')=='camera_similarity_relative_2d':return '카메라 이동·확대·회전 제외(추정)'
     return '카메라 이동 제외(평행이동 추정)' if report.get('coordinate_scope')=='camera_translation_relative_2d' else '화면'
 
 

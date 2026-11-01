@@ -284,9 +284,14 @@ def geometry_note(policy):
     return text + ('; '+exclusion_note if exclusion_note else '')
 
 
-def describe(packets, window, pose_frames=None, timing_packets=None):
+def describe(packets, window, pose_frames=None, timing_packets=None, camera_path=None):
     """Per-point source-stable geometry. Displacements never join missing frames or
     different body-reference contributors. Raw surface observations alone supply timing."""
+    if camera_path is not None:
+        from image_lens import camera
+        packets = [camera.correct_packet(packet, camera_path, window['seed']) for packet in packets]
+        timing_packets = [camera.correct_packet(packet, camera_path, window['seed']) for packet in timing_packets] if timing_packets is not None else None
+        pose_frames = camera.correct_pose(pose_frames, camera_path, window['seed']) if pose_frames is not None else None
     geometry = geometry_policy(packets, window, timing_packets)
     packets = geometry_packets(packets, window, timing_packets, geometry)
     points = series(packets, window)
@@ -382,6 +387,7 @@ def describe(packets, window, pose_frames=None, timing_packets=None):
                           strokes=strokes[:BODY_MOTION['max_segments']], omitted=max(0, len(strokes)-BODY_MOTION['max_segments']),
                           runs=[[ns[0], ns[-1]] for ns in usable], axis_px=round(spread, 1) if abs(spread) >= limit else 0.))
     return dict(reference=reference_kind, geometry=geometry, size_px=round(size, 1), limit_px=round(limit, 1),
+                coordinate_scope=camera.scope(camera_path) if camera_path is not None else 'screen_2d',
                 centre_shift=centre_shift, limbs=limbs, unknown=unknown, uncertain=uncertain, incomplete=sorted(incomplete))
 
 
@@ -857,13 +863,29 @@ def _centre(t):
 def people(pose_frames, window, fps, camera=None):
     """Up to three people present in most of the window, named P1.. from screen left; per person the body-centre
     shift (camera removed) and a fall candidate; per pair distance change, hand-on-body runs and box overlap."""
+    if camera is not None and not isinstance(camera,(tuple,list)):
+        from image_lens import camera as geometry
+        matrices = geometry.transforms(camera,window['seed']); native = pose_frames
+        corrected = geometry.correct_pose(pose_frames,camera,window['seed'])
+        for n,persons in corrected.items():
+            for person in persons:
+                x0,y0,x1,y1=person['bbox'];person['native_bbox']=person['bbox']
+                corners=[geometry.apply(matrices[n],xy) for xy in ((x0,y0),(x1,y0),(x1,y1),(x0,y1))]
+                person['bbox']=[min(x for x,y in corners),min(y for x,y in corners),max(x for x,y in corners),max(y for x,y in corners)]
+        result = people(corrected,window,fps)
+        for person in result['people']:
+            original = next(t for t in native[person['frames'][0]] if t['track_id']==person['track_id'])
+            person['bbox'] = original['bbox']  # who overlays remain exact source-image boxes.
+        result['coordinate_scope'] = geometry.scope(camera)
+        return result
     frames = range(window['seed'], window['end']+1)
     tracks = {}
     for n in frames:
         for t in pose_frames.get(n) or []:
             if t.get('track_id') is not None:
                 tracks.setdefault(t['track_id'], {})[n] = t
-    area = lambda t: (t['bbox'][2]-t['bbox'][0])*(t['bbox'][3]-t['bbox'][1])
+    source_box = lambda t:t.get('native_bbox',t['bbox'])
+    area = lambda t: (source_box(t)[2]-source_box(t)[0])*(source_box(t)[3]-source_box(t)[1])
     median = lambda v: sorted(v)[len(v)//2]
     found = {i: seen for i, seen in tracks.items() if len(seen) >= PEOPLE['presence']*len(frames)}
     if not found:
@@ -871,7 +893,7 @@ def people(pose_frames, window, fps, camera=None):
     big = max(median([area(t) for t in seen.values()]) for seen in found.values())
     found = sorted(((i, seen) for i, seen in found.items() if median([area(t) for t in seen.values()]) >= PEOPLE['min_area']*big),
                    key=lambda x: -median([area(t) for t in x[1].values()]))[:PEOPLE['max_people']]
-    found.sort(key=lambda x: median([(t['bbox'][0]+t['bbox'][2])/2 for t in x[1].values()]))
+    found.sort(key=lambda x: median([(source_box(t)[0]+source_box(t)[2])/2 for t in x[1].values()]))
     cam = camera or (0., 0.)
     out = []
     for number, (track_id, seen) in enumerate(found, 1):
@@ -907,7 +929,7 @@ def people(pose_frames, window, fps, camera=None):
             rel = dict(pair=[p['name'], q['name']], frames=[both[0], both[-1]])
             if abs(change) >= PEOPLE['distance']:
                 rel['distance'] = dict(closer=change < 0, widths=round(abs(change), 2))
-            overlap = sum(_iou(a[n]['bbox'], b[n]['bbox']) >= PEOPLE['overlap_iou'] for n in both)
+            overlap = sum(_iou(source_box(a[n]), source_box(b[n])) >= PEOPLE['overlap_iou'] for n in both)
             rel['overlap'] = overlap >= PEOPLE['overlap_share']*len(both)
             touches = []
             for who, hand_track, body_track in ((p['name'], a, b), (q['name'], b, a)):

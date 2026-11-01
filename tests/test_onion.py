@@ -131,8 +131,8 @@ class Trails(unittest.TestCase):
     def test_screen_basis_is_named_in_the_onion_lines(self):
         bands=[dict(band='맨 위',dx=20.,dy=0.)]
         self.assertIn('카메라 모름: 화면 좌표 그대로',onion.lines(bands,'x-onion.jpg',screen=True)[0])
-        self.assertTrue(all('평행이동 제외' not in l for l in onion.lines(bands,'x-onion.jpg',screen=True)))
-        self.assertIn('카메라 추정 시 평행이동 제외',onion.lines(bands,'x-onion.jpg')[0])
+        self.assertTrue(all('추정 카메라 변환 제외' not in l for l in onion.lines(bands,'x-onion.jpg',screen=True)))
+        self.assertIn('추정 카메라 변환 제외',onion.lines(bands,'x-onion.jpg')[0])
         partial=onion.lines(bands,'x-onion.jpg',screen=True,camera_unknown=False)
         self.assertTrue(all('카메라 일부 모름: 화면 좌표 그대로' in l for l in partial))
         self.assertTrue(all('카메라 모름:' not in l for l in partial))
@@ -168,7 +168,10 @@ class Trails(unittest.TestCase):
     def test_camera_view_goes_against_the_content(self):
         # camera.path on a view panning 114 px right read dx=-114 (synthetic crop pan, 2026-11-01)
         self.assertEqual(onion._views({0:(0.,0.,1.),9:(-114.,0.,1.)},320,240)[9],(114.,0.,434.,240.))
-        self.assertEqual(onion._views({9:(0.,0.,2.)},320,240)[9],(80.,60.,240.,180.))  # zoom in: half the view
+        from image_lens import camera
+        zoom = camera.CameraPath({0:((1,0,0),(0,1,0),(0,0,1)),9:((2,0,-160),(0,2,-120),(0,0,1))},size=(320,240))
+        self.assertEqual(onion._views(zoom,320,240)[9],(80.,60.,240.,180.))
+        self.assertEqual(onion._views({9:(0.,0.,2.)},320,240)[9],(0.,0.,320.,240.))  # Legacy scale is diagnostic only.
         self.assertIsNone(onion.moved({n:(.5*n,0.,1.) for n in range(10)}))
         self.assertIsNotNone(onion.moved({n:(-6.*n,0.,1.) for n in range(10)}))
 

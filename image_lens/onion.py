@@ -43,25 +43,26 @@ TRAILS = dict(parts=6, dot=2, tick=5, tick_seconds=.1, start=9, end=8, line=2, b
 
 
 def trails(packets, points, seed, end, camera=None, limit=None, body=None):
-    """[{point, xy: [(frame, x, y)]}] for up to TRAILS['parts'] point ids, visible frames after the seed, in screen
-    coordinates minus the camera shift since the seed (`camera` is camera.path; None = no camera move). With a camera
-    move, frames whose camera shift is unknown are left out rather than drawn in the wrong place. `body` (body_path)
-    instead takes out the body centre's move since its first frame (camera included: the centre is on screen)."""
+    """Visible native samples inverse-mapped into seed pixels when camera is supplied.
+    Missing camera samples remain gaps. Optional body centres already share that basis;
+    subtract their move from the first usable centre after camera correction.
+    """
     out = []
-    shift = camera
-    if body:
-        b0 = body[min(body)]; shift = {n: (x-b0[0], y-b0[1]) for n, (x, y) in body.items()}
+    from image_lens import camera as geometry
+    matrices = geometry.transforms(camera, seed) if camera is not None else None
+    b0 = body[min(body)] if body else None
     for pid in points[:limit or TRAILS['parts']]:
         xy = []
         for packet in packets:
             for frame in packet['frames']:
                 n = frame['frame']
-                if not seed < n <= end or (shift is not None and n not in shift):
+                if not seed < n <= end or (matrices is not None and n not in matrices) or (body and n not in body):
                     continue
                 for q in frame['points']:
                     if q['point_id'] == pid and q['visible']:
-                        dx, dy = shift[n][:2] if shift is not None else (0., 0.)
-                        xy.append((n, q['xy'][0]-dx, q['xy'][1]-dy))
+                        x, y = geometry.apply(matrices[n], q['xy']) if matrices is not None else q['xy']
+                        dx, dy = (body[n][0]-b0[0], body[n][1]-b0[1]) if body else (0., 0.)
+                        xy.append((n, x-dx, y-dy))
         if xy:
             out.append(dict(point=pid, xy=sorted(xy)))
     return out
@@ -79,19 +80,25 @@ def trails(packets, points, seed, end, camera=None, limit=None, body=None):
 BODY_VIEW = dict(min_share=.15, agree_share=.6, subject_agree_share=.85, smooth=5, color=(60, 60, 220))
 
 
-def body_path(packets, seed, end):
+def body_path(packets, seed, end, camera=None):
     """{frame: (x, y)} body centre after the seed (body_motion.reference: shoulder midpoint, else face), median of 3
     then mean of BODY_VIEW['smooth'] frames, so pose jitter does not shake every trail drawn against it."""
     from image_lens import body_motion
+    if camera is not None:
+        from image_lens import camera as geometry
+        packets = [geometry.correct_packet(packet, camera, seed) for packet in packets]
     window = dict(seed=seed, end=end)
     kind, centre, _ = body_motion.reference(body_motion.series(packets, window), window)
     return _smooth(centre) if kind else {}
 
 
-def subject_path(packets, seed, end):
+def subject_path(packets, seed, end, camera=None):
     """('body', body_path) when shoulders or a face were tracked, else ('subject', median of the visible points per
     frame, smoothed the same way): mark's and box's points need not be a body (box on a hat: corners p1..p8)."""
     from image_lens import body_motion
+    if camera is not None:
+        from image_lens import camera as geometry
+        packets = [geometry.correct_packet(packet, camera, seed) for packet in packets]
     path = body_path(packets, seed, end)
     if path:
         return 'body', path
@@ -107,7 +114,13 @@ def _smooth(centre):
     if not centre:
         return {}
     from image_lens import body_motion
-    ns = sorted(centre); path = body_motion._median3([centre[n] for n in ns]); r = BODY_VIEW['smooth']//2
+    ns = sorted(centre)
+    cuts = [i for i in range(1,len(ns)) if ns[i] != ns[i-1]+1]
+    if cuts:
+        out = {}
+        for a,b in zip([0]+cuts,cuts+[len(ns)]):out.update(_smooth({n:centre[n] for n in ns[a:b]}))
+        return out
+    path = body_motion._median3([centre[n] for n in ns]); r = BODY_VIEW['smooth']//2
     out = {}
     for i, n in enumerate(ns):
         q = min(r, i, len(ns)-1-i)  # symmetric near the ends, so a steady slide keeps its full length
@@ -116,11 +129,15 @@ def _smooth(centre):
     return out
 
 
-def body_basis(video, bbox, path, packets, share=None):
+def body_basis(video, bbox, path, packets, share=None, camera=None, reference=None):
     """(dx, dy) of the body centre over the window when the whole figure moved that way far enough to draw against
     the body, else None."""
     import cv2
     from image_lens import body_motion
+    if camera is not None:
+        from image_lens import camera as geometry
+        if reference is None:raise ValueError('camera-corrected body basis requires its explicit reference frame')
+        packets = [geometry.correct_packet(packet, camera, reference) for packet in packets] if path else packets
     if not path or not bbox:
         return None
     capture = cv2.VideoCapture(str(video)); w, h = int(capture.get(cv2.CAP_PROP_FRAME_WIDTH)), int(capture.get(cv2.CAP_PROP_FRAME_HEIGHT)); capture.release()
@@ -144,6 +161,7 @@ def bands(video, start, end, bbox, camera=None, image=None, trails=(), colors=No
     import cv2
     import numpy as np
     from image_lens import frames
+    from image_lens import camera as geometry
     window = frames.window(video, start, end)
     if not window:
         return []
@@ -166,8 +184,13 @@ def bands(video, start, end, bbox, camera=None, image=None, trails=(), colors=No
             cur, status, _ = cv2.calcOpticalFlowPyrLK(last, gray, cur, None, winSize=(31, 31), maxLevel=3)
             alive &= status.ravel() == 1
         last = gray
-    cam = camera or (0., 0.)
-    shift = (cur-origin).reshape(-1, 2)
+    if isinstance(camera, (tuple,list)):
+        camera = {start:(0.,0.,1.), end:(*camera[:2],1.)}  # Explicit legacy endpoint translation adapter.
+    matrix = geometry.transforms(camera,start).get(end) if camera is not None else np.eye(3)
+    if matrix is None:
+        raise ValueError('onion endpoint camera transform unknown')
+    corrected = np.asarray([geometry.apply(matrix,xy) for xy in cur.reshape(-1,2)]).reshape(cur.shape)
+    shift = (corrected-origin).reshape(-1, 2)
     result = []; at = 0
     for name, (top, bottom), size in zip(ONION['bands'], edges, sizes):
         keep = alive[at:at+size]; d = shift[at:at+size][keep]; at += size
@@ -175,14 +198,13 @@ def bands(video, start, end, bbox, camera=None, image=None, trails=(), colors=No
             result.append(dict(band=name, y=[top, bottom], dx=None, dy=None, features=int(len(d))))
             continue
         mx, my = np.median(d, 0)
-        result.append(dict(band=name, y=[top, bottom], dx=round(float(mx)-cam[0], 1), dy=round(float(my)-cam[1], 1), features=int(len(d))))
+        result.append(dict(band=name, y=[top, bottom], dx=round(float(mx), 1), dy=round(float(my), 1), features=int(len(d))))
     if image:
         drawn = result
         if view_shift:  # body basis: the overlay and the arrows leave the body centre's move out; the text above does not
-            last = cv2.warpAffine(last, np.float32([[1, 0, -view_shift[0]], [0, 1, -view_shift[1]]]), (w, h), borderMode=cv2.BORDER_REPLICATE)
-            drawn = [dict(b, dx=b['dx']+cam[0]-view_shift[0], dy=b['dy']+cam[1]-view_shift[1]) if b['dx'] is not None else b for b in result]
-        elif camera:  # trails have the camera taken out; without this the overlay showed a pan as motion (anime clip f180..209)
-            last = cv2.warpAffine(last, np.float32([[1, 0, -cam[0]], [0, 1, -cam[1]]]), (w, h), borderMode=cv2.BORDER_REPLICATE)
+            drawn = [dict(b, dx=b['dx']-view_shift[0], dy=b['dy']-view_shift[1]) if b['dx'] is not None else b for b in result]
+        if camera is not None or view_shift:
+            last = geometry.warp(last,matrix,(w,h),shift=view_shift or (0.,0.))
         capture = cv2.VideoCapture(str(video)); fps = capture.get(cv2.CAP_PROP_FPS); capture.release()
         _image(cv2, np, first, last, _view(bbox, w, h), drawn, image, trails, colors, named, fps, (x0+x1)//2)
     return result
@@ -239,23 +261,29 @@ SPACING = dict(width=420, height=680, row=70, min_px=15., margin=30)
 REFERENCE = dict(names=('camera', 'body', 'subject'), colors=((130, 130, 130), BODY_VIEW['color']))
 
 
-def references(trails, seed, end, camera=None, body=None, name='body', colors=None):
+def references(trails, seed, end, camera=None, body=None, name='body', colors=None, body_corrected=False):
     """(trails, colours) with `camera` (camera.path) and `body` (body_path) put first as rows. The body row leaves
     the camera out when it is given, as look.md's body numbers do; frames missing from either are left out."""
     rows, out = [], []
+    from image_lens import camera as geometry
+    centres = geometry.centre_path(camera,seed) if camera else {}
+    matrices = geometry.transforms(camera,seed) if camera else {}
     if camera:
-        rows.append(dict(point='camera', xy=[(n, camera[n][0], camera[n][1]) for n in sorted(camera) if seed <= n <= end]))
+        rows.append(dict(point='camera', xy=[(n, centres[n][0], centres[n][1]) for n in sorted(centres) if seed <= n <= end]))
         out.append(REFERENCE['colors'][0])
     if body:
-        xy = [(n, x-camera[n][0], y-camera[n][1]) if camera else (n, x, y) for n, (x, y) in sorted(body.items())
-              if not camera or n in camera]
+        xy = [(n,*(geometry.apply(matrices[n],(x,y)) if camera and not body_corrected else (x,y))) for n,(x,y) in sorted(body.items())
+              if not camera or n in matrices]
         rows.append(dict(point=name, xy=xy)); out.append(REFERENCE['colors'][1])
     return rows+list(trails), out+list(colors or TRAILS['colors'])
 
 
 def moved(camera):
     """camera (camera.path) when it travelled enough for a chart row, else None."""
-    rows, _ = spacing_rows([dict(point='camera', xy=[(n, v[0], v[1]) for n, v in sorted(camera.items())])], None)
+    from image_lens import camera as geometry
+    path = geometry.normalize(camera)
+    if path.kind == 'similarity' and path.size and any(geometry.displacement(m,*path.size)>=SPACING['min_px'] for m in path.values()):return camera
+    rows, _ = spacing_rows([dict(point='camera', xy=[(n, v[0], v[1]) for n, v in sorted(geometry.centre_path(path).items())])], None)
     return camera if rows else None
 
 
@@ -321,19 +349,18 @@ def spacing(video, image, trails, colors=None, context=None):
     return dict(rows=[r['point'] for r in rows], still=skipped)
 
 
-def _views(camera, w, h):
+def _views(camera, w, h, reference=None):
     """{frame: (x0, y0, x1, y1)} of the view on each frame in the first frame's pixels. camera.path is how the
     content moved (a pan right reads dx < 0, scale > 1 = zoom in), so the view went the other way: centre c - d/s."""
-    out = {}
-    for n, (dx, dy, k) in camera.items():
-        cx, cy = w/2-dx/k, h/2-dy/k
-        out[n] = (cx-w/2/k, cy-h/2/k, cx+w/2/k, cy+h/2/k)
-    return out
+    from image_lens import camera as geometry
+    return {n:(min(x for x,y in pts),min(y for x,y in pts),max(x for x,y in pts),max(y for x,y in pts))
+            for n,pts in geometry.view_corners(camera,w,h,reference).items()}
 
 
-def _dashed(cv2, panel, a, b, color, t):
+def _dashed(cv2, panel, a, b, color, t, vertices=None):
     (x0, y0), (x1, y1) = a, b; dash = 4*t
-    for p, q in (((x0, y0), (x1, y0)), ((x1, y0), (x1, y1)), ((x1, y1), (x0, y1)), ((x0, y1), (x0, y0))):
+    vertices = vertices or [(x0,y0),(x1,y0),(x1,y1),(x0,y1)]
+    for p,q in zip(vertices,vertices[1:]+vertices[:1]):
         n = max(1, int(math.dist(p, q)//(2*dash)))
         for i in range(n):
             f, g = 2*i*dash/max(1., math.dist(p, q)), (2*i+1)*dash/max(1., math.dist(p, q))
@@ -355,7 +382,7 @@ def _context(cv2, video, context, panel, area):
     if not got:
         return
     image = got[0]; h, w = image.shape[:2]; ax0, ay0, ax1, ay1 = area
-    views = _views(camera, w, h) if camera else {}
+    views = _views(camera, w, h,frame) if camera else {}
     end = views[max(views)] if views else (0, 0, w, h)
     ux0, uy0, ux1, uy1 = min(0, end[0]), min(0, end[1]), max(w, end[2]), max(h, end[3])
     k = min((ax1-ax0)/(ux1-ux0), (ay1-ay0)/(uy1-uy0))
@@ -376,13 +403,17 @@ def _context(cv2, video, context, panel, area):
 
     def line(points, color):  # a path in first-frame pixels: white rim, 0.1 s dots, square at the end
         ns = sorted(points); at = [(sx+round(points[n][0]*k), sy+round(points[n][1]*k)) for n in ns]
-        for a, b in zip(at, at[1:]):
-            cv2.line(panel, a, b, (255, 255, 255), t+2); cv2.line(panel, a, b, color, t)
+        for i,(a,b) in enumerate(zip(at,at[1:])):
+            if ns[i+1]==ns[i]+1:
+                cv2.line(panel, a, b, (255, 255, 255), t+2); cv2.line(panel, a, b, color, t)
         for i in sorted(ticks(ns, fps) | {0}):
             cv2.circle(panel, at[i], t+2, (255, 255, 255), -1); cv2.circle(panel, at[i], t+1, color, -1)
         e = t+3; cv2.rectangle(panel, (at[-1][0]-e, at[-1][1]-e), (at[-1][0]+e, at[-1][1]+e), color, t)
     if views:  # where the camera ended up, and how its centre got there
-        _dashed(cv2, panel, (sx+round(end[0]*k), sy+round(end[1]*k)), (sx+round(end[2]*k)-1, sy+round(end[3]*k)-1), REFERENCE['colors'][0], t)
+        from image_lens import camera as geometry
+        corners = geometry.view_corners(camera,w,h,frame)[max(views)]
+        vertices = [(sx+round(x*k),sy+round(y*k)) for x,y in corners]
+        _dashed(cv2, panel, (0,0), (0,0), REFERENCE['colors'][0], t, vertices=vertices)
         line({n: ((v[0]+v[2])/2, (v[1]+v[3])/2) for n, v in views.items()}, REFERENCE['colors'][0])
     if path:  # body basis: the body centre's own move, on screen
         line(path, BODY_VIEW['color'])
@@ -636,7 +667,7 @@ def lines(result, image_name=None, screen=False, peak=False, body=None, camera_u
     if not parts:
         return []
     basis = (('카메라 모름: 화면 좌표 그대로' if camera_unknown else '카메라 일부 모름: 화면 좌표 그대로')
-             if screen else '카메라 추정 시 평행이동 제외')
+             if screen else '추정 카메라 변환 제외')
     out = [f'- 높이별 흐름 (사람 상자 5등분, {basis}): ' + ' · '.join(parts)]
     if image_name:
         out.append(f"  - 어니언 그림: {image_name} (청록=시작, 빨강=끝(진한 윤곽선 기준; 배경보다 밝은 면은 띠 색이 반대(청록 띠=간 쪽); 카메라가 움직였으면 끝 프레임을 카메라만큼 되돌려 겹침), 초록 화살표=띠별 이동 ×{ONION['arrow_scale']}(그림 밖으로 나가면 줄임, 머리보다 짧으면 생략); {'왼쪽 회색=시작과 가장 다른 가운데 프레임; ' if peak else ''}"
@@ -683,6 +714,7 @@ def gap_seeds(video, start, end, bbox, names):
         return {}
     later = sorted({start+(end-start)//3, start+2*(end-start)//3, end} - {start})
     moves = camera.path(video, start, end, bbox)
+    matrices = camera.transforms(moves,start) if camera.supported(moves,start,end) else None
     # Gaps are found in the box plus a zero margin, not the whole frame (whole-frame masks per gap were 0.23 of 0.37 s per
     # call on clip B). The margin is wider than the opening and distance-transform steps, so they see the same zeros
     # around the box as on the whole frame; the outline is still traced on the whole frame. Same seeds on 6 clips.
@@ -691,14 +723,14 @@ def gap_seeds(video, start, end, bbox, names):
     base = first[y0:y1, x0:x1]
     found = []
     for n in later:
-        shift = camera.between(moves, start, n)
-        if shift and math.hypot(*shift) >= motion_report.STROKE['major_min_px']:
-            image = cv2.warpAffine(kept[n], np.float32([[1, 0, x0+shift[0]], [0, 1, y0+shift[1]]]), (x1-x0, y1-y0),
-                                   flags=cv2.INTER_LINEAR | cv2.WARP_INVERSE_MAP, borderMode=cv2.BORDER_REPLICATE)
+        if matrices is not None:
+            if n not in matrices:continue
+            image = camera.warp(kept[n],matrices[n],(x1-x0,y1-y0),offset=(x0,y0),border=cv2.BORDER_CONSTANT)
+            valid = camera.warp(np.full((h,w),255,np.uint8),matrices[n],(x1-x0,y1-y0),offset=(x0,y0),border=cv2.BORDER_CONSTANT)==255
         else:
-            image = kept[n][y0:y1, x0:x1]
+            image = kept[n][y0:y1,x0:x1]; valid = np.ones(image.shape,bool)  # Explicit unsupported-camera screen basis.
         mask = np.zeros((ey-oy, ex-ox), np.uint8)
-        mask[y0-oy:y1-oy, x0-ox:x1-ox] = cv2.absdiff(base, image) > GAPS['diff']
+        mask[y0-oy:y1-oy, x0-ox:x1-ox] = (cv2.absdiff(base, image) > GAPS['diff']) & valid
         mask = cv2.morphologyEx(mask, cv2.MORPH_OPEN, np.ones((3, 3), np.uint8))
         depth = cv2.distanceTransform(mask, cv2.DIST_L2, 5)
         count, labels, stats, _ = cv2.connectedComponentsWithStats(mask)
@@ -728,13 +760,15 @@ def parts(tracks, end, frame_motion=None):
     frames = [f for f in tracks['frames'] if f['frame'] <= end]
     if not frames:
         return []
+    matrices = camera.transforms(frame_motion,frames[0]['frame']) if frame_motion is not None else None
     origin = {p['point_id']: p['xy'] for p in frames[0]['points'] if p.get('visible') and p.get('xy')}
     paths = {pid: [] for pid in origin}
     for f in frames:
-        cam = camera.between(frame_motion, frames[0]['frame'], f['frame']) or (0., 0.)
-        seen = {p['point_id']: p['xy'] for p in f['points'] if p.get('visible') and p.get('xy')}
+        matrix = matrices.get(f['frame']) if matrices is not None else None
+        seen = {p['point_id']: camera.apply(matrix,p['xy']) if matrix is not None else p['xy'] for p in f['points']
+                if p.get('visible') and p.get('xy') and (matrices is None or matrix is not None)}
         for pid, xy in origin.items():
-            paths[pid].append((seen[pid][0]-xy[0]-cam[0], seen[pid][1]-xy[1]-cam[1]) if pid in seen else None)
+            paths[pid].append((seen[pid][0]-xy[0], seen[pid][1]-xy[1]) if pid in seen else None)
     travel = {pid: max((math.hypot(*d) for d in p if d), default=0.) for pid, p in paths.items()}
     def together(i, j):
         gaps = [math.dist(a, b) for a, b in zip(paths[i], paths[j]) if a and b]

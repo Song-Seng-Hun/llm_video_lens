@@ -29,7 +29,7 @@ class Path_(unittest.TestCase):
             for person in (None, [200, 100, 400, 250]):
                 with self.subTest(person=person):
                     found = camera.path(video, 0, 39, person)
-                    self.assertIn(39, found); self.assertAlmostEqual(found[39][0], -780, delta=30); self.assertAlmostEqual(found[39][1], 0, delta=10)
+                    self.assertIn(39, found); self.assertAlmostEqual(camera.centre_path(found)[39][0], -780, delta=30); self.assertAlmostEqual(camera.centre_path(found)[39][1], 0, delta=10)
 
     def test_a_failed_rich_background_cannot_borrow_the_subject_motion(self):
         """A textured narrow UI strip and a different moving actor: feature count does not establish a global fit."""
@@ -48,7 +48,7 @@ class Path_(unittest.TestCase):
             out.release()
             camera._LAST.clear()
             found = camera.path(video, 0, 9, [80, 180, 560, 475])
-            self.assertEqual(found, {0: (0., 0., 1.)})
+            self.assertEqual(camera.centre_path(found), {0: (0., 0., 1.)})
 
     def test_a_shorter_request_is_cut_from_the_kept_path(self):
         with tempfile.TemporaryDirectory(dir=REPO/'workspace') as d:
@@ -73,7 +73,7 @@ class Path_(unittest.TestCase):
                 image = room.copy(); image[50:310, 100+6*k:400+6*k] = figure; out.write(image)
             out.release()
             found = camera.path(video, 0, 19, [100, 50, 400, 310])
-            self.assertEqual(len(found), 20); self.assertTrue(all(math.hypot(dx, dy) < 1 for dx, dy, _ in found.values()))
+            self.assertEqual(len(found), 20); self.assertTrue(all(math.hypot(dx, dy) < 1 for dx, dy, _ in camera.centre_path(found).values()))
             self.assertLess(len(camera.path(video, 0, 19)), 20)  # on the whole frame the figure's moves leave it unknown
 
 
