@@ -262,4 +262,36 @@ class Peak(unittest.TestCase):
             self.assertGreater(cols.size, 1.3*onion.SHEET['tile_height'])  # beside the still at full height, wider than tall
 
 
+    def test_picture_view_has_a_floor_and_the_same_ratio_limit_both_ways(self):
+        a = onion.VIEW['max_aspect']
+        for bbox in ((300, 900, 800, 1050), (500, 300, 560, 1500), (0, 0, 40, 40), (1040, 1880, 1080, 1920)):
+            x0, y0, x1, y1 = onion._view(bbox, 1080, 1920)
+            vw, vh = x1-x0, y1-y0
+            self.assertTrue(0 <= x0 < x1 <= 1080 and 0 <= y0 < y1 <= 1920)
+            self.assertGreaterEqual(min(vw, vh), onion.VIEW['min_side']*1080-1)
+            self.assertLessEqual(max(vw/vh, vh/vw), a+.01)
+        bx = onion._box((300, 900, 800, 1050), 1080, 1920); v = onion._view((300, 900, 800, 1050), 1080, 1920)
+        self.assertTrue(v[0] <= bx[0] and v[1] <= bx[1] and v[2] >= bx[2] and v[3] >= bx[3])  # never cuts the person
+
+
+    def test_context_frame_sits_in_the_chart_panel_and_stills_are_whole(self):
+        import cv2
+        import numpy as np
+        with tempfile.TemporaryDirectory() as d:
+            video = Path(d)/'v.avi'; out = cv2.VideoWriter(str(video), cv2.VideoWriter_fourcc(*'MJPG'), 10, (320, 240))
+            for k in range(6):
+                frame = np.full((240, 320, 3), 255, np.uint8); cv2.rectangle(frame, (100+4*k, 80), (140+4*k, 160), (0, 0, 0), -1)
+                out.write(frame)
+            out.release()
+            image = Path(d)/'o.jpg'; bbox = (100, 80, 160, 160)
+            onion.bands(video, 0, 5, bbox, None, image); width = cv2.imread(str(image)).shape[1]
+            self.assertEqual(onion.spacing(video, image, [], context=(0, bbox)), dict(rows=[], still=[]))
+            picture = cv2.imread(str(image)); panel = picture[:, width+6:]
+            yellow = (panel[..., 0] < 80) & (panel[..., 1] > 150) & (panel[..., 2] > 200)
+            self.assertGreater(int(yellow.sum()), 20)  # the view outline on the small whole frame
+            self.assertIsNone(onion.spacing(video, Path(d)/'missing.jpg', []))
+            onion.still(video, 2, bbox, Path(d)/'s.jpg')
+            self.assertEqual(cv2.imread(str(Path(d)/'s.jpg')).shape[:2], (240, 320))
+
+
 if __name__ == '__main__': unittest.main()
