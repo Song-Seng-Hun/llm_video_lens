@@ -133,6 +133,9 @@ class Trails(unittest.TestCase):
         self.assertIn('카메라 모름: 화면 좌표 그대로',onion.lines(bands,'x-onion.jpg',screen=True)[0])
         self.assertTrue(all('평행이동 제외' not in l for l in onion.lines(bands,'x-onion.jpg',screen=True)))
         self.assertIn('카메라 추정 시 평행이동 제외',onion.lines(bands,'x-onion.jpg')[0])
+        partial=onion.lines(bands,'x-onion.jpg',screen=True,camera_unknown=False)
+        self.assertTrue(all('카메라 일부 모름: 화면 좌표 그대로' in l for l in partial))
+        self.assertTrue(all('카메라 모름:' not in l for l in partial))
 
     def test_spacing_rows_stretch_the_path_and_ignore_held_jitter(self):
         slowing=dict(point='hand',xy=[(n,x,0.) for n,x in enumerate((0,20,38,52,62,68,71))])

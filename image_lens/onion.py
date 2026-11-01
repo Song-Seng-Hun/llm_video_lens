@@ -623,7 +623,7 @@ def sheets(root, items):
     return written
 
 
-def lines(result, image_name=None, screen=False, peak=False, body=None):
+def lines(result, image_name=None, screen=False, peak=False, body=None, camera_unknown=True):
     from image_lens import motion_report
     parts = []
     for band in result:
@@ -635,7 +635,8 @@ def lines(result, image_name=None, screen=False, peak=False, body=None):
             parts.append(f"{band['band']} {motion_report.KO[motion_report.direction(band['dx'], band['dy'])].replace('화면 ', '')} {math.hypot(band['dx'], band['dy']):.0f}px")
     if not parts:
         return []
-    basis = '카메라 모름: 화면 좌표 그대로' if screen else '카메라 추정 시 평행이동 제외'
+    basis = (('카메라 모름: 화면 좌표 그대로' if camera_unknown else '카메라 일부 모름: 화면 좌표 그대로')
+             if screen else '카메라 추정 시 평행이동 제외')
     out = [f'- 높이별 흐름 (사람 상자 5등분, {basis}): ' + ' · '.join(parts)]
     if image_name:
         out.append(f"  - 어니언 그림: {image_name} (청록=시작, 빨강=끝(진한 윤곽선 기준; 배경보다 밝은 면은 띠 색이 반대(청록 띠=간 쪽); 카메라가 움직였으면 끝 프레임을 카메라만큼 되돌려 겹침), 초록 화살표=띠별 이동 ×{ONION['arrow_scale']}(그림 밖으로 나가면 줄임, 머리보다 짧으면 생략); {'왼쪽 회색=시작과 가장 다른 가운데 프레임; ' if peak else ''}"

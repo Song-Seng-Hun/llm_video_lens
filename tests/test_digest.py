@@ -65,6 +65,13 @@ class Lines(unittest.TestCase):
                               band('아래', -20., -21.), band('맨 아래', 3., 2.)])
         self.assertTrue(text.endswith('(맨 위 오른쪽, 가운데·아래 왼쪽: 높이에 따라 좌우가 반대)'))
         self.assertNotIn('반대', digest._bands([band('맨 위', 15., 0.), band('아래', 12., 0.)]))
+        done=dict(window=dict(seed=0,end=29),groups=[],onion_basis='screen',bands=[band('맨 위',15.,0.)])
+        self.assertIn('높이별(화면 좌표, 카메라 모름)',digest.window_line(done,30))
+        done['camera']=dict(known=.93,net=[200.,0.],until=28)
+        line=digest.window_line(done,30)
+        self.assertIn('카메라 오른쪽 200px',line)
+        self.assertIn('높이별(화면 좌표, 카메라 일부 모름)',line)
+        self.assertNotIn('화면 좌표, 카메라 모름',line)
 
 
     def test_framing_is_said_first(self):

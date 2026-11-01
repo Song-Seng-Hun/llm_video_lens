@@ -270,7 +270,8 @@ def window_line(done, fps, first=None):
                 fields.append('추적 결과 없음: 움직임 모름')
         flow = _bands(done.get('bands'))
         if flow:
-            fields.append(('높이별(화면 좌표, 카메라 모름): ' if done.get('onion_basis') == 'screen' else '높이별: ') + flow)
+            reason = '카메라 모름' if not done.get('camera') or done['camera'].get('unknown') else '카메라 일부 모름'
+            fields.append((f'높이별(화면 좌표, {reason}): ' if done.get('onion_basis') == 'screen' else '높이별: ') + flow)
         if done.get('picture_basis') == 'body':  # the onion of this window is drawn against the body centre (onion.BODY_VIEW)
             dx, dy = done['body_shift']
             fields.append(f"어니언은 몸 기준(몸 중심 {motion_report.KO[motion_report.direction(dx, dy)].replace('화면 ', '')} {math.hypot(dx, dy):.0f}px 이동을 빼고 겹침, 그 이동은 차트 body 줄)")
