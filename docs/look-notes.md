@@ -308,7 +308,7 @@ The body-relative path had a separate median3 that still reduced an authored 90p
 
 The authored return now retains90px and f9. Isolated-error, below-resolution and neighbouring-weaker-corner regressions protect against false motion and lost output. In three recorded style contexts, available limb identities, returned direction sequences and omitted counts were preserved; the flat2D output was unchanged and the SD context had no selected body route. Independent source-only visual annotations used screen or approximate torso references, so they did not establish exact shoulder-relative timing truth. This change does not establish improved real-video ease accuracy. Coherent tracker errors and missing body observations remain limitations.
 
-## Timing dots and screen-basis onions (2026-11-02)
+## Timing dots and screen-basis onions (2026-11-01)
 
 Every frame's trail dot looked evenly spaced even where the speed fell: in the Live2D sweep the hand point moved 18-21 px/f for ten frames and then 15, 11, 6, 7, 3, 0, and the last six dots merged into one blob. Trails now draw a slightly larger dot every 0.1 s (fps-derived, counted from the start of each continuous run); the same point's steps over three frames read 39, 61, 54, 32, 10 px, which shows the settle at a glance. Per-frame dots stay, smaller.
 
