@@ -6,7 +6,8 @@
   "vendor_licenses": {
     "PySceneDetect": "BSD-3-Clause plus embedded MIT notice",
     "CoTracker": "CC-BY-NC-4.0",
-    "rtmlib-derived detector postprocess": "Apache-2.0 (pose.py ScoredYOLOX)"
+    "rtmlib-derived detector postprocess": "Apache-2.0 (pose.py ScoredYOLOX)",
+    "SAM3 MLX image implementation": "Meta custom SAM License (image_lens/_sam3_mlx/LICENSE)"
   },
   "excluded": [
     "workspace",
@@ -19,8 +20,8 @@
     "historical experiment outputs"
   ],
   "manifest_self_excluded": true,
-  "file_count": 140,
-  "total_bytes": 1960047,
+  "file_count": 165,
+  "total_bytes": 2190192,
   "files": [
     {
       "path": ".gitattributes",
@@ -39,8 +40,8 @@
     },
     {
       "path": "README.md",
-      "bytes": 15304,
-      "sha256": "d7ede632a62d80c64747b55589878360874a21905759eb744769a267b997778f"
+      "bytes": 15634,
+      "sha256": "7805c3e67022e2ca8502cc2d2b77ea3a9aa8aeab3fd8358ba23e2e9424ce5d30"
     },
     {
       "path": "assets/banner-dark.svg",
@@ -98,6 +99,11 @@
       "sha256": "7c6c8f0b15f0e94be1906fd600873d5832ac57402cbbd766f5f642f4f3b5d97a"
     },
     {
+      "path": "docs/person-detectors.md",
+      "bytes": 4712,
+      "sha256": "50b1b8aec800e8af1fb843c7d88c26c31a841e5574b4efd07e13e2df92f8d4c2"
+    },
+    {
       "path": "docs/provenance.md",
       "bytes": 3974,
       "sha256": "0f53be77a8f705c8dd5df7b80ef556c1527a46348a2c97a86132d05059ad24ae"
@@ -116,6 +122,111 @@
       "path": "image_lens/__main__.py",
       "bytes": 284,
       "sha256": "719706951257de6617cb48ebc6eaaa3f2b103010ad8747feb93de756778e4b0b"
+    },
+    {
+      "path": "image_lens/_sam3_mlx/LICENSE",
+      "bytes": 7353,
+      "sha256": "4dea99bfaa016e21bc860d73f344236bd1e5c4977d1a9a8fd32f822b500ae1be"
+    },
+    {
+      "path": "image_lens/_sam3_mlx/PROVENANCE.md",
+      "bytes": 1374,
+      "sha256": "5171ad04d40eecb6b78a0315728dbd0aedf2b32490bb07a2ed799225611c010e"
+    },
+    {
+      "path": "image_lens/_sam3_mlx/__init__.py",
+      "bytes": 185,
+      "sha256": "7e0230eec57e2f971e43b01f97d73ce41ad6b7f5ec5e84789c5f1084b18abf57"
+    },
+    {
+      "path": "image_lens/_sam3_mlx/model/box_ops.py",
+      "bytes": 6909,
+      "sha256": "cce0e37459ce3448e609cb73213148f58f5c189eeb70f93244e92729301e8c5e"
+    },
+    {
+      "path": "image_lens/_sam3_mlx/model/data_misc.py",
+      "bytes": 2241,
+      "sha256": "e105daba38c9e49dd188621f2636a6aaee98ad904a27f2f32f3e0a20a1aeac28"
+    },
+    {
+      "path": "image_lens/_sam3_mlx/model/decoder.py",
+      "bytes": 22368,
+      "sha256": "081e06d545faeeaa237784a2a451b03c9f2962b29b9ed27193adde6869637245"
+    },
+    {
+      "path": "image_lens/_sam3_mlx/model/encoder.py",
+      "bytes": 14626,
+      "sha256": "8efc853eac6b8c748be75548456b71f39c8b0b6f0ccd0c653ef40cb3e0d94a71"
+    },
+    {
+      "path": "image_lens/_sam3_mlx/model/geometry_encoders.py",
+      "bytes": 26553,
+      "sha256": "c409b75d816b6ce2b36ad8f6fe0836cd4055ad915f8dd91ac39b0021b2addb0f"
+    },
+    {
+      "path": "image_lens/_sam3_mlx/model/grid_sample_mlx.py",
+      "bytes": 7105,
+      "sha256": "2b6bf9633797cefa7c33dbf863c9a6ca9b084742f74ad837df7ce8cdd2b6c24e"
+    },
+    {
+      "path": "image_lens/_sam3_mlx/model/maskformer_segmentation.py",
+      "bytes": 10777,
+      "sha256": "7020f916767b51971e252513900f625d9f728c4b279f68280bab25577ba7b5ba"
+    },
+    {
+      "path": "image_lens/_sam3_mlx/model/model_misc.py",
+      "bytes": 12771,
+      "sha256": "ac32e8fefca75217112976813f61efacbd7ab14539eb1ce86b365da7cd53506d"
+    },
+    {
+      "path": "image_lens/_sam3_mlx/model/necks.py",
+      "bytes": 6323,
+      "sha256": "8877037fe270f6ee0549adb654e153d4e16288174a1e3173a699590be1978c16"
+    },
+    {
+      "path": "image_lens/_sam3_mlx/model/position_encoding.py",
+      "bytes": 4372,
+      "sha256": "d3779563232d3bedd3c4e8b3ec8a35efe3b4e46e3e1224c84436782e2356c808"
+    },
+    {
+      "path": "image_lens/_sam3_mlx/model/roi_align.py",
+      "bytes": 5971,
+      "sha256": "430c597a58da7da6cf4b8a97daf88e8474a61c61687b4e9ef7b43570ea2b9786"
+    },
+    {
+      "path": "image_lens/_sam3_mlx/model/sam3_image.py",
+      "bytes": 17037,
+      "sha256": "144699cdfffb5ba0e704d2ceea4ecea13343febf32ec99f2cefa9d79365ed4ee"
+    },
+    {
+      "path": "image_lens/_sam3_mlx/model/sam3_image_processor.py",
+      "bytes": 9202,
+      "sha256": "231e0d1eca01caa925bb6cebece999827ea69058a6972e5e26620c455a8c4376"
+    },
+    {
+      "path": "image_lens/_sam3_mlx/model/text_encoder_ve.py",
+      "bytes": 10473,
+      "sha256": "c42026dc2a47c74e44ce897dc446a3711ad1aa2e873b6d13fa3f7a0c95b3a47c"
+    },
+    {
+      "path": "image_lens/_sam3_mlx/model/tokenizer_ve.py",
+      "bytes": 8773,
+      "sha256": "8e949deea3725d27b27fd51db158c6d0b940e1cc68e49ffa2ea44b26af6c5220"
+    },
+    {
+      "path": "image_lens/_sam3_mlx/model/vitdet.py",
+      "bytes": 20874,
+      "sha256": "414f9289a4b92333e467932594aa46683e8ba9dd9827d78349e63f6f5ed842eb"
+    },
+    {
+      "path": "image_lens/_sam3_mlx/model/vl_combiner.py",
+      "bytes": 3469,
+      "sha256": "63818b9a25c1ab0fbd8b18a06df5999c13a4199e32a782bd6bd35cabe564ee98"
+    },
+    {
+      "path": "image_lens/_sam3_mlx/model_builder.py",
+      "bytes": 11495,
+      "sha256": "02a206f40319cdedf3d25cd39dcde0d52449b1f7b5ed039ab25a0d70f1609cfb"
     },
     {
       "path": "image_lens/analyze_motion.py",
@@ -233,9 +344,14 @@
       "sha256": "2ff77c28b7a031dbb0296d59724aa34da46ccf580da0c0805c6bc7356084f910"
     },
     {
+      "path": "image_lens/person_models.py",
+      "bytes": 8675,
+      "sha256": "a70c40e07c84400831a131f7bf37e6f84703b9556eefd8c31954c738a9c03e0f"
+    },
+    {
       "path": "image_lens/pose.py",
-      "bytes": 26564,
-      "sha256": "9bdb318cd5f1cd1200878f8ef66c8b2ece8f1d860ae554e3bdf5e9a28eefcdd6"
+      "bytes": 27366,
+      "sha256": "7178500c9ca61e6bf3ab6f81b32806a10e72e57f65d3ac9319dd1e24395ae389"
     },
     {
       "path": "image_lens/run_point_tracker.py",
@@ -619,8 +735,8 @@
     },
     {
       "path": "pyproject.toml",
-      "bytes": 1020,
-      "sha256": "c1e00df0d267ba48e0091becd18c1f73ad9e538208d434ffc9bdb9edf88fdf22"
+      "bytes": 1234,
+      "sha256": "246de9679adc6b13cfd8cd76993490e4cc50df31d6a790de4527f2bdf04b6af0"
     },
     {
       "path": "requirements/base.txt",
@@ -631,6 +747,11 @@
       "path": "requirements/pose.txt",
       "bytes": 188,
       "sha256": "ad171e9ed6dcc3ada1ceebe07d92e4d3da33354291d7feeb7c04aab25fc9f5c0"
+    },
+    {
+      "path": "requirements/sam3.txt",
+      "bytes": 170,
+      "sha256": "b99df0a8920d43767682f05627d5827a1e7b2994736e3892fa3e928c518fda32"
     },
     {
       "path": "requirements/tracking.txt",
@@ -701,6 +822,11 @@
       "path": "tests/test_onion.py",
       "bytes": 20932,
       "sha256": "ba9a516dcacbd0aab342859dc822617cf31a2432a8727220cb733688024d249f"
+    },
+    {
+      "path": "tests/test_person_models.py",
+      "bytes": 4991,
+      "sha256": "328c1a5230053031fbf3520d9684f72a47ea650dddb2bc61ac108b742fea828c"
     },
     {
       "path": "tests/test_pose.py",
