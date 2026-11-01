@@ -5,7 +5,7 @@ from pathlib import Path
 import sys
 from image_lens import paths
 
-COMMANDS = ('look', 'scan', 'compare', 'brief', 'catalog', 'pose', 'seed', 'bind', 'prepare', 'validate', 'track', 'analyze', 'grid', 'mark', 'focus', 'zoom', 'at')
+COMMANDS = ('look', 'scan', 'compare', 'brief', 'catalog', 'pose', 'seed', 'bind', 'prepare', 'validate', 'track', 'analyze', 'grid', 'mark', 'box', 'focus', 'zoom', 'at')
 
 
 def parser(command, description):
@@ -155,6 +155,15 @@ def dispatch(command, arguments):
         from image_lens import onion
         onion.PEAK['draw'] = a.peak
         return mark.run(a.video, a.shots, a.frame, a.point, a.checkpoint, a.out, a.end, not a.no_snap)
+    if command == 'box':
+        from image_lens import box
+        ap = parser(command, "Re-track one window from a box: the joints of the person it covers, else corners inside it.")
+        ap.add_argument('--video', required=True); ap.add_argument('--look', required=True, help='look output directory (shots.json, pose.json)')
+        ap.add_argument('--frame', type=int, required=True); ap.add_argument('--end', type=int)
+        ap.add_argument('--box', required=True, help='x0,y0,x1,y1 in source pixels on --frame')
+        ap.add_argument('--checkpoint', help='default: models.json'); ap.add_argument('--out', required=True, help='new output directory')
+        a = models(ap.parse_args(arguments), 'checkpoint')
+        return box.run(a.video, a.look, a.frame, a.box, a.checkpoint, a.out, a.end)
     if command == 'focus':
         from image_lens import digest
         ap = parser(command, 'Print one shot of a look run in full detail (look-full.md).')

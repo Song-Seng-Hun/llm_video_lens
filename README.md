@@ -124,6 +124,12 @@ python -m image_lens --workspace W grid --video V --frame 572 --box 100,250,1000
 python -m image_lens --workspace W mark --video V --shots W/look/shots.json --frame 572 --end 599 --point hammer-stripe=430,680 --point eye=322,738 --checkpoint C --out W/mark-s19
 ```
 
+look이 엉뚱한 사람을 따라갔거나 사람이 아닌 대상을 보고 싶으면 `box`에 상자를 줍니다. 어니언 차트 아래 작은 그림의 초록 테두리가 look이 추적한 사람입니다. 상자가 사람을 덮으면 그 사람의 관절을, 아니면 상자 안의 뚜렷한 모서리를 최대 8개 골라 `mark`와 같은 방식으로 추적합니다.
+
+```bash
+python -m image_lens --workspace W box --video V --look W/look --frame 0 --end 119 --box 0,300,880,1440 --checkpoint C --out W/box-f0
+```
+
 ## 현재 상태와 한계
 
 - 팔다리 좌표는 자세 모델과 점 추적을 함께 써서 추정하고, 확실하지 않은 곳은 "모름"으로 적습니다. 자세한 비교와 한계는 [look 노트](docs/look-notes.md)에 있습니다.

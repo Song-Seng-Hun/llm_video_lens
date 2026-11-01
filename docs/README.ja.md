@@ -123,6 +123,12 @@ python -m image_lens --workspace W grid --video V --frame 572 --box 100,250,1000
 python -m image_lens --workspace W mark --video V --shots W/look/shots.json --frame 572 --end 599 --point hammer-stripe=430,680 --point eye=322,738 --checkpoint C --out W/mark-s19
 ```
 
+look が別の人を追っていたときや、人以外の対象を見たいときは、`box` に枠を渡します。オニオンのチャート下にある小さな画像の緑の枠が、look が追跡した人です。枠が人を覆っていればその人の関節を、そうでなければ枠内のはっきりした角を最大 8 個選び、`mark` と同じ方法で追跡します。
+
+```bash
+python -m image_lens --workspace W box --video V --look W/look --frame 0 --end 119 --box 0,300,880,1440 --checkpoint C --out W/box-f0
+```
+
 ## 現在の状態と限界
 
 - 手足の位置は姿勢モデルと点の追跡を合わせて推定し、確かでないところは「모름」（不明）と書きます。詳しい比較と限界は [look ノート](look-notes.md) にあります。
