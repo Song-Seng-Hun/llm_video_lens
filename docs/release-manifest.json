@@ -21,7 +21,7 @@
   ],
   "manifest_self_excluded": true,
   "file_count": 168,
-  "total_bytes": 2287302,
+  "total_bytes": 2291827,
   "files": [
     {
       "path": ".gitattributes",
@@ -95,8 +95,8 @@
     },
     {
       "path": "docs/look-notes.md",
-      "bytes": 82444,
-      "sha256": "ad3949bab986d9ce780d9fc1137d057fd7f883fbe9603ed93eef6c7264475e77"
+      "bytes": 84339,
+      "sha256": "3c4ee3cb0dc7a69ceb2a56f2f7d4b8cb3b47592c49cfd6e3b157fbede0988ccc"
     },
     {
       "path": "docs/person-detectors.md",
@@ -255,8 +255,8 @@
     },
     {
       "path": "image_lens/camera.py",
-      "bytes": 19482,
-      "sha256": "bba5847bd0e2c2fc5f78157d3783bf11578c939356533a32d3ec9cf34f64c745"
+      "bytes": 19956,
+      "sha256": "55d0433f55983acf0fd2df9f331b89ce0de9acc46f3b4078437fb8b6186c3002"
     },
     {
       "path": "image_lens/check.py",
@@ -780,8 +780,8 @@
     },
     {
       "path": "tests/test_camera_similarity.py",
-      "bytes": 13804,
-      "sha256": "7e505d1e722b4913b45f38fd7249b66d7d7c82ba293b71f94eddec3826005793"
+      "bytes": 15960,
+      "sha256": "cf578007dc6f1d0df504d9ea0e9e30972cdcf6019298a2981588dba5c914aa9e"
     },
     {
       "path": "tests/test_check.py",
