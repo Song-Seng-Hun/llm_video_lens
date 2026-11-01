@@ -231,6 +231,12 @@ def references(trails, seed, end, camera=None, body=None):
     return rows+list(trails), colors+list(TRAILS['colors'])
 
 
+def moved(camera):
+    """camera (camera.path) when it travelled enough for a chart row, else None."""
+    rows, _ = spacing_rows([dict(point='camera', xy=[(n, v[0], v[1]) for n, v in sorted(camera.items())])], None)
+    return camera if rows else None
+
+
 def spacing_rows(trails, fps):
     """[{point, length, ticks: [(fraction, timed)]}, ...] and the names of parts too still to chart. Path length grows
     only by steps of at least motion_report STROKE['hold_step_px'], so a held part's jitter does not read as motion."""
@@ -293,33 +299,65 @@ def spacing(video, image, trails, colors=None, context=None):
     return dict(rows=[r['point'] for r in rows], still=skipped)
 
 
+def _views(camera, w, h):
+    """{frame: (x0, y0, x1, y1)} of the view on each frame in the first frame's pixels. camera.path is how the
+    content moved (a pan right reads dx < 0, scale > 1 = zoom in), so the view went the other way: centre c - d/s."""
+    out = {}
+    for n, (dx, dy, k) in camera.items():
+        cx, cy = w/2-dx/k, h/2-dy/k
+        out[n] = (cx-w/2/k, cy-h/2/k, cx+w/2/k, cy+h/2/k)
+    return out
+
+
+def _dashed(cv2, panel, a, b, color, t):
+    (x0, y0), (x1, y1) = a, b; dash = 4*t
+    for p, q in (((x0, y0), (x1, y0)), ((x1, y0), (x1, y1)), ((x1, y1), (x0, y1)), ((x0, y1), (x0, y0))):
+        n = max(1, int(math.dist(p, q)//(2*dash)))
+        for i in range(n):
+            f, g = 2*i*dash/max(1., math.dist(p, q)), (2*i+1)*dash/max(1., math.dist(p, q))
+            u = (round(p[0]+(q[0]-p[0])*f), round(p[1]+(q[1]-p[1])*f)); v = (round(p[0]+(q[0]-p[0])*min(g, 1)), round(p[1]+(q[1]-p[1])*min(g, 1)))
+            cv2.line(panel, u, v, (255, 255, 255), t+2); cv2.line(panel, u, v, color, t)
+
+
 def _context(cv2, video, context, panel, area):
     """The whole frame, fitted into `area` of the chart panel, with the onion's view outlined: a crop alone hid that
-    mikumiku is a character inside a square card on a phone player (2026-11-01). Costs no width: the panel is there."""
+    mikumiku is a character inside a square card on a phone player (2026-11-01). Costs no width: the panel is there.
+    context=(frame, bbox, body path, camera path): with a camera path the view's centre path and the last frame's
+    view (dashed) are drawn too, and the picture shrinks so that view fits beside it."""
     from image_lens import frames
-    frame, bbox, path = (tuple(context)+(None,))[:3]
+    frame, bbox, path, camera = (tuple(context)+(None, None))[:4]
     got = frames.window(video, frame, frame)
     if not got:
         return
     image = got[0]; h, w = image.shape[:2]; ax0, ay0, ax1, ay1 = area
-    k = min((ax1-ax0)/w, (ay1-ay0)/h)
+    views = _views(camera, w, h) if camera else {}
+    end = views[max(views)] if views else (0, 0, w, h)
+    ux0, uy0, ux1, uy1 = min(0, end[0]), min(0, end[1]), max(w, end[2]), max(h, end[3])
+    k = min((ax1-ax0)/(ux1-ux0), (ay1-ay0)/(uy1-uy0))
     if k <= 0:
         return
     small = cv2.resize(image, (max(1, int(w*k)), max(1, int(h*k))), interpolation=cv2.INTER_AREA)
-    sx, sy = ax0+(ax1-ax0-small.shape[1])//2, ay1-small.shape[0]
+    ox, oy = ax0+(ax1-ax0-round((ux1-ux0)*k))//2-round(ux0*k), ay1-round((uy1-uy0)*k)-round(uy0*k)
+    sx, sy = ox, oy
     panel[sy:sy+small.shape[0], sx:sx+small.shape[1]] = small
     vx0, vy0, vx1, vy1 = (_view(bbox, w, h) if bbox else (0, 0, w, h))
     t = max(2, round(small.shape[0]/200))  # 1 px of colour did not survive JPEG
     corners = ((sx+int(vx0*k), sy+int(vy0*k)), (sx+int(vx1*k)-1, sy+int(vy1*k)-1))
     cv2.rectangle(panel, *corners, (0, 0, 0), t+2); cv2.rectangle(panel, *corners, (0, 220, 255), t)
-    if path:  # body basis: the body centre's own move, on screen, 0.1 s dots as on the trails
-        ns = sorted(path); at = [(sx+int(path[n][0]*k), sy+int(path[n][1]*k)) for n in ns]
-        capture = cv2.VideoCapture(str(video)); timed = ticks(ns, capture.get(cv2.CAP_PROP_FPS)); capture.release()
+    capture = cv2.VideoCapture(str(video)); fps = capture.get(cv2.CAP_PROP_FPS); capture.release()
+
+    def line(points, color):  # a path in first-frame pixels: white rim, 0.1 s dots, square at the end
+        ns = sorted(points); at = [(sx+round(points[n][0]*k), sy+round(points[n][1]*k)) for n in ns]
         for a, b in zip(at, at[1:]):
-            cv2.line(panel, a, b, (255, 255, 255), t+2); cv2.line(panel, a, b, BODY_VIEW['color'], t)
-        for i in sorted(timed | {0}):
-            cv2.circle(panel, at[i], t+2, (255, 255, 255), -1); cv2.circle(panel, at[i], t+1, BODY_VIEW['color'], -1)
-        e = t+3; cv2.rectangle(panel, (at[-1][0]-e, at[-1][1]-e), (at[-1][0]+e, at[-1][1]+e), BODY_VIEW['color'], t)
+            cv2.line(panel, a, b, (255, 255, 255), t+2); cv2.line(panel, a, b, color, t)
+        for i in sorted(ticks(ns, fps) | {0}):
+            cv2.circle(panel, at[i], t+2, (255, 255, 255), -1); cv2.circle(panel, at[i], t+1, color, -1)
+        e = t+3; cv2.rectangle(panel, (at[-1][0]-e, at[-1][1]-e), (at[-1][0]+e, at[-1][1]+e), color, t)
+    if views:  # where the camera ended up, and how its centre got there
+        _dashed(cv2, panel, (sx+round(end[0]*k), sy+round(end[1]*k)), (sx+round(end[2]*k)-1, sy+round(end[3]*k)-1), REFERENCE['colors'][0], t)
+        line({n: ((v[0]+v[2])/2, (v[1]+v[3])/2) for n, v in views.items()}, REFERENCE['colors'][0])
+    if path:  # body basis: the body centre's own move, on screen
+        line(path, BODY_VIEW['color'])
 
 
 def _image(cv2, np, first, last, box, result, path, trails=(), colors=None, named=False, fps=None, centre=None):
@@ -573,7 +611,7 @@ def lines(result, image_name=None, screen=False, peak=False, body=None):
     out = [f'- 높이별 흐름 (사람 상자 5등분, {basis}): ' + ' · '.join(parts)]
     if image_name:
         out.append(f"  - 어니언 그림: {image_name} (청록=시작, 빨강=끝(진한 윤곽선 기준; 배경보다 밝은 면은 띠 색이 반대(청록 띠=간 쪽); 카메라가 움직였으면 끝 프레임을 카메라만큼 되돌려 겹침), 초록 화살표=띠별 이동 ×{ONION['arrow_scale']}(그림 밖으로 나가면 줄임, 머리보다 짧으면 생략); {'왼쪽 회색=시작과 가장 다른 가운데 프레임; ' if peak else ''}"
-                   f"색 점선=부위별 대표 점(몸 기준이 없으면 '화면'에 적힌 점)의 프레임마다 위치({'·'.join(TRAILS['names'])} 순, {basis}), 큰 원·네모=각 연속 관측의 시작·끝, 선 끊김=관측 누락, 이어진 점 간격이 좁으면 느림·넓으면 빠름, 조금 큰 점={TRAILS['tick_seconds']:g}초마다(그 간격이 좁아지면 느려짐); 맨 오른쪽 spacing=부위마다 지나온 길이를 같은 길이 줄로 펼친 것, 굵은 눈금={TRAILS['tick_seconds']:g}초마다·가는 눈금=프레임마다, 눈금이 모이면 느림·벌어지면 빠름(작은 이동도 같은 크기로 보임, {SPACING['min_px']:g}px 미만 부위는 still), 맨 위 camera 줄=화면 전체 이동·body 줄=몸 중심 이동(카메라 추정 시 카메라 제외; {SPACING['min_px']:g}px 미만이면 줄 없음), 그 아래 작은 그림=구간 첫 프레임 전체(노란 테두리=어니언이 잘라 보여 준 범위))")
+                   f"색 점선=부위별 대표 점(몸 기준이 없으면 '화면'에 적힌 점)의 프레임마다 위치({'·'.join(TRAILS['names'])} 순, {basis}), 큰 원·네모=각 연속 관측의 시작·끝, 선 끊김=관측 누락, 이어진 점 간격이 좁으면 느림·넓으면 빠름, 조금 큰 점={TRAILS['tick_seconds']:g}초마다(그 간격이 좁아지면 느려짐); 맨 오른쪽 spacing=부위마다 지나온 길이를 같은 길이 줄로 펼친 것, 굵은 눈금={TRAILS['tick_seconds']:g}초마다·가는 눈금=프레임마다, 눈금이 모이면 느림·벌어지면 빠름(작은 이동도 같은 크기로 보임, {SPACING['min_px']:g}px 미만 부위는 still), 맨 위 camera 줄=화면 전체 이동·body 줄=몸 중심 이동(카메라 추정 시 카메라 제외; {SPACING['min_px']:g}px 미만이면 줄 없음), 그 아래 작은 그림=구간 첫 프레임 전체(노란 테두리=어니언이 잘라 보여 준 범위, 카메라가 움직였으면 회색 선=화면 중심의 궤적·회색 점선 사각형=구간 끝의 화면))")
     if image_name and body:
         out.append(f"  - 몸 기준 그림: 몸 중심이 {motion_report.KO[motion_report.direction(*body)].replace('화면 ', '')} {math.hypot(*body):.0f}px "
                    "움직여 끝 프레임과 궤적을 그만큼 되돌려 겹침(몸은 포개지고 팔다리 움직임만 갈라짐, 배경은 반대로 갈라짐; "

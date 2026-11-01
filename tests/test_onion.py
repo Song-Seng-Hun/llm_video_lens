@@ -156,6 +156,13 @@ class Trails(unittest.TestCase):
         self.assertEqual(colors[:2],list(onion.REFERENCE['colors']))
         self.assertEqual([t['point'] for t in onion.references([],0,10,None,body)[0]],['body'])  # no camera: screen basis
 
+    def test_camera_view_goes_against_the_content(self):
+        # camera.path on a view panning 114 px right read dx=-114 (synthetic crop pan, 2026-11-01)
+        self.assertEqual(onion._views({0:(0.,0.,1.),9:(-114.,0.,1.)},320,240)[9],(114.,0.,434.,240.))
+        self.assertEqual(onion._views({9:(0.,0.,2.)},320,240)[9],(80.,60.,240.,180.))  # zoom in: half the view
+        self.assertIsNone(onion.moved({n:(.5*n,0.,1.) for n in range(10)}))
+        self.assertIsNotNone(onion.moved({n:(-6.*n,0.,1.) for n in range(10)}))
+
     def test_timing_dot_is_drawn_larger(self):
         import tempfile
         import cv2
