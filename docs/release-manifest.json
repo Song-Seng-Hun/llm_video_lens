@@ -21,7 +21,7 @@
   ],
   "manifest_self_excluded": true,
   "file_count": 167,
-  "total_bytes": 2250235,
+  "total_bytes": 2251693,
   "files": [
     {
       "path": ".gitattributes",
@@ -95,8 +95,8 @@
     },
     {
       "path": "docs/look-notes.md",
-      "bytes": 76482,
-      "sha256": "5db11356e626df188fa3d30ca53d7e20f3e9be35ed615329a030500ac5fa05bd"
+      "bytes": 76465,
+      "sha256": "96f9b384576e64bedf9173a09fdaf234056929360413c290775fdd6c0cde8436"
     },
     {
       "path": "docs/person-detectors.md",
@@ -275,8 +275,8 @@
     },
     {
       "path": "image_lens/digest.py",
-      "bytes": 37456,
-      "sha256": "deb86e2cca8fda992ebc1734105a989e701d2c1a3bddd1fac2eb03f2f6dde20b"
+      "bytes": 38418,
+      "sha256": "da9b0b92169a2c66f62cc0b5e33feffae8d0088819c5cb95fd98f30b863fdbbd"
     },
     {
       "path": "image_lens/foreground_regions.py",
@@ -330,8 +330,8 @@
     },
     {
       "path": "image_lens/onion.py",
-      "bytes": 44406,
-      "sha256": "bfe11421c5603e36e5077cf2c45815a733b5354ee005810cd869e20d73efdd5f"
+      "bytes": 44423,
+      "sha256": "58a42b7acb80b6202158510d9f39d67edd18e1f63be13bb4df8eae450dff8fad"
     },
     {
       "path": "image_lens/part_regions.py",
@@ -355,8 +355,8 @@
     },
     {
       "path": "image_lens/redo.py",
-      "bytes": 4372,
-      "sha256": "ad6abf731b626e19a597545d674efa14e7e02d421aa9fc61c18708cf5234bb80"
+      "bytes": 4378,
+      "sha256": "2df1b7552e291a499defe5bebda69f1226903a100a7277f51bfbcd72c3e709de"
     },
     {
       "path": "image_lens/run_point_tracker.py",
@@ -805,8 +805,8 @@
     },
     {
       "path": "tests/test_look.py",
-      "bytes": 36842,
-      "sha256": "d47eb12dfa256cf17785c27f25d99ecd98d2e9bf027bcb9c41dc0210d1e73a48"
+      "bytes": 37332,
+      "sha256": "0e84eae88ea92b4eba96f89604656043a87b79cbd22308a1edd3a0c5980efc1f"
     },
     {
       "path": "tests/test_mark.py",

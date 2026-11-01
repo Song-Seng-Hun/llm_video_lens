@@ -1,5 +1,5 @@
 """Re-run one look window with another person detector. A whole look with SAM3 runs about 23 s per second of video and
-lost track frames elsewhere on the Miku clip, so the agent re-runs only the window whose green box is wrong: the first
+lost track frames elsewhere on clip B (look-notes), so the agent re-runs only the window whose green box is wrong: the first
 look stays as it was, and the new folder is a look of that window's frames only."""
 from image_lens import paths
 

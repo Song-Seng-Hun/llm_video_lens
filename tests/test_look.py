@@ -543,6 +543,11 @@ class MultipleActors(unittest.TestCase):
                 self.assertTrue(all(w['source_native_range'] == shot['frames'] for w in shot['windows']))
             text = (Path(directory)/'look/look.md').read_text()
             self.assertIn('A2 · 모델 ID b', text); self.assertNotIn('P2 · 모델 ID b', text)
+            # Each actor's windows sit under its own heading, so A2 restarting at the shot's first second reads as a new person.
+            self.assertEqual(text.count('### A1 · 모델 ID a (동일인 미검증)'), 2)
+            self.assertEqual(text.count('### A2 · 모델 ID b (동일인 미검증)'), 2)
+            self.assertIn('사람별 분석(장면마다 최대 2명): A1·A2…는', text)
+            self.assertIn('P1…은 화면 기준 문맥 순서로 A와 별개', text)
             self.assertIn('32/32프레임', text)
             self.assertNotIn('64/32프레임', text)
 
