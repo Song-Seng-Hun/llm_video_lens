@@ -474,7 +474,7 @@ def _run(video, detector, pose_model, checkpoint, out, max_shots=LOOK['max_shots
                         done['mark_hint'] = hint; slot.append('  '+_mark_hint(hint, source, root/'shots.json'))
                 done['onion'] = picture.name
                 done['peak'] = onion.peak(source, w['seed'], end, person['bbox'], picture)
-                done['spacing'] = onion.spacing(source, picture, done['trails'])
+                done['spacing'] = onion.spacing(source, picture, done['trails'], context=(w['seed'], person['bbox']))
                 turns = [e['share'] for e in (done.get('events') or {}).get('width', []) if e['share'] >= body_motion.EVENTS['turn']]
                 if turns:
                     done['turn_share'] = max(turns); stripping.append((done, end, person['bbox'], base))

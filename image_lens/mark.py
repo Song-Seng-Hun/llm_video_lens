@@ -141,7 +141,7 @@ def run(video, shots, frame, points, checkpoint, out, end=None, snap_points=True
         text.append(f"- 어니언 그림: {onion_image} (청록=f{frame}, 빨강=f{stop}(진한 윤곽선 기준; 배경보다 밝은 면은 띠 색이 반대(청록 띠=간 쪽); 카메라가 움직였으면 끝 프레임을 카메라만큼 되돌려 겹침), 색 점선=찍은 점의 프레임마다 위치({basis}; "
                     + ', '.join(f'{c}={n}' for n, c in colors) + "), "
                     f"큰 원·네모=각 연속 관측의 시작·끝, 선 끊김=관측 누락, 이어진 점 간격이 좁으면 느림·넓으면 빠름, 조금 큰 점={onion.TRAILS['tick_seconds']:g}초마다; {'왼쪽 회색=시작과 가장 다른 가운데 프레임; ' if peaked else ''}"
-                    "맨 오른쪽 spacing=점마다 지나온 길이를 같은 길이 줄로 펼친 것(줄 이름=점 이름, 눈금 색=궤적 색), 굵은 눈금이 모이면 느림·벌어지면 빠름, still=거의 안 움직인 점)")
+                    "맨 오른쪽 spacing=점마다 지나온 길이를 같은 길이 줄로 펼친 것(줄 이름=점 이름, 눈금 색=궤적 색), 굵은 눈금이 모이면 느림·벌어지면 빠름, still=거의 안 움직인 점, 그 아래 작은 그림=구간 첫 프레임 전체(노란 테두리=어니언이 잘라 보여 준 범위))")
         text.append(f"  - {SLIP}")
     lines, summary = look._summary(view, dict(seed=frame, end=stop), 'marked', 'mark.report.md', 'mark-traj/trajectory.png')
     if relative:summary['relative_report']=relative.name
@@ -176,7 +176,8 @@ def _onion(video, frame, stop, names, tracks, moving, camera, image):
     onion.bands(video, frame, stop, (min(xs)-m, min(ys)-m, max(xs)+m, max(ys)+m), moving, image, trails,
                 onion.TRAILS['colors']+MARK_COLORS)
     peaked = onion.peak(video, frame, stop, (min(xs)-m, min(ys)-m, max(xs)+m, max(ys)+m), image)
-    onion.spacing(video, image, trails, onion.TRAILS['colors']+MARK_COLORS)
+    onion.spacing(video, image, trails, onion.TRAILS['colors']+MARK_COLORS,
+                  context=(frame, (min(xs)-m, min(ys)-m, max(xs)+m, max(ys)+m)))
     return image.name, [(t['point'], c) for t, c in zip(trails, onion.TRAILS['names']+MARK_COLOR_NAMES)], peaked
 
 

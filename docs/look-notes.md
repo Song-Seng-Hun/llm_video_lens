@@ -336,3 +336,9 @@ Cost on mikumiku (50 tiles; tokens estimated as image area after the reader's 15
 | 540 | 9 | ~13,800 | 287-540 px |
 
 Larger tiles gain less than their cost because tall sheets are downscaled when read. The user picked 360 (same reasoning as the peak panel: tokens against information). A row with a tile that does not fit leaves a black gap on its right.
+
+## Picture crop floor, whole-frame stills and context (2026-11-01)
+
+mikumiku puts a character inside a square card on a phone player (1080x1920). The pose box covered only the visible part of the body, so onions came out as strips of one part (1372x395, 580x243). The pictures (onion, strip, peak panel) now show at least half the frame's shorter side each way, between 1.6:1 and 1:1.6, grown around the padded box and kept in the frame; band features, gap seeds and peak's difference stay on the padded box, so look.md text was unchanged on mikumiku, the dancer, the Live2D sweep and the sliding wave (diff 0 outside the legend).
+
+A short cut's still is now the whole frame. The chart panel also shows, under its rows, the whole first frame of the span with the onion's view outlined in yellow, so a crop is never read without where it sits. It uses the panel's empty lower part: mikumiku stayed 6 sheets, ~9,200 image tokens. With six chart rows the small frame gets small.

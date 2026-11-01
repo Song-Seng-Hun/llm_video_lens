@@ -16,6 +16,23 @@ def _box(bbox, w, h):
     return max(0, int(x0-px)), max(0, int(y0-py)), min(w, int(x1+px)), min(h, int(y1+py))
 
 
+# The pictures (onion, still, strip, peak panel) show at least half the frame's shorter side each way, between 1.6:1
+# and 1:1.6 (wide or tall, the same limit):
+# a pose box around the visible part of a character in a square card (mikumiku) cut 1372x395 strips of one body part.
+# Measurements (bands, gaps, peak's difference) stay on the padded box.
+VIEW = dict(min_side=.5, max_aspect=1.6)
+
+
+def _view(bbox, w, h):
+    x0, y0, x1, y1 = _box(bbox, w, h)
+    side = VIEW['min_side']*min(w, h)
+    bw, bh = max(x1-x0, side), max(y1-y0, side)
+    bw, bh = min(w, max(bw, bh/VIEW['max_aspect'])), min(h, max(bh, bw/VIEW['max_aspect']))
+    cx, cy = (x0+x1)/2, (y0+y1)/2
+    vx, vy = int(min(max(0, cx-bw/2), w-bw)), int(min(max(0, cy-bh/2), h-bh))
+    return vx, vy, vx+int(bw), vy+int(bh)
+
+
 # Each part's lead point (digest.limbs) drawn frame by frame on the onion: the overlay shows only start and end, the
 # trail shows how the part got there and where it bunched up (slow) or spread out (fast).
 # Every frame's dot looked evenly spaced even where the speed fell (Live2D sweep: the hand went 21 -> 0 px/f in its last
@@ -90,7 +107,7 @@ def bands(video, start, end, bbox, camera=None, image=None, trails=(), colors=No
         if camera:  # trails have the camera taken out; without this the overlay showed a pan as motion (anime clip f180..209)
             last = cv2.warpAffine(last, np.float32([[1, 0, -cam[0]], [0, 1, -cam[1]]]), (w, h), borderMode=cv2.BORDER_REPLICATE)
         capture = cv2.VideoCapture(str(video)); fps = capture.get(cv2.CAP_PROP_FPS); capture.release()
-        _image(cv2, np, first, last, (x0, y0, x1, y1), result, image, trails, colors, named, fps)
+        _image(cv2, np, first, last, _view(bbox, w, h), result, image, trails, colors, named, fps, (x0+x1)//2)
     return result
 
 
@@ -158,22 +175,24 @@ def spacing_rows(trails, fps):
     return rows, skipped
 
 
-def spacing(video, image, trails, colors=None):
+def spacing(video, image, trails, colors=None, context=None):
     """Append the spacing chart right of the onion image: one equal-length line per trail, a thick tick every
-    TRAILS['tick_seconds'] and a thin one per frame at the fraction of path covered; close ticks = slow."""
+    TRAILS['tick_seconds'] and a thin one per frame at the fraction of path covered; close ticks = slow.
+    context=(frame, bbox): under the rows, that whole frame small with the onion's view outlined (`_context`)."""
     import cv2
     import numpy as np
     picture = cv2.imread(str(image))
-    if picture is None or not trails:
+    if picture is None:
         return None
     capture = cv2.VideoCapture(str(video)); fps = capture.get(cv2.CAP_PROP_FPS); capture.release()
-    rows, skipped = spacing_rows(trails, fps)
-    if not rows:
+    rows, skipped = spacing_rows(trails, fps) if trails else ([], [])
+    if not rows and not context:
         return None
     h = picture.shape[0]; k = max(1., h/SPACING['height']); w = round(SPACING['width']*k)
     panel = np.full((h, w, 3), 245, np.uint8); m = round(SPACING['margin']*k); x0, x1 = m, w-m
     row = min(round(SPACING['row']*k), (h-2*m)//(len(rows)+1)); size, th = .45*k, max(1, round(k))
-    cv2.putText(panel, f"spacing: {TRAILS['tick_seconds']:g}s ticks", (round(10*k), round(22*k)), cv2.FONT_HERSHEY_SIMPLEX, size, (60, 60, 60), th, cv2.LINE_AA)
+    if rows:
+        cv2.putText(panel, f"spacing: {TRAILS['tick_seconds']:g}s ticks", (round(10*k), round(22*k)), cv2.FONT_HERSHEY_SIMPLEX, size, (60, 60, 60), th, cv2.LINE_AA)
     palette = {t['point']: c for t, c in zip(trails, colors or TRAILS['colors'])}
     for i, r in enumerate(rows):
         y = m+round(10*k)+row*i+row//2; c = palette[r['point']]; big, small = round(12*k), round(4*k)
@@ -193,15 +212,38 @@ def spacing(video, image, trails, colors=None):
         x += cv2.getTextSize(text+' ', cv2.FONT_HERSHEY_SIMPLEX, size, th)[0][0]
         if x > x1-round(60*k):
             x, y = x0, y+round(24*k)
+    if context:
+        _context(cv2, video, context, panel, (x0, y+row//2 if rows or skipped else m, x1, h-m))
     cv2.imwrite(str(image), np.hstack([picture, np.full((h, 6, 3), 255, np.uint8), panel]))
     return dict(rows=[r['point'] for r in rows], still=skipped)
 
 
-def _image(cv2, np, first, last, box, result, path, trails=(), colors=None, named=False, fps=None):
+def _context(cv2, video, context, panel, area):
+    """The whole frame, fitted into `area` of the chart panel, with the onion's view outlined: a crop alone hid that
+    mikumiku is a character inside a square card on a phone player (2026-11-01). Costs no width: the panel is there."""
+    from image_lens import frames
+    frame, bbox = context
+    got = frames.window(video, frame, frame)
+    if not got:
+        return
+    image = got[0]; h, w = image.shape[:2]; ax0, ay0, ax1, ay1 = area
+    k = min((ax1-ax0)/w, (ay1-ay0)/h)
+    if k <= 0:
+        return
+    small = cv2.resize(image, (max(1, int(w*k)), max(1, int(h*k))), interpolation=cv2.INTER_AREA)
+    sx, sy = ax0+(ax1-ax0-small.shape[1])//2, ay1-small.shape[0]
+    panel[sy:sy+small.shape[0], sx:sx+small.shape[1]] = small
+    vx0, vy0, vx1, vy1 = (_view(bbox, w, h) if bbox else (0, 0, w, h))
+    t = max(2, round(small.shape[0]/200))  # 1 px of colour did not survive JPEG
+    corners = ((sx+int(vx0*k), sy+int(vy0*k)), (sx+int(vx1*k)-1, sy+int(vy1*k)-1))
+    cv2.rectangle(panel, *corners, (0, 0, 0), t+2); cv2.rectangle(panel, *corners, (0, 220, 255), t)
+
+
+def _image(cv2, np, first, last, box, result, path, trails=(), colors=None, named=False, fps=None, centre=None):
     x0, y0, x1, y1 = box
     a = cv2.cvtColor(first, cv2.COLOR_BGR2GRAY)[y0:y1, x0:x1]; b = last[y0:y1, x0:x1]
     picture = np.dstack([b, b, a])  # dark only at the start -> cyan, dark only at the end -> red
-    centre = (x1-x0)//2
+    centre = (x1-x0)//2 if centre is None else centre-x0  # arrows on the person, not the middle of the view
     for band in result:
         top = band['y'][0]-y0
         cv2.line(picture, (0, top), (x1-x0, top), (150, 150, 150), 1)
@@ -251,9 +293,9 @@ def _image(cv2, np, first, last, box, result, path, trails=(), colors=None, name
 PEAK = dict(min_frames=8, margin=.15, scale=4, plateau=.95, draw=False)
 
 
-def _crop(cv2, image, bbox):
+def _crop(cv2, image, bbox, view=True):
     h, w = image.shape[:2]
-    x0, y0, x1, y1 = _box(bbox, w, h) if bbox else (0, 0, w, h)
+    x0, y0, x1, y1 = ((_view if view else _box)(bbox, w, h)) if bbox else (0, 0, w, h)
     return image[y0:y1, x0:x1]
 
 
@@ -269,7 +311,7 @@ def peak(video, start, end, bbox, image):
     window = frames.window(video, start, end)[:hi-start+1]
     found = {}; first = None
     for n, frame in zip(range(start, hi+1), window):
-        small = cv2.resize(cv2.cvtColor(_crop(cv2, frame, bbox), cv2.COLOR_BGR2GRAY), None, fx=1/PEAK['scale'], fy=1/PEAK['scale'], interpolation=cv2.INTER_AREA).astype(np.float32)
+        small = cv2.resize(cv2.cvtColor(_crop(cv2, frame, bbox, view=False), cv2.COLOR_BGR2GRAY), None, fx=1/PEAK['scale'], fy=1/PEAK['scale'], interpolation=cv2.INTER_AREA).astype(np.float32)
         if first is None:
             first = small
         elif n >= lo:
@@ -312,7 +354,7 @@ def who(video, frame, people, image):
 
 
 def still(video, frame, bbox, image):
-    """One native frame (cropped to the padded person box when there is one) for a range too short to track."""
+    """One native frame, whole (bbox unused, kept for callers), for a range too short to track."""
     import cv2
     cap = cv2.VideoCapture(str(video))
     try:
@@ -322,7 +364,7 @@ def still(video, frame, bbox, image):
         cap.release()
     if not ok:
         return None
-    cv2.imwrite(str(image), _crop(cv2, picture, bbox))
+    cv2.imwrite(str(image), picture)  # the whole frame: a short cut's still is context, not a close-up
     return image.name
 
 
@@ -448,7 +490,7 @@ def lines(result, image_name=None, screen=False, peak=False):
     out = [f'- 높이별 흐름 (사람 상자 5등분, {basis}): ' + ' · '.join(parts)]
     if image_name:
         out.append(f"  - 어니언 그림: {image_name} (청록=시작, 빨강=끝(진한 윤곽선 기준; 배경보다 밝은 면은 띠 색이 반대(청록 띠=간 쪽); 카메라가 움직였으면 끝 프레임을 카메라만큼 되돌려 겹침), 초록 화살표=띠별 이동 ×{ONION['arrow_scale']}(그림 밖으로 나가면 줄임, 머리보다 짧으면 생략); {'왼쪽 회색=시작과 가장 다른 가운데 프레임; ' if peak else ''}"
-                   f"색 점선=부위별 대표 점(몸 기준이 없으면 '화면'에 적힌 점)의 프레임마다 위치({'·'.join(TRAILS['names'])} 순, {basis}), 큰 원·네모=각 연속 관측의 시작·끝, 선 끊김=관측 누락, 이어진 점 간격이 좁으면 느림·넓으면 빠름, 조금 큰 점={TRAILS['tick_seconds']:g}초마다(그 간격이 좁아지면 느려짐); 맨 오른쪽 spacing=부위마다 지나온 길이를 같은 길이 줄로 펼친 것, 굵은 눈금={TRAILS['tick_seconds']:g}초마다·가는 눈금=프레임마다, 눈금이 모이면 느림·벌어지면 빠름(작은 이동도 같은 크기로 보임, {SPACING['min_px']:g}px 미만 부위는 still))")
+                   f"색 점선=부위별 대표 점(몸 기준이 없으면 '화면'에 적힌 점)의 프레임마다 위치({'·'.join(TRAILS['names'])} 순, {basis}), 큰 원·네모=각 연속 관측의 시작·끝, 선 끊김=관측 누락, 이어진 점 간격이 좁으면 느림·넓으면 빠름, 조금 큰 점={TRAILS['tick_seconds']:g}초마다(그 간격이 좁아지면 느려짐); 맨 오른쪽 spacing=부위마다 지나온 길이를 같은 길이 줄로 펼친 것, 굵은 눈금={TRAILS['tick_seconds']:g}초마다·가는 눈금=프레임마다, 눈금이 모이면 느림·벌어지면 빠름(작은 이동도 같은 크기로 보임, {SPACING['min_px']:g}px 미만 부위는 still), 그 아래 작은 그림=구간 첫 프레임 전체(노란 테두리=어니언이 잘라 보여 준 범위))")
     return out
 
 
