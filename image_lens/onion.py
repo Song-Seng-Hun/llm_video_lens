@@ -326,7 +326,10 @@ def still(video, frame, bbox, image):
     return image.name
 
 
-SHEET = dict(tile=360, label=24, columns=4, rows=5, strip_height=200, gap_s=.05)
+# Tiles share one height, not one width: fitted to a 360 px width, an onion with its spacing chart (about 1.4x as
+# wide as tall) shrank to 360x262 next to a 360x414 still (Live2D sliding wave, 2026-11-01). 360 high: about 1.3x
+# the image tokens of the old layout on mikumiku (540 high: 2x), onions 1.3-1.5x taller as read; docs/look-notes.md.
+SHEET = dict(width=1440, tile_height=360, label=24, rows=5, strip_height=200, gap_s=.05)
 
 
 def strip(video, start, end, bbox, image, count=5):
@@ -364,7 +367,7 @@ def sheets(root, items):
     row under its window. Rows, not tiles, are counted per sheet."""
     import cv2
     import numpy as np
-    t, top = SHEET['tile'], SHEET['label']; width = t*SHEET['columns']
+    top, width, h = SHEET['label'], SHEET['width'], SHEET['tile_height']
     def read(name):
         return cv2.imread(str(root/name))
     def label(image, text):
@@ -397,14 +400,14 @@ def sheets(root, items):
             if len(images) > 1:
                 units.append(('row', full_row(*zip(*images))))
             elif images:
-                units.append(('tile', label(fit(images[0][0], t, 1.5*t), images[0][1])))
+                units.append(('tile', label(fit(images[0][0], width, h), images[0][1])))
         else:
             image = read(name)
             if image is not None:
                 if note == 'strip':
                     units.append(('row', full_row([image], [f'{start:.2f}-{end:.2f}s strip'])))
                 else:
-                    units.append(('tile', label(fit(image, t, 1.5*t), f'{start:.2f}-{end:.2f}s')))
+                    units.append(('tile', label(fit(image, width, h), f'{start:.2f}-{end:.2f}s')))
         i += 1
     rows = []; pending = []
     def flush():
@@ -417,10 +420,10 @@ def sheets(root, items):
         if kind == 'row':
             flush(); rows.append(image)
         else:
-            image = np.hstack([image, np.zeros((image.shape[0], t-image.shape[1], 3), np.uint8)])
-            pending.append(image)
-            if len(pending) == SHEET['columns']:
+            # Left to right; a tile that would pass the sheet width starts the next row.
+            if pending and sum(x.shape[1] for x in pending)+image.shape[1]+4 > width:
                 flush()
+            pending.append(np.hstack([image, np.zeros((image.shape[0], 4, 3), np.uint8)])[:, :width])
     flush()
     written = []
     for first in range(0, len(rows), SHEET['rows']):
