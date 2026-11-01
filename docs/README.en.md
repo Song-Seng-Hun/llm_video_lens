@@ -129,6 +129,12 @@ If look followed the wrong person, or you want something that is not a person, g
 python -m image_lens --workspace W box --video V --look W/look --frame 0 --end 119 --box 0,300,880,1440 --checkpoint C --out W/box-f0
 ```
 
+If the box is on the right person but badly shaped (head cut off, screen UI inside), re-run only that window with another person detector. `redo` leaves the first look as it is and looks at that window's frames again in a new look folder. `redo-boxes.jpg` draws the first (red) and the new (green) boxes on the same frames. The window name is the start of its file names (`shot-0000-w0`). The SAM3 bundle is slow on a whole video (about 15 min for a 39 s clip) but short on one window (30 frames in 33 s).
+
+```bash
+python -m image_lens --workspace W redo --look W/look --window shot-0000-w0 --detector /models/sam3-bundle --out W/redo-w0 --checkpoint C
+```
+
 ## Status and limits
 
 - Limb positions are estimated from the pose model and point tracking together; where they are unsure, the line says "모름" (unknown). Comparisons and limits are in the [look notes](look-notes.md).

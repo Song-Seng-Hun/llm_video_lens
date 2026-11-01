@@ -132,6 +132,12 @@ look이 엉뚱한 사람을 따라갔거나 사람이 아닌 대상을 보고 �
 python -m image_lens --workspace W box --video V --look W/look --frame 0 --end 119 --box 0,300,880,1440 --checkpoint C --out W/box-f0
 ```
 
+상자는 맞는 사람을 잡았는데 모양이 어설프면(머리가 잘림, 화면 UI가 들어감) 그 구간만 다른 사람 검출기로 다시 돌립니다. `redo`는 처음 look을 그대로 두고, 그 구간의 프레임만 새 look 폴더로 다시 봅니다. `redo-boxes.jpg`에 처음(빨강)과 지금(초록) 상자가 같은 프레임에 그려집니다. 구간 이름은 그 구간 파일 이름 앞부분(`shot-0000-w0`)입니다. SAM3 묶음은 영상 전체에 쓰면 느리지만(39초 클립에 약 15분), 한 구간이면 짧습니다(30프레임 33초).
+
+```bash
+python -m image_lens --workspace W redo --look W/look --window shot-0000-w0 --detector /models/sam3-bundle --out W/redo-w0 --checkpoint C
+```
+
 ## 현재 상태와 한계
 
 - 팔다리 좌표는 자세 모델과 점 추적을 함께 써서 추정하고, 확실하지 않은 곳은 "모름"으로 적습니다. 자세한 비교와 한계는 [look 노트](docs/look-notes.md)에 있습니다.

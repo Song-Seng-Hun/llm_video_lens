@@ -129,6 +129,12 @@ look が別の人を追っていたときや、人以外の対象を見たいと
 python -m image_lens --workspace W box --video V --look W/look --frame 0 --end 119 --box 0,300,880,1440 --checkpoint C --out W/box-f0
 ```
 
+枠は正しい人を捉えているのに形が不十分なとき(頭が切れる、画面の UI が入る)は、その区間だけ別の人物検出器でやり直します。`redo` は最初の look をそのまま残し、その区間のフレームだけを新しい look フォルダで見直します。`redo-boxes.jpg` には最初(赤)と今回(緑)の枠が同じフレームに描かれます。区間名はその区間のファイル名の先頭(`shot-0000-w0`)です。SAM3 バンドルは動画全体だと遅いですが(39 秒のクリップで約 15 分)、1 区間なら短く済みます(30 フレームで 33 秒)。
+
+```bash
+python -m image_lens --workspace W redo --look W/look --window shot-0000-w0 --detector /models/sam3-bundle --out W/redo-w0 --checkpoint C
+```
+
 ## 現在の状態と限界
 
 - 手足の位置は姿勢モデルと点の追跡を合わせて推定し、確かでないところは「모름」（不明）と書きます。詳しい比較と限界は [look ノート](look-notes.md) にあります。

@@ -5,7 +5,7 @@ from pathlib import Path
 import sys
 from image_lens import paths
 
-COMMANDS = ('look', 'scan', 'compare', 'brief', 'catalog', 'pose', 'seed', 'bind', 'prepare', 'validate', 'track', 'analyze', 'grid', 'mark', 'box', 'focus', 'zoom', 'at')
+COMMANDS = ('look', 'scan', 'compare', 'brief', 'catalog', 'pose', 'seed', 'bind', 'prepare', 'validate', 'track', 'analyze', 'grid', 'mark', 'box', 'redo', 'focus', 'zoom', 'at')
 
 
 def parser(command, description):
@@ -164,6 +164,17 @@ def dispatch(command, arguments):
         ap.add_argument('--checkpoint', help='default: models.json'); ap.add_argument('--out', required=True, help='new output directory')
         a = models(ap.parse_args(arguments), 'checkpoint')
         return box.run(a.video, a.look, a.frame, a.box, a.checkpoint, a.out, a.end)
+    if command == 'redo':
+        from image_lens import redo
+        ap = parser(command, "Re-run one look window with another person detector (e.g. the SAM3 bundle) into a new look folder.")
+        ap.add_argument('--look', required=True, help='look output directory'); ap.add_argument('--window', required=True, help='<shot id>-w<i>, as in its file names')
+        ap.add_argument('--detector', required=True, help='pinned detector: HumanArt/DeepGHS .onnx or the SAM3 bundle directory')
+        ap.add_argument('--pose-model', help='default: models.json'); ap.add_argument('--checkpoint', help='default: models.json')
+        ap.add_argument('--out', required=True, help='new output directory inside the workspace'); ap.add_argument('--max-seconds', type=int, default=1800)
+        a = models(ap.parse_args(arguments), 'pose_model', 'checkpoint')
+        if not 60 <= a.max_seconds <= 7200:
+            raise ValueError('--max-seconds 60..7200')
+        return redo.run(a.look, a.window, a.detector, a.pose_model, a.checkpoint, a.out, a.max_seconds)
     if command == 'focus':
         from image_lens import digest
         ap = parser(command, 'Print one shot of a look run in full detail (look-full.md).')
