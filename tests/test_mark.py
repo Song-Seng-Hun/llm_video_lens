@@ -28,4 +28,51 @@ class Ease(unittest.TestCase):
         ts = [.1*i+1e-12*(i == 6) for i in range(7)]
         self.assertIn(motion_report.ease(ts, [(float(i), 0.) for i in range(7)]), ('even', 'ease_in', 'ease_out', 'ease_in_out'))
 
+
+class Coordinates(unittest.TestCase):
+    def test_middle_camera_gap_keeps_numbers_trails_and_caption_in_screen_basis(self):
+        """The endpoints alone must not correct the picture while the numerical view has fallen back to screen."""
+        import json
+        import tempfile
+        import cv2
+        from pathlib import Path
+        from unittest.mock import patch
+        from image_lens import camera, look, onion, paths, shot_boundaries
+        from tests.test_look import Camera
+        previous = paths.workspace_root()
+        with tempfile.TemporaryDirectory() as d:
+            root=Path(d).resolve();paths.configure(root)
+            try:
+                video=root/'source.avi';writer=cv2.VideoWriter(str(video),cv2.VideoWriter_fourcc(*'MJPG'),25,(640,360))
+                image=np.full((360,640,3),128,np.uint8);image[100:200,180:300]=[50,180,220]
+                for _ in range(26):writer.write(image)
+                writer.release()
+                scan=shot_boundaries.scan_video(video);scan_path=paths.write_json(root/'shots.json',scan)
+                packet,_,_=Camera().view([(200+3*n,150) for n in range(26)],None)
+                partial={n:(4.*n,0.,1.) for n in range(26) if n!=12}
+                original=look._step
+                def step(command,args):
+                    if command!='track':return original(command,args)
+                    args=list(map(str,args));query=json.loads(Path(args[args.index('--queries')+1]).read_text())
+                    packet['job']=query['jobs'][0];packet['shot_check']=scan
+                    paths.write_json(args[args.index('--out')+1],packet)
+                out=root/'marked'
+                with patch.object(look,'_step',step),patch.object(camera,'path',return_value=partial),\
+                     patch.object(onion,'body_basis',return_value=None),\
+                     patch.object(onion,'bands',wraps=onion.bands) as bands,\
+                     patch.object(onion,'references',wraps=onion.references) as references:
+                    mark.run(video,scan_path,0,['hand=200,150'],'recorded-unused',out,end=25,snap_points=False)
+                text=(out/'mark.md').read_text();record=json.loads((out/'mark.json').read_text())
+                self.assertIn('(카메라·배경 이동 추정, 일부 프레임 모름; 아래 수치·그림은 화면 기준)',text)
+                self.assertIn('움직임 수치 기준: 화면.',text)
+                self.assertIn('카메라 일부 모름: 화면 좌표 그대로',text)
+                self.assertEqual(record['summary']['coordinate_scope'],'screen_2d')
+                self.assertIsNone(bands.call_args.args[4])
+                trail=bands.call_args.args[6][0]['xy']
+                self.assertEqual(trail[-1][1]-trail[0][1],72.)
+                self.assertIsNone(references.call_args.args[3])
+                self.assertFalse((out/'mark.relative.json').exists())
+            finally:
+                paths.configure(previous)
+
 if __name__ == '__main__': unittest.main()

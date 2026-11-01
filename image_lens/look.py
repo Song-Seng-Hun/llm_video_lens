@@ -174,8 +174,10 @@ def lost(report, window, min_frames=LOOK['min_frames']):
 
 def _motion_view(report, tracks, binding, frame_motion):
     """One numerical view for look and mark. Raw analyze reports and trajectory pictures remain source evidence."""
-    from image_lens import analyze_motion, motion_report
-    if not frame_motion:return report
+    from image_lens import analyze_motion, camera, motion_report
+    # A partial corrected view discards genuine observations at unmatched camera frames. Keep the complete
+    # screen-coordinate report as the selected numerical view; explicit camera_relative still supports gaps.
+    if not camera.complete(frame_motion, *report['requested_frames']):return report
     packet,_=paths.load(tracks);bindings,_=paths.load(binding)
     return motion_report.camera_relative(report,packet,bindings,frame_motion,
                                          analyze_motion.collect_observations,analyze_motion.infer)
@@ -374,7 +376,9 @@ def _run(video, detector, pose_model, checkpoint, out, max_shots=LOOK['max_shots
         except Exception as error:  # OpenCV raises its own error type; a missing estimate only disables the filter
             frame_motion = None; errors.append(dict(window=w, step='camera', error=str(error)[:300]))
         cam = camera.between(frame_motion, w['seed'], end)
-        done['coordinate_scope'] = 'camera_translation_relative_2d' if frame_motion else 'screen_2d'
+        camera_complete = camera.complete(frame_motion, w['seed'], end)
+        done['coordinate_scope'] = ('camera_translation_relative_2d'
+                                    if camera_complete else 'screen_2d')
         done['camera'] = camera.describe(frame_motion, w['seed'], end, motion_report.STROKE['major_min_px'])
         if done['camera'].get('unknown'):
             try:
@@ -384,7 +388,9 @@ def _run(video, detector, pose_model, checkpoint, out, max_shots=LOOK['max_shots
         from image_lens import digest
         camera_text = digest.camera(done['camera'], fps)
         if camera_text:
-            slot.append(f"  - 화면 전체: {camera_text} (카메라·배경 이동 추정; 카메라만 따라간 이동은 아래에서 뺌)")
+            basis_note = ('(카메라·배경 이동 추정; 아래 수치·그림에서 뺌)' if camera_complete
+                          else '(카메라·배경 이동 추정, 일부 프레임 모름; 아래 수치·그림은 화면 기준)')
+            slot.append(f"  - 화면 전체: {camera_text} {basis_note}")
         # Move candidates: report one per group that moved together (see onion.parts); the rest stay in the tracks file.
         from image_lens import onion
         for k, (name, group, stem, tracks) in enumerate(tracked):
@@ -458,8 +464,8 @@ def _run(video, detector, pose_model, checkpoint, out, max_shots=LOOK['max_shots
             try:
                 # End-frame camera unknown (plain backgrounds): draw in screen coordinates and say so; dropping the
                 # picture left the plain-background README examples with no onion at all.
-                screen = bool(frame_motion) and cam is None
-                moving = cam
+                screen = bool(frame_motion) and not camera_complete
+                moving = cam if camera_complete else None
                 if screen:
                     done['onion_basis'] = 'screen'
                 from image_lens import digest
@@ -481,7 +487,7 @@ def _run(video, detector, pose_model, checkpoint, out, max_shots=LOOK['max_shots
                         done['mark_hint'] = hint; slot.append('  '+_mark_hint(hint, source, root/'shots.json'))
                 done['onion'] = picture.name
                 done['peak'] = onion.peak(source, w['seed'], end, person['bbox'], picture)
-                known = frame_motion if frame_motion and not screen and not done.get('camera', {}).get('unknown') else None
+                known = frame_motion if camera_complete and not done.get('camera', {}).get('unknown') else None
                 charted, palette = onion.references(done['trails'], w['seed'], end, known, centre)
                 done['spacing'] = onion.spacing(source, picture, charted, palette, context=(w['seed'], person['bbox'], path, known and onion.moved(known), person['bbox']))
                 turns = [e['share'] for e in (done.get('events') or {}).get('width', []) if e['share'] >= body_motion.EVENTS['turn']]

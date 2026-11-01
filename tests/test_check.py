@@ -24,9 +24,31 @@ class Path_(unittest.TestCase):
     def test_a_pan_longer_than_the_view_stays_known(self):
         with tempfile.TemporaryDirectory(dir=REPO/'workspace') as d:
             video = Path(d)/'pan.avi'; pan_video(video)
-            found = camera.path(video, 0, 39)
-            # The view moved 780 px, more than its 640 px width: the start frame shares nothing with the last one.
-            self.assertIn(39, found); self.assertAlmostEqual(found[39][0], -780, delta=30); self.assertAlmostEqual(found[39][1], 0, delta=10)
+            # The view moved 780 px, more than its width. Check chaining both on the whole frame and on an admitted
+            # background, so refusing a failed background fit cannot disable a genuinely coherent camera pan.
+            for person in (None, [200, 100, 400, 250]):
+                with self.subTest(person=person):
+                    found = camera.path(video, 0, 39, person)
+                    self.assertIn(39, found); self.assertAlmostEqual(found[39][0], -780, delta=30); self.assertAlmostEqual(found[39][1], 0, delta=10)
+
+    def test_a_failed_rich_background_cannot_borrow_the_subject_motion(self):
+        """A textured narrow UI strip and a different moving actor: feature count does not establish a global fit."""
+        import cv2
+        import numpy as np
+        with tempfile.TemporaryDirectory(dir=REPO/'workspace') as d:
+            rng = np.random.default_rng(12)
+            strip = cv2.GaussianBlur(rng.integers(0, 255, (150, 680, 3), dtype=np.uint8), (3, 3), 0)
+            actor = cv2.GaussianBlur(rng.integers(0, 255, (295, 480, 3), dtype=np.uint8), (3, 3), 0)
+            video = Path(d)/'layers.avi'; out = cv2.VideoWriter(str(video), cv2.VideoWriter_fourcc(*'MJPG'), 10, (640, 480))
+            for n in range(10):
+                image = np.full((480, 640, 3), 128, np.uint8)
+                image[:150] = strip[:, 2*n:640+2*n]
+                image[180:475, 80+6*n:560+6*n] = actor
+                out.write(image)
+            out.release()
+            camera._LAST.clear()
+            found = camera.path(video, 0, 9, [80, 180, 560, 475])
+            self.assertEqual(found, {0: (0., 0., 1.)})
 
     def test_a_shorter_request_is_cut_from_the_kept_path(self):
         with tempfile.TemporaryDirectory(dir=REPO/'workspace') as d:

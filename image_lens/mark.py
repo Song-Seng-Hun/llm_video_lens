@@ -123,6 +123,8 @@ def run(video, shots, frame, points, checkpoint, out, end=None, snap_points=True
     paths.write(root/'mark.report.md', motion_report.markdown(report))
     frame_motion = camera.path(source, frame, stop)
     cam = camera.between(frame_motion, frame, stop)
+    camera_complete = camera.complete(frame_motion, frame, stop)
+    known = frame_motion if camera_complete else None
     view = look._motion_view(report, tracks, bindings, frame_motion)
     relative = paths.write_json(root/'mark.relative.json', view) if view is not report else None
     text = [f'# 찍은 점 추적 f{frame}..{stop}', '',
@@ -132,15 +134,19 @@ def run(video, shots, frame, points, checkpoint, out, end=None, snap_points=True
     text += [f"- {p['point_id']}: 준 위치 {p['given'][0]:.0f},{p['given'][1]:.0f} → 놓은 위치 {p['seed'][0]:.0f},{p['seed'][1]:.0f}"
              + (f" ({p['snapped_px']:.0f}px 옮김)" if p['snapped_px'] else '') for p in placed]
     if cam and math.hypot(*cam) >= motion_report.STROKE['major_min_px']:
-        text.append(f"- 화면 전체: {motion_report.KO[motion_report.direction(*cam)]} {math.hypot(*cam):.0f}px (카메라·배경 이동 추정; 이것만 따라간 이동은 뺌)")
-    text.append(f'- 움직임 수치·점선 기준: {motion_report.coordinate_label(view)}. 원시 보고서·trajectory는 화면 좌표다.')
+        basis_note = ('(카메라·배경 이동 추정; 아래 수치·그림에서 뺌)' if camera_complete
+                      else '(카메라·배경 이동 추정, 일부 프레임 모름; 아래 수치·그림은 화면 기준)')
+        text.append(f"- 화면 전체: {motion_report.KO[motion_report.direction(*cam)]} {math.hypot(*cam):.0f}px {basis_note}")
+    text.append(f'- 움직임 수치 기준: {motion_report.coordinate_label(view)}. 원시 보고서·trajectory는 화면 좌표다.')
     if relative:text.append('- 카메라 보정 수치 근거: mark.relative.json')
     # End-frame camera unknown: draw in screen coordinates and say so, as look does (the onion used to be skipped).
     screen = bool(frame_motion) and cam is None
-    onion_image, colors, peaked, basis_shift = _onion(source, frame, stop, [n for n, _ in parsed], tracks, cam, None if screen else frame_motion or None, root/'mark-onion.jpg', subject)
+    onion_image, colors, peaked, basis_shift = _onion(source, frame, stop, [n for n, _ in parsed], tracks,
+                                                    cam if camera_complete else None, known, root/'mark-onion.jpg', subject)
     if onion_image:
-        basis = '카메라 모름: 화면 좌표 그대로' if screen else motion_report.coordinate_label(view)
-        text.append(f"- 어니언 그림: {onion_image} (청록=f{frame}, 빨강=f{stop}(진한 윤곽선 기준; 배경보다 밝은 면은 띠 색이 반대(청록 띠=간 쪽); 카메라가 움직였으면 끝 프레임을 카메라만큼 되돌려 겹침), 색 점선=찍은 점의 프레임마다 위치({basis}; "
+        basis = ('카메라 이동 제외(평행이동 추정)' if known else '카메라 모름: 화면 좌표 그대로' if screen
+                 else '카메라 일부 모름: 화면 좌표 그대로' if frame_motion else '화면')
+        text.append(f"- 어니언 그림: {onion_image} (청록=f{frame}, 빨강=f{stop}(진한 윤곽선 기준; 배경보다 밝은 면은 띠 색이 반대(청록 띠=간 쪽); 카메라 이동을 뺀 그림이면 끝 프레임을 카메라만큼 되돌려 겹침), 색 점선=찍은 점의 프레임마다 위치({basis}; "
                     + ', '.join(f'{c}={n}' for n, c in colors) + "), "
                     f"큰 원·네모=각 연속 관측의 시작·끝, 선 끊김=관측 누락, 이어진 점 간격이 좁으면 느림·넓으면 빠름, 조금 큰 점={onion.TRAILS['tick_seconds']:g}초마다; {'왼쪽 회색=시작과 가장 다른 가운데 프레임; ' if peaked else ''}"
                     "맨 오른쪽 spacing=점마다 지나온 길이를 같은 길이 줄로 펼친 것(줄 이름=점 이름, 눈금 색=궤적 색), 굵은 눈금이 모이면 느림·벌어지면 빠름, still=거의 안 움직인 점, 맨 위 camera·body(또는 subject) 줄=화면 전체·대상 중심의 이동(움직였을 때만), 그 아래 작은 그림=구간 첫 프레임 전체(노란 테두리=어니언이 잘라 보여 준 범위"+(", 초록 테두리=box로 준 상자" if subject else '')+"))")
