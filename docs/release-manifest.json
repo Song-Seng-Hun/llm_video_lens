@@ -21,7 +21,7 @@
   ],
   "manifest_self_excluded": true,
   "file_count": 167,
-  "total_bytes": 2250769,
+  "total_bytes": 2251693,
   "files": [
     {
       "path": ".gitattributes",
@@ -275,8 +275,8 @@
     },
     {
       "path": "image_lens/digest.py",
-      "bytes": 37673,
-      "sha256": "34b57f228b67a020b8da797b490bd509a86f7c0509b080166643d79d7795b4c9"
+      "bytes": 38418,
+      "sha256": "da9b0b92169a2c66f62cc0b5e33feffae8d0088819c5cb95fd98f30b863fdbbd"
     },
     {
       "path": "image_lens/foreground_regions.py",
@@ -805,8 +805,8 @@
     },
     {
       "path": "tests/test_look.py",
-      "bytes": 37153,
-      "sha256": "5ff5ae278247d04de12e8a38c63b29a132487a651b31bd21f4d1ac42dda8359c"
+      "bytes": 37332,
+      "sha256": "0e84eae88ea92b4eba96f89604656043a87b79cbd22308a1edd3a0c5980efc1f"
     },
     {
       "path": "tests/test_mark.py",

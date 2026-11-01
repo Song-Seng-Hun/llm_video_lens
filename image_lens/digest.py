@@ -452,6 +452,12 @@ def markdown(record, scan, full_name):
            f"자세히: `image_lens focus --look <이 폴더> --shot <shot-id>` (또는 {full_name}). 점 이름·부위는 미검증, 수치는 원본 비교 전 후보.", '']
     if record.get('joint_tracking'):
         out.insert(3, '몸 관절 좌표는 pose·추적 혼합 추정(보임·관절 정답 미검증). 속도·완급은 연속된 원시 점 추적에서만 계산. *.raw-tracks.json은 원시 결과, *.tracks.json은 선택된 좌표. SD·골격 불명은 이름 없는 표면점 경로.')
+    if record.get('max_people', 1) > 1:
+        # Without this a reader sees "A1 · 모델 ID" beside P1 and cannot tell what A1 is or which person it is.
+        at = next(i for i, line in enumerate(out) if line.startswith('읽는 법'))+1
+        out.insert(at, f"사람별 분석(장면마다 최대 {record['max_people']}명): A1·A2…는 이 도구가 따로 추적한 사람(먼저 보인 순, 같은 프레임이면 상자가 큰 순; "
+                       '모델 ID는 장면 안 번호라 동일인 미검증). 어느 사람인지는 그 구간의 어니언 그림을 본다. '
+                       'P1…은 화면 기준 문맥 순서로 A와 별개. 장면 안에서 사람마다 "### A1" 아래에 시간 순으로 쓴다.')
     if record.get('redo'):
         r = record['redo']
         out.insert(3, f"이 폴더는 {r['look']}의 {r['window']} 구간(f{record['frames'][0]}..{record['frames'][1]})만 검출기 {r['detector']}로 다시 본 것(처음은 {r['was']}). "
