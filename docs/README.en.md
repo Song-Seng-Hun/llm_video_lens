@@ -35,7 +35,7 @@ Give it one video with people or characters in it, and for each shot (cut) it wr
    pip install -r requirements/pose.txt -r requirements/tracking.txt
    ```
 
-2. Get the three model files yourself: person detection (YOLOX HumanArt, ONNX), whole-body pose (RTMW 133 keypoints, ONNX) and point tracking (a CoTracker checkpoint). They are not in the repository and are never downloaded for you.
+2. Get the three model files yourself: person detection (YOLOX HumanArt, ONNX), whole-body pose (RTMW 133 keypoints, ONNX) and point tracking (a CoTracker checkpoint). They are not in the repository and are never downloaded for you. Person detection can be switched to DeepGHS for drawn figures or to the SAM3 bundle ([Models and licenses](#models-and-licenses), [detector choice and pinned files](person-detectors.md)).
 3. Copy the video into the workspace folder (by default `workspace/` in the repository), and write the model paths in `workspace/models.json`.
 
    ```json
@@ -129,6 +129,12 @@ If look followed the wrong person, or you want something that is not a person, g
 python -m image_lens --workspace W box --video V --look W/look --frame 0 --end 119 --box 0,300,880,1440 --checkpoint C --out W/box-f0
 ```
 
+If the box is on the right person but badly shaped (head cut off, screen UI inside), re-run only that window with another person detector. `redo` leaves the first look as it is and looks at that window's frames again in a new look folder. `redo-boxes.jpg` draws the first (red) and the new (green) boxes on the same frames. The window name is the start of its file names (`shot-0000-w0`). The SAM3 bundle is slow on a whole video (about 15 min for a 39 s clip) but short on one window (30 frames in 33 s).
+
+```bash
+python -m image_lens --workspace W redo --look W/look --window shot-0000-w0 --detector /models/sam3-bundle --out W/redo-w0 --checkpoint C
+```
+
 ## Status and limits
 
 - Limb positions are estimated from the pose model and point tracking together; where they are unsure, the line says "모름" (unknown). Comparisons and limits are in the [look notes](look-notes.md).
@@ -141,9 +147,21 @@ python -m image_lens --workspace W box --video V --look W/look --frame 0 --end 1
 
 A person set the direction and AI agents built this project together. What to build, which accuracy to aim for and what to adopt were human decisions; implementation, measurement and code review were split between Claude (Anthropic) and Codex (OpenAI) agents. The [look notes](look-notes.md) are the agents' measurement log.
 
-## License
+## Models and licenses
 
-The project's own code and documents are [MIT](../LICENSE). Vendored code keeps its own terms: `image_lens/vendor/shot-detector` (PySceneDetect) is BSD 3-Clause, and `image_lens/vendor/source` (CoTracker) is CC-BY-NC 4.0, noncommercial use only. No model weights are included.
+| Part | Used for | License |
+|---|---|---|
+| YOLOX HumanArt (ONNX, bring your own) | person detection (default) | weight license not established |
+| [DeepGHS anime_person_detection](https://huggingface.co/deepghs/anime_person_detection) (ONNX, bring your own) | person detection for drawn figures (optional) | MIT |
+| [SAM3](https://huggingface.co/mlx-community/sam3-image) MLX weights (bring your own) and `image_lens/_sam3_mlx` (included) | person detection (optional, Apple Silicon) | Meta SAM License |
+| RTMW-l 384, 133 keypoints (ONNX, bring your own) | whole-body pose | weight license not established |
+| [CoTracker](https://github.com/facebookresearch/co-tracker) (source in `image_lens/vendor/source`, checkpoint bring your own) | point tracking | CC-BY-NC 4.0 |
+| [PySceneDetect](https://www.scenedetect.com/) (in `image_lens/vendor/shot-detector`) | finding cuts | BSD 3-Clause |
+| rtmlib detector postprocess (`pose.py`) · ONNX Runtime · MLX | running the models | Apache-2.0 · MIT · MIT |
+
+- The project's own code and documents are [MIT](../LICENSE). Vendored code keeps its own terms.
+- CoTracker source and checkpoint are for noncommercial use only. SAM3 follows the SAM License; research that uses it must acknowledge SAM3.
+- No model weights are in the repository. The SAM3 upload (mlx-community) says apache-2.0, but the weights follow the original's (facebook/sam3) SAM License.
 
 ## More
 

@@ -220,6 +220,17 @@ def _summary(report, window, group, md_path, traj):
                        report=str(md_path), trajectory=str(traj), trajectory_scope='screen_2d')
 
 
+def clip(scan, frames=None):
+    """The scan's shots, cut to frames=(first, last) when given (a redo of one window)."""
+    if not frames:
+        return scan['analysis_segments']
+    first, last = frames
+    if not 0 <= first <= last < scan['source_frame_count']:
+        raise ValueError('frames outside the video')
+    return [dict(s, start_frame=max(s['start_frame'], first), end_frame=min(s['end_frame'], last))
+            for s in scan['analysis_segments'] if s['start_frame'] <= last and s['end_frame'] >= first]
+
+
 def fit(source, root, max_pixels=1920*1080):
     """(video, scaled) where video fits the point tracker's pixel cap. A larger source is shrunk once into the output
     directory (aspect kept, even sides); px in every report are then of that copy. scaled is None or {from, to}."""
@@ -281,7 +292,8 @@ def run(*args, **kwargs):
         _stop_pose()
 
 
-def _run(video, detector, pose_model, checkpoint, out, max_shots=LOOK['max_shots'], max_seconds=1800):
+def _run(video, detector, pose_model, checkpoint, out, max_shots=LOOK['max_shots'], max_seconds=1800, frames=None, redo=None):
+    """frames=(first, last): look at that native range only; redo: what redo re-ran, for look.md's header."""
     started = time.monotonic()
     def remaining():
         return max_seconds-(time.monotonic()-started)
@@ -296,7 +308,8 @@ def _run(video, detector, pose_model, checkpoint, out, max_shots=LOOK['max_shots
     # tracked while it poses the rest (clip B side by side: pose 28 -> 38 s, tracking 35 -> 41 s, 63 -> 41 s in all).
     global POSER
     POSER = _pose_child(['--shots', root/'shots.json', '--detector', detector, '--pose-model', pose_model, '--out', root/'pose.json',
-                         '--max-seconds', max(1, min(1800, int(remaining()))), '--parts-dir', root/'pose-parts'])
+                         '--max-seconds', max(1, min(1800, int(remaining()))), '--parts-dir', root/'pose-parts']
+                        + (['--start', frames[0], '--end', frames[1]] if frames else []))
     # A thread reads the child's lines, so look can take a part that has arrived without waiting for the next one: the
     # next shot is seeded ahead only once its part is taken (clip B: every third shot missed it, the child idled 0.6-1 s).
     # Named apart from the local queue() below: in this scope that def would shadow the module (only hit when the
@@ -533,7 +546,8 @@ def _run(video, detector, pose_model, checkpoint, out, max_shots=LOOK['max_shots
         return queued
     # (sid, window, receipt, error, queued): the next shot's first window, seeded and queued while the child tracks
     ahead = None
-    segments = scan['analysis_segments']; shown = segments[:max_shots]
+    segments = clip(scan, frames)
+    shown = segments[:max_shots]
     for order, segment in enumerate(shown):
         sid = segment['segment_id']; s0, s1 = segment['start_frame'], segment['end_frame']
         if pending and pose_for(s1, wait=False) is None:
@@ -631,7 +645,7 @@ def _run(video, detector, pose_model, checkpoint, out, max_shots=LOOK['max_shots
         lines.append('')
     if pending:
         report(pending)
-    pose_for(scan['source_frame_count']-1)  # pose.json covers the whole clip, past --max-shots too
+    pose_for(frames[1] if frames else scan['source_frame_count']-1)  # pose.json covers the whole clip, past --max-shots too
     if posed[-1][2] != root/'pose.json':
         with LOG.open('a') as log:
             line = heard.get()
@@ -665,7 +679,7 @@ def _run(video, detector, pose_model, checkpoint, out, max_shots=LOOK['max_shots
     from image_lens import zoom
     errors = []
     try:
-        frame_sheets = zoom.overview(source, root)
+        frame_sheets = [] if frames else zoom.overview(source, root)  # whole-clip frames are the first look's
     except Exception as error:  # OpenCV raises its own error type; the overview is optional
         frame_sheets = []; errors.append(dict(step='frame_sheets', error=str(error)[:300]))
     from image_lens import motif
@@ -674,7 +688,7 @@ def _run(video, detector, pose_model, checkpoint, out, max_shots=LOOK['max_shots
             done['motif'] = label
     record = dict(schema='image-lens.look/1', source_video=str(source), source_sha256=scan['source_sha256'], params=LOOK,
                   max_shots=max_shots, scaled=scaled, onion_sheets=sheets, frame_sheets=frame_sheets, errors=errors, shots=shots,
-                  joint_tracking=joint_tracking.PARAMS)
+                  joint_tracking=joint_tracking.PARAMS, **(dict(frames=list(frames)) if frames else {}), **(dict(redo=redo) if redo else {}))
     from image_lens import check
     record['check'] = check.spans(record, fps)
     try:

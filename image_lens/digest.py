@@ -414,6 +414,8 @@ def bridge_line(bridge, facing=None):
 
 def markdown(record, scan, full_name):
     fps = scan['fps']; total = scan['source_frame_count']
+    if record.get('frames'):
+        total = record['frames'][1]-record['frames'][0]+1
     covered = sum(min(d.get('cut_after', d['window']['end']), d['window']['end'])-d['window']['seed']+1
                   for s in record['shots'] for d in s['windows'] if d.get('groups'))
     skipped = [k for s in record['shots'] for k in s['skipped']]
@@ -435,6 +437,10 @@ def markdown(record, scan, full_name):
            f"자세히: `image_lens focus --look <이 폴더> --shot <shot-id>` (또는 {full_name}). 점 이름·부위는 미검증, 수치는 원본 비교 전 후보.", '']
     if record.get('joint_tracking'):
         out.insert(3, '몸 관절 좌표는 pose·추적 혼합 추정(보임·관절 정답 미검증). 속도·완급은 연속된 원시 점 추적에서만 계산. *.raw-tracks.json은 원시 결과, *.tracks.json은 선택된 좌표. SD·골격 불명은 이름 없는 표면점 경로.')
+    if record.get('redo'):
+        r = record['redo']
+        out.insert(3, f"이 폴더는 {r['look']}의 {r['window']} 구간(f{record['frames'][0]}..{record['frames'][1]})만 검출기 {r['detector']}로 다시 본 것(처음은 {r['was']}). "
+                      f"추적된 구간·건너뜀은 이 범위 안의 수. 처음과 지금의 사람 상자: {r['boxes']} (빨강=처음, 초록=지금; 같은 프레임).")
     if record.get('scaled'):
         out.insert(3, f"원본 {record['scaled']['from'][0]}×{record['scaled']['from'][1]}을 {record['scaled']['to'][0]}×{record['scaled']['to'][1]}로 줄여서 봄: px는 줄인 영상 기준.")
     if record.get('onion_sheets') or record.get('frame_sheets'):
