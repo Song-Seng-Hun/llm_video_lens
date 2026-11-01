@@ -39,8 +39,8 @@
     },
     {
       "path": "README.md",
-      "bytes": 14195,
-      "sha256": "5d8c5f0c65d1944a1c36f6c96461ee0b5c7ec880a5ea60fe4a0716ba89a675df"
+      "bytes": 14633,
+      "sha256": "7f72fe85749d766fb0a7a7d7c26cf77aaf7749f4d6ee7cf9c3f373596067badd"
     },
     {
       "path": "assets/banner-dark.svg",
@@ -54,28 +54,28 @@
     },
     {
       "path": "assets/example-live2d-onion.jpg",
-      "bytes": 91731,
-      "sha256": "42b5bb60d25295c08a25d44dbc2d696d0d30531f0e4f1b4c916e637889f24ce9"
+      "bytes": 92129,
+      "sha256": "7ff02240c77f4038dcac3d9e8407b359d5a12c61e590e09edc0917a5a1253a75"
     },
     {
       "path": "assets/example-onion.jpg",
-      "bytes": 70940,
-      "sha256": "a8a8545c1f887bfeecedb4c408fc7bb786606532f9ac7f27c49f6fd5ed09017d"
+      "bytes": 85292,
+      "sha256": "bfab910c8d58cf66b402bb484322557a765b6b0601dcadef09f2e2bc40b74d1f"
     },
     {
       "path": "docs/README.en.md",
-      "bytes": 12478,
-      "sha256": "9ae5478a57324fab90f941e352ac1ba4495c3b5597b0e144835e071cc7bde228"
+      "bytes": 12579,
+      "sha256": "d8e0d5fd0aa584d5273a49eb1b25bab25ceff47138ace15c6ac304cfbfadada7"
     },
     {
       "path": "docs/README.ja.md",
-      "bytes": 15176,
-      "sha256": "74b338877e9b9c67efb9f626df26d8bba08df7906df8193ec0f356ca3ae620cf"
+      "bytes": 15378,
+      "sha256": "fe0fcbfbc9a46accaa9ac16f8067928c86102f457c25beec8935afde973c74ff"
     },
     {
       "path": "docs/guide.md",
-      "bytes": 17972,
-      "sha256": "620f1ab884f20d3f69ff6f44f4670323b50a79fcc1394b4a8f1949d3907c3867"
+      "bytes": 18318,
+      "sha256": "fb90853448cb6cbd818913a70809c167417509736180f4ff20b9ddbcdfee2cc7"
     },
     {
       "path": "docs/import-provenance.json",
@@ -94,8 +94,8 @@
     },
     {
       "path": "docs/look-notes.md",
-      "bytes": 66164,
-      "sha256": "4a9dd3a911241797e979570d7dcfce7c1965b653cf593c1fc07058ec7d820240"
+      "bytes": 67552,
+      "sha256": "b105be1c01d3f3e4563761932c2a35d2dd7509df6687b5607269d6e4bab27e7e"
     },
     {
       "path": "docs/provenance.md",
@@ -154,13 +154,13 @@
     },
     {
       "path": "image_lens/cli.py",
-      "bytes": 20907,
-      "sha256": "59c93fd41eaecfc3d98d80c87f30bac1ddb5ee52a0b77a7a1c6b241fc07ca45d"
+      "bytes": 21288,
+      "sha256": "c9e06128122640359fc116134264f48cd6207976998a9b7c4798af2c98a8de07"
     },
     {
       "path": "image_lens/digest.py",
-      "bytes": 34701,
-      "sha256": "78fe08dd0d414824628ab21a922a19ac6c81280e0bcd8550c29e726cfb1f3484"
+      "bytes": 34981,
+      "sha256": "714484ba151ec8d867891751ace59884b5110fd5e3caa810275922ecff50703f"
     },
     {
       "path": "image_lens/foreground_regions.py",
@@ -184,13 +184,13 @@
     },
     {
       "path": "image_lens/look.py",
-      "bytes": 43260,
-      "sha256": "12f1aff413ea465bd4e6132b0855abb21958ea93577da46c59303c3f327cfc63"
+      "bytes": 43370,
+      "sha256": "8c0f619af51589d793d8205bf8c5e7bdec0d4f9f16daa8d05fbc46652ae65c00"
     },
     {
       "path": "image_lens/mark.py",
-      "bytes": 12952,
-      "sha256": "4e8c1e18f6a0485576ff1d8a548816a785cc0a5624c88b0ae63db3aeed09ecbc"
+      "bytes": 13730,
+      "sha256": "2dbd6f7b381e3d9d0cd4e52f9d3b25803718cf2e325c8b6a3d901a8d32940e8b"
     },
     {
       "path": "image_lens/motif.py",
@@ -214,8 +214,8 @@
     },
     {
       "path": "image_lens/onion.py",
-      "bytes": 26580,
-      "sha256": "d91fdb76d13795c5bd5f1e365cff35aa58d570eced3bdbafabdcca9f3961a5f8"
+      "bytes": 31210,
+      "sha256": "97db86d02f22f1c91ee5c95c35845206e31e19a9ec73a78d446f6aed734ba11c"
     },
     {
       "path": "image_lens/part_regions.py",
@@ -689,8 +689,8 @@
     },
     {
       "path": "tests/test_onion.py",
-      "bytes": 13071,
-      "sha256": "769613b39220a47c95566ac49fabab41f14b8161c794bef06746e9c48caa4e6b"
+      "bytes": 14482,
+      "sha256": "a6546fad4378b333d5b3f7d8913952c07fbe2edc0e35ad99c63dd362fa514844"
     },
     {
       "path": "tests/test_pose.py",

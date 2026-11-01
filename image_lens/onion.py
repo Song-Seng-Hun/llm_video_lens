@@ -136,6 +136,67 @@ def ticks(frames, fps):
     return out
 
 
+# The timing dots still merged where a part moved only a little (README examples: steps shorter than a dot). An
+# animator's spacing chart stretches each trail's path to one fixed-length line, so a 20 px move reads like a 300 px one.
+SPACING = dict(width=420, height=680, row=70, min_px=15., margin=30)
+
+
+def spacing_rows(trails, fps):
+    """[{point, length, ticks: [(fraction, timed)]}, ...] and the names of parts too still to chart. Path length grows
+    only by steps of at least motion_report STROKE['hold_step_px'], so a held part's jitter does not read as motion."""
+    from image_lens import motion_report
+    still = motion_report.STROKE['hold_step_px']; rows, skipped = [], []
+    for t in trails:
+        xy = [(x, y) for _, x, y in t['xy']]; frames = [n for n, _, _ in t['xy']]
+        cum = [0.]  # a jump over missing frames is not travel the chart can time (mark trial: one lost corner read 326 px)
+        for (a, b), (n, m) in zip(zip(xy, xy[1:]), zip(frames, frames[1:])):
+            d = math.dist(a, b) if m == n+1 else 0.; cum.append(cum[-1]+(d if d >= still else 0.))
+        if cum[-1] < SPACING['min_px']:
+            skipped.append(t['point']); continue
+        timed = ticks(frames, fps)
+        rows.append(dict(point=t['point'], length=cum[-1], ticks=[(c/cum[-1], i in timed or i == 0) for i, c in enumerate(cum)]))
+    return rows, skipped
+
+
+def spacing(video, image, trails, colors=None):
+    """Append the spacing chart right of the onion image: one equal-length line per trail, a thick tick every
+    TRAILS['tick_seconds'] and a thin one per frame at the fraction of path covered; close ticks = slow."""
+    import cv2
+    import numpy as np
+    picture = cv2.imread(str(image))
+    if picture is None or not trails:
+        return None
+    capture = cv2.VideoCapture(str(video)); fps = capture.get(cv2.CAP_PROP_FPS); capture.release()
+    rows, skipped = spacing_rows(trails, fps)
+    if not rows:
+        return None
+    h = picture.shape[0]; k = max(1., h/SPACING['height']); w = round(SPACING['width']*k)
+    panel = np.full((h, w, 3), 245, np.uint8); m = round(SPACING['margin']*k); x0, x1 = m, w-m
+    row = min(round(SPACING['row']*k), (h-2*m)//(len(rows)+1)); size, th = .45*k, max(1, round(k))
+    cv2.putText(panel, f"spacing: {TRAILS['tick_seconds']:g}s ticks", (round(10*k), round(22*k)), cv2.FONT_HERSHEY_SIMPLEX, size, (60, 60, 60), th, cv2.LINE_AA)
+    palette = {t['point']: c for t, c in zip(trails, colors or TRAILS['colors'])}
+    for i, r in enumerate(rows):
+        y = m+round(10*k)+row*i+row//2; c = palette[r['point']]; big, small = round(12*k), round(4*k)
+        cv2.line(panel, (x0, y), (x1, y), (150, 150, 150), th)
+        for f, timed in r['ticks']:
+            x = round(x0+(x1-x0)*f)
+            if timed:
+                cv2.line(panel, (x, y-big), (x, y+big), (0, 0, 0), 4*th); cv2.line(panel, (x, y-big), (x, y+big), c, 2*th)
+            else:
+                cv2.line(panel, (x, y-small), (x, y+small), c, th)
+        cv2.putText(panel, f"{r['point']} {r['length']:.0f}px", (x0, y-big-round(4*k)), cv2.FONT_HERSHEY_SIMPLEX, size, (40, 40, 40), th, cv2.LINE_AA)
+    x, y = x0, m+round(10*k)+row*len(rows)+row//2
+    for i, name in enumerate(skipped):  # each still name in its trail colour, outlined, so colour -> name stays readable
+        text = ('still: ' if i == 0 else '')+name+(',' if i < len(skipped)-1 else '')
+        cv2.putText(panel, text, (x, y), cv2.FONT_HERSHEY_SIMPLEX, size, (40, 40, 40), th+2, cv2.LINE_AA)
+        cv2.putText(panel, text, (x, y), cv2.FONT_HERSHEY_SIMPLEX, size, palette[name], th, cv2.LINE_AA)
+        x += cv2.getTextSize(text+' ', cv2.FONT_HERSHEY_SIMPLEX, size, th)[0][0]
+        if x > x1-round(60*k):
+            x, y = x0, y+round(24*k)
+    cv2.imwrite(str(image), np.hstack([picture, np.full((h, 6, 3), 255, np.uint8), panel]))
+    return dict(rows=[r['point'] for r in rows], still=skipped)
+
+
 def _image(cv2, np, first, last, box, result, path, trails=(), colors=None, named=False, fps=None):
     x0, y0, x1, y1 = box
     a = cv2.cvtColor(first, cv2.COLOR_BGR2GRAY)[y0:y1, x0:x1]; b = last[y0:y1, x0:x1]
@@ -185,7 +246,9 @@ def _image(cv2, np, first, last, box, result, path, trails=(), colors=None, name
 # The onion overlays start and end only: a spin or a hand that goes out and back ends where it began, so the overlay
 # looks still (clip B blind test, all three spins missed). The frame most unlike the start, away from both ends,
 # goes next to it.
-PEAK = dict(min_frames=8, margin=.15, scale=4, plateau=.95)
+# Off by default (user 2026-11-01): the strip, trails and spacing chart now cover turns and out-and-back moves, and the
+# extra panel cost a third of the picture width. `--peak` on look/mark turns it back on.
+PEAK = dict(min_frames=8, margin=.15, scale=4, plateau=.95, draw=False)
 
 
 def _crop(cv2, image, bbox):
@@ -196,7 +259,7 @@ def _crop(cv2, image, bbox):
 
 def peak(video, start, end, bbox, image):
     """Frame number of the frame most unlike `start` (mean grey difference inside the padded person box), searched
-    away from both window ends, drawn as a grey panel right of the onion image. None for short windows."""
+    away from both window ends, drawn as a grey panel left of the onion image. None for short windows."""
     import cv2
     import numpy as np
     if end-start+1 < PEAK['min_frames']:
@@ -218,11 +281,14 @@ def peak(video, start, end, bbox, image):
     n = plateau[len(plateau)//2]; frame = window[n-start]
     if image is None:
         return n
+    if not PEAK['draw']:
+        return None
     onion = cv2.imread(str(image))
     panel = cv2.cvtColor(cv2.cvtColor(_crop(cv2, frame, bbox), cv2.COLOR_BGR2GRAY), cv2.COLOR_GRAY2BGR)
     if onion is not None and onion.shape[0] == panel.shape[0]:
         _frame_label(cv2, panel, n)
-        cv2.imwrite(str(image), np.hstack([onion, np.full((onion.shape[0], 6, 3), 255, np.uint8), panel]))
+        # Plain frame first, then the onion with its trails next to the spacing chart: read the pose, then the motion.
+        cv2.imwrite(str(image), np.hstack([panel, np.full((onion.shape[0], 6, 3), 255, np.uint8), onion]))
     return n
 
 
@@ -363,7 +429,7 @@ def sheets(root, items):
     return written
 
 
-def lines(result, image_name=None, screen=False):
+def lines(result, image_name=None, screen=False, peak=False):
     from image_lens import motion_report
     parts = []
     for band in result:
@@ -378,8 +444,8 @@ def lines(result, image_name=None, screen=False):
     basis = '카메라 모름: 화면 좌표 그대로' if screen else '카메라 추정 시 평행이동 제외'
     out = [f'- 높이별 흐름 (사람 상자 5등분, {basis}): ' + ' · '.join(parts)]
     if image_name:
-        out.append(f"  - 어니언 그림: {image_name} (청록=시작, 빨강=끝(진한 윤곽선 기준; 배경보다 밝은 면은 띠 색이 반대(청록 띠=간 쪽); 카메라가 움직였으면 끝 프레임을 카메라만큼 되돌려 겹침), 초록 화살표=띠별 이동 ×{ONION['arrow_scale']}(그림 밖으로 나가면 줄임, 머리보다 짧으면 생략); 오른쪽 회색=시작과 가장 다른 가운데 프레임; "
-                   f"색 점선=부위별 대표 점(몸 기준이 없으면 '화면'에 적힌 점)의 프레임마다 위치({'·'.join(TRAILS['names'])} 순, {basis}), 큰 원·네모=각 연속 관측의 시작·끝, 선 끊김=관측 누락, 이어진 점 간격이 좁으면 느림·넓으면 빠름, 조금 큰 점={TRAILS['tick_seconds']:g}초마다(그 간격이 좁아지면 느려짐))")
+        out.append(f"  - 어니언 그림: {image_name} (청록=시작, 빨강=끝(진한 윤곽선 기준; 배경보다 밝은 면은 띠 색이 반대(청록 띠=간 쪽); 카메라가 움직였으면 끝 프레임을 카메라만큼 되돌려 겹침), 초록 화살표=띠별 이동 ×{ONION['arrow_scale']}(그림 밖으로 나가면 줄임, 머리보다 짧으면 생략); {'왼쪽 회색=시작과 가장 다른 가운데 프레임; ' if peak else ''}"
+                   f"색 점선=부위별 대표 점(몸 기준이 없으면 '화면'에 적힌 점)의 프레임마다 위치({'·'.join(TRAILS['names'])} 순, {basis}), 큰 원·네모=각 연속 관측의 시작·끝, 선 끊김=관측 누락, 이어진 점 간격이 좁으면 느림·넓으면 빠름, 조금 큰 점={TRAILS['tick_seconds']:g}초마다(그 간격이 좁아지면 느려짐); 맨 오른쪽 spacing=부위마다 지나온 길이를 같은 길이 줄로 펼친 것, 굵은 눈금={TRAILS['tick_seconds']:g}초마다·가는 눈금=프레임마다, 눈금이 모이면 느림·벌어지면 빠름(작은 이동도 같은 크기로 보임, {SPACING['min_px']:g}px 미만 부위는 still))")
     return out
 
 

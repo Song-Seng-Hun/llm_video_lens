@@ -85,9 +85,9 @@ One line from the `look.md` of a live-action solo dance video, the span where th
 - `높이별` (by height): movement measured in 5 bands from top to bottom of the area where the person is; `?` means that band could not be measured.
 - `몸 돌림 후보` (turn candidate): a place marked for checking because the estimate wavered.
 
-<p align="center"><img src="../assets/example-onion.jpg" width="420" alt="An onion picture made by look. On the left the start frame (cyan) and end frame (red) are overlaid; a yellow dotted trail follows the right leg from low up to knee height, and green arrows show movement by height. On the right is the middle frame f403 with the knee raised."></p>
+<p align="center"><img src="../assets/example-onion.jpg" width="560" alt="An onion picture made by look. On the left the start frame (cyan) and end frame (red) are overlaid; a yellow dotted trail follows the right leg from low up to knee height, and green arrows show movement by height. On the right is the spacing chart."></p>
 
-The onion skin of the same span. The left side overlays the start (cyan) and the end (red). The dotted trails are the parts in the order `몸 기준` lists them: yellow (right leg), magenta (left leg), blue (left arm)… One dot is one frame; a slightly bigger dot marks every 0.1 s, so where those get closer the part slowed down. A circle is the start, a square the end. Green arrows are the `높이별` movement. The right side is the middle frame most different from the start (f403).
+The onion skin of the same span. The left panel overlays the start (cyan) and the end (red). The dotted trails are the parts in the order `몸 기준` lists them: yellow (right leg), magenta (left leg), blue (left arm)… One dot is one frame; a slightly bigger dot marks every 0.1 s, so where those get closer the part slowed down. A circle is the start, a square the end. Green arrows are the `높이별` movement. The right panel is a spacing chart: each part's path stretched to one equal-length line, with a thick tick every 0.1 s. Close ticks mean slow, wide ticks fast, so the ease of a small move reads here too.
 
 The tool was also confused in this example: the shoulder width changed as the leg came up, so a turn candidate was marked although the body did not turn. The left arm's speed also came out unknown.
 
@@ -95,7 +95,7 @@ Video: Antoni Shkraba, ["Video of a Man Dancing"](https://www.pexels.com/video/v
 
 #### Animation
 
-<p align="center"><img src="../assets/example-live2d-onion.jpg" width="560" alt="An onion picture of a 2D animated character. On the left the start (cyan) and end (red) are overlaid; magenta and yellow dotted trails run side by side from the fingertips at the hat brim outward, and a blue trail follows the elbow a short way down. The cyan and red outlines of the hat and face split apart where the head tilted. On the right is frame f35, near the end."></p>
+<p align="center"><img src="../assets/example-live2d-onion.jpg" width="720" alt="An onion picture of a 2D animated character. On the left the start (cyan) and end (red) are overlaid; magenta and yellow dotted trails run side by side from the fingertips at the hat brim outward, and a blue trail follows the elbow a short way down. The cyan and red outlines of the hat and face split apart where the head tilted. On the right is the spacing chart."></p>
 
 2D illustrated and animated characters read the same way. In this 1.5 s move the hand at the hat brim sweeps outward while the head tilts; its easing follows the speed changes this tool measured in another reference video. The two fingertip points (magenta, yellow) draw side-by-side arcs, and the hat and face outlines split as far as the head tilted. `몸 기준` says the left arm went right 124 px fast, then 68 px more while slowing. The background is plain, so the camera is "모름" (unknown).
 
