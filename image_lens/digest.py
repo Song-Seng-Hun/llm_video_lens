@@ -270,7 +270,7 @@ def window_line(done, fps, first=None):
                 fields.append('추적 결과 없음: 움직임 모름')
         flow = _bands(done.get('bands'))
         if flow:
-            fields.append('높이별: ' + flow)
+            fields.append(('높이별(화면 좌표, 카메라 모름): ' if done.get('onion_basis') == 'screen' else '높이별: ') + flow)
     fields += events(done.get('events'), fps, done.get('facing'))
     fields += people(done.get('people'), fps)
     notes = []
@@ -439,7 +439,7 @@ def markdown(record, scan, full_name):
                        '단, 어니언에서 그 부위의 청록·빨강 윤곽선이 벌어진 만큼 궤적(과 글의 숫자)이 따라가지 않으면(짧거나 다른 방향) 추적이 미끄러진 것으로 의심한다(카메라 추정 시 어니언과 궤적의 평행이동을 뺐다).')
     if record.get('onion_sheets'):
         out.insert(-1, f"어니언 모음 그림: {', '.join(record['onion_sheets'])} (구간마다 청록=시작, 빨강=끝(진한 윤곽선 기준; 배경보다 밝은 면은 띠 색이 반대(청록 띠=간 쪽); 카메라가 움직였으면 끝 프레임을 카메라만큼 되돌려 겹침), 초록 화살표=높이별 이동, 오른쪽 회색=시작과 가장 다른 가운데 프레임: 돌거나 갔다 돌아오는 동작은 여기서 보임; "
-                       f"색 점선=각 줄 \"몸 기준\"의 부위 대표 점 궤적, 몸 기준이 없는 줄은 \"화면\"에 적힌 점의 궤적({'·'.join(onion.TRAILS['names'])} = 그 줄에 적힌 순서, 점 하나가 한 프레임, 카메라 추정 시 평행이동 제외, 큰 원=시작·큰 네모=끝, 점 간격이 좁으면 느림); "
+                       f"색 점선=각 줄 \"몸 기준\"의 부위 대표 점 궤적, 몸 기준이 없는 줄은 \"화면\"에 적힌 점의 궤적({'·'.join(onion.TRAILS['names'])} = 그 줄에 적힌 순서, 점 하나가 한 프레임, 카메라 추정 시 평행이동 제외, 큰 원=시작·큰 네모=끝, 점 간격이 좁으면 느림, 조금 큰 점={onion.TRAILS['tick_seconds']:g}초마다(그 간격이 좁아지면 느려짐)); "
                        '"who"=사람이 여럿인 구간의 P1·P2 상자; "still"=추적하기엔 짧은 컷의 한 장면, 붙어 있는 컷은 한 줄에 시간 순서; "strip"=몸 돌림 후보 구간의 프레임 5장을 시간 순서로). '
                        '손 모양(하트·브이)처럼 글에 안 나오는 동작은 그림에서 본다.')
     if record.get('frame_sheets'):
