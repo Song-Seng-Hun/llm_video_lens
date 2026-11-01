@@ -57,8 +57,12 @@ def run(look_dir, name, detector, pose_model, checkpoint, out, max_seconds=1800)
     from image_lens import look, person_models
     root = Path(look_dir)
     record, _ = paths.load(paths.confined(root/'look.json', exists=True), max_bytes=64*1024*1024)
-    before, _ = paths.load(paths.confined(root/'pose.json', exists=True), max_bytes=64*1024*1024)
     first, last = window(record, name)
+    sid, _, index = name.rpartition('-w')
+    done = next(shot for shot in record['shots'] if shot['segment_id'] == sid)['windows'][int(index)]
+    if record.get('max_people', 1) > 1 or done.get('source_track_id') is not None:
+        raise ValueError('redo cannot preserve the selected actor across detectors; multi-person/source_track_id windows require a new explicit actor selection')
+    before, _ = paths.load(paths.confined(root/'pose.json', exists=True), max_bytes=64*1024*1024)
     video = paths.confined(record['source_video'], exists=True, max_bytes=512*1024*1024)
     if not paths.sha(video) == record['source_sha256'] == before['source_sha256']:
         raise ValueError('look run, its pose.json and the video on disk differ; redo needs the video that look saw')

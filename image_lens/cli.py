@@ -203,13 +203,17 @@ def dispatch(command, arguments):
         ap.add_argument('--pose-model', help='default: models.json'); ap.add_argument('--checkpoint', help='default: models.json')
         ap.add_argument('--out', required=True, help='new output directory inside the workspace')
         ap.add_argument('--max-shots', type=int, default=look.LOOK['max_shots']); ap.add_argument('--max-seconds', type=int, default=1800)
+        ap.add_argument('--max-people', type=int, default=1, help='1..8 observed people per shot; default1 keeps largest-person behavior')
         ap.add_argument('--peak', action='store_true', help='add the frame most unlike the start left of each onion')
         a = models(ap.parse_args(arguments), 'detector', 'pose_model', 'checkpoint')
         if not 1 <= a.max_shots <= 256 or not 60 <= a.max_seconds <= 7200:
             raise ValueError('--max-shots 1..256 and --max-seconds 60..7200')
+        if not 1 <= a.max_people <= 8:
+            raise ValueError('--max-people integer1..8 required')
         from image_lens import onion
         onion.PEAK['draw'] = a.peak
-        return look.run(a.video, a.detector, a.pose_model, a.checkpoint, a.out, a.max_shots, a.max_seconds)
+        return look.run(a.video, a.detector, a.pose_model, a.checkpoint, a.out, a.max_shots, a.max_seconds,
+                        **(dict(max_people=a.max_people) if a.max_people > 1 else {}))
     if command == 'pose':
         from image_lens import pose
         ap = parser(command, 'Optional local whole-body pose (pinned user-supplied ONNX weights); per-shot track IDs and overlap flags.')

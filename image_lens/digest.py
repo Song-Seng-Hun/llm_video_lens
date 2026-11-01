@@ -209,6 +209,8 @@ def window_line(done, fps, first=None):
     """One window. With `first` (the first window of the same repeated pose) only the differences are written."""
     w = done['window']; end = done.get('cut_after', w['end'])
     fields = [f"{w['seed']/fps:.2f}–{(end+1)/fps:.2f}s f{w['seed']}..{end}"]
+    if done.get('source_track_id'):
+        fields.append(f"{done['actor_label']} · 모델 ID {done['source_track_id']}")
     if done.get('framing'):
         fields.append(body_motion.FRAMING_KO[done['framing']] + (' (팔만)' if done.get('scope') == 'upper' else ''))
     if done.get('facing'):
@@ -412,16 +414,29 @@ def bridge_line(bridge, facing=None):
             + '; '.join(f"{_named(l, l['part'], facing)} {_dir(l['direction'])} {l['distance_px']:.0f}px" for l in shown))
 
 
+def skipped_line(item):
+    """One skipped range, with its analysis actor when present; shared by look/full/at."""
+    actor = f"{item['actor_label']} · 모델 ID {item['source_track_id']} " if item.get('source_track_id') is not None else ''
+    return f"- 건너뜀 {actor}f{item['frames'][0]}..{item['frames'][1]}: {item['reason']}"
+
+
 def markdown(record, scan, full_name):
     fps = scan['fps']; total = scan['source_frame_count']
     if record.get('frames'):
         total = record['frames'][1]-record['frames'][0]+1
     covered = sum(min(d.get('cut_after', d['window']['end']), d['window']['end'])-d['window']['seed']+1
                   for s in record['shots'] for d in s['windows'] if d.get('groups'))
+    if record.get('max_people', 1) > 1:
+        covered = len({n for s in record['shots'] for d in s['windows'] if d.get('groups')
+                       for n in range(d['window']['seed'], min(d.get('cut_after', d['window']['end']), d['window']['end'])+1)})
     skipped = [k for s in record['shots'] for k in s['skipped']]
+    coverage = f'추적된 구간 {covered}/{total}프레임, 건너뜀 {len(skipped)}곳.'
+    if record.get('max_people', 1) > 1:
+        actor_skips = sum(item.get('source_track_id') is not None for item in skipped)
+        coverage = f'한 사람 이상 추적된 구간 {covered}/{total}프레임, 사람별 건너뜀 {actor_skips}곳'
+        coverage += (f', 장면 건너뜀 {len(skipped)-actor_skips}곳' if len(skipped) > actor_skips else '') + '.'
     out = ['# 영상 움직임 요약', '',
-           f"영상 {record['source_video'].rsplit('/', 1)[-1]}: {total}프레임, {fps:g}fps, 장면 {len(record['shots'])}개. "
-           f"추적된 구간 {covered}/{total}프레임, 건너뜀 {len(skipped)}곳.",
+           f"영상 {record['source_video'].rsplit('/', 1)[-1]}: {total}프레임, {fps:g}fps, 장면 {len(record['shots'])}개. " + coverage,
            '읽는 법: 한 줄 = 추적 구간 하나. 방향은 화면 기준. 팔·다리·손·어깨의 왼/오른은 사람 자신의 몸 기준(포즈 모델의 관절 이름; 앞을 보면 왼팔이 화면 오른쪽), '
            '괄호 안은 그 구간에서 화면 어느 쪽인지(엉덩이 방향으로 앞·뒤를 판단). 이름 없는 점(move-a…)과 높이별·사람 순서(P1…)는 화면 기준. "전체"는 카메라와 몸 중심(어깨 가운데, 없으면 얼굴)의 이동이고, '
            '"몸 기준"은 그 위에 팔다리가 더 한 움직임(몸 중심 기준, 같은 쪽 팔·다리에서 같이 움직인 점은 한 줄). '
@@ -475,7 +490,7 @@ def markdown(record, scan, full_name):
     for s in record['shots']:
         out.append(f"## {s['segment_id']} {s['seconds'][0]:.2f}–{s['seconds'][1]:.2f}s")
         for k in s['skipped']:
-            out.append(f"- 건너뜀 f{k['frames'][0]}..{k['frames'][1]}: {k['reason']}" + (' (모음 그림에 still 사진: 자세만, 움직임 모름)' if k.get('still') else ''))
+            out.append(skipped_line(k) + (' (모음 그림에 still 사진: 자세만, 움직임 모름)' if k.get('still') else ''))
         for done in s['windows']:
             bridge = done.get('bridge'); pair = (prev.get('motif'), done.get('motif')) if prev else (None, None)
             if bridge and bridge['limbs'] and all(pair) and pair in switches:
