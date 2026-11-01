@@ -74,7 +74,9 @@ def trails(packets, points, seed, end, camera=None, limit=None, body=None):
 # Only a move of the whole figure counts: most tracked points (agree_share), and as many of the lowest quarter of them,
 # must have gone at least half the centre's shift its way. A lunge drops the shoulders while the feet stay; drawn
 # against the body, the planted foot moved 117 px (dancer f54..213), and the upper-body points alone still agreed.
-BODY_VIEW = dict(min_share=.15, agree_share=.6, smooth=5, color=(60, 60, 220))
+# Points an agent placed are not a body: a hammer swing in mikumiku s19 moved 4 of 6 points and their median 179 px,
+# so the barely moving eye (16 px) was drawn as 477 px. Against their median, nearly every point must agree.
+BODY_VIEW = dict(min_share=.15, agree_share=.6, subject_agree_share=.85, smooth=5, color=(60, 60, 220))
 
 
 def body_path(packets, seed, end):
@@ -83,8 +85,28 @@ def body_path(packets, seed, end):
     from image_lens import body_motion
     window = dict(seed=seed, end=end)
     kind, centre, _ = body_motion.reference(body_motion.series(packets, window), window)
-    if not kind:
+    return _smooth(centre) if kind else {}
+
+
+def subject_path(packets, seed, end):
+    """('body', body_path) when shoulders or a face were tracked, else ('subject', median of the visible points per
+    frame, smoothed the same way): mark's and box's points need not be a body (box on a hat: corners p1..p8)."""
+    from image_lens import body_motion
+    path = body_path(packets, seed, end)
+    if path:
+        return 'body', path
+    centre = {}
+    for q in body_motion.series(packets, dict(seed=seed, end=end)).values():
+        for n, xy in q.items():
+            centre.setdefault(n, []).append(xy)
+    mid = {n: (sorted(p[0] for p in v)[len(v)//2], sorted(p[1] for p in v)[len(v)//2]) for n, v in centre.items()}
+    return 'subject', _smooth(mid)
+
+
+def _smooth(centre):
+    if not centre:
         return {}
+    from image_lens import body_motion
     ns = sorted(centre); path = body_motion._median3([centre[n] for n in ns]); r = BODY_VIEW['smooth']//2
     out = {}
     for i, n in enumerate(ns):
@@ -94,7 +116,7 @@ def body_path(packets, seed, end):
     return out
 
 
-def body_basis(video, bbox, path, packets):
+def body_basis(video, bbox, path, packets, share=None):
     """(dx, dy) of the body centre over the window when the whole figure moved that way far enough to draw against
     the body, else None."""
     import cv2
@@ -110,7 +132,7 @@ def body_basis(video, bbox, path, packets):
     moves = sorted(((q[min(q)][1], ((q[max(q)][0]-q[min(q)][0])*shift[0]+(q[max(q)][1]-q[min(q)][1])*shift[1])/size**2)
                     for q in points), reverse=True)  # lowest start first
     def agree(group):
-        return bool(group) and sum(v >= .5 for _, v in group) >= BODY_VIEW['agree_share']*len(group)
+        return bool(group) and sum(v >= .5 for _, v in group) >= (share or BODY_VIEW['agree_share'])*len(group)
     return shift if agree(moves) and agree(moves[:max(1, len(moves)//4)]) else None
 
 
@@ -214,21 +236,21 @@ SPACING = dict(width=420, height=680, row=70, min_px=15., margin=30)
 
 
 # The whole frame's and the body centre's own moves as the chart's top rows, so a part's ease is read against them.
-REFERENCE = dict(names=('camera', 'body'), colors=((130, 130, 130), BODY_VIEW['color']))
+REFERENCE = dict(names=('camera', 'body', 'subject'), colors=((130, 130, 130), BODY_VIEW['color']))
 
 
-def references(trails, seed, end, camera=None, body=None):
+def references(trails, seed, end, camera=None, body=None, name='body', colors=None):
     """(trails, colours) with `camera` (camera.path) and `body` (body_path) put first as rows. The body row leaves
     the camera out when it is given, as look.md's body numbers do; frames missing from either are left out."""
-    rows, colors = [], []
+    rows, out = [], []
     if camera:
         rows.append(dict(point='camera', xy=[(n, camera[n][0], camera[n][1]) for n in sorted(camera) if seed <= n <= end]))
-        colors.append(REFERENCE['colors'][0])
+        out.append(REFERENCE['colors'][0])
     if body:
         xy = [(n, x-camera[n][0], y-camera[n][1]) if camera else (n, x, y) for n, (x, y) in sorted(body.items())
               if not camera or n in camera]
-        rows.append(dict(point='body', xy=xy)); colors.append(REFERENCE['colors'][1])
-    return rows+list(trails), colors+list(TRAILS['colors'])
+        rows.append(dict(point=name, xy=xy)); out.append(REFERENCE['colors'][1])
+    return rows+list(trails), out+list(colors or TRAILS['colors'])
 
 
 def moved(camera):

@@ -156,6 +156,12 @@ class Trails(unittest.TestCase):
         self.assertEqual(colors[:2],list(onion.REFERENCE['colors']))
         self.assertEqual([t['point'] for t in onion.references([],0,10,None,body)[0]],['body'])  # no camera: screen basis
 
+    def test_subject_path_falls_back_to_the_points_median(self):
+        packet = dict(frames=[dict(frame=n, points=[dict(point_id=f'p{i}', visible=True, xy=[10.*i+3*n, 50.]) for i in range(3)])
+                              for n in range(1, 11)])
+        kind, path = onion.subject_path([packet], 0, 10)
+        self.assertEqual(kind, 'subject'); self.assertAlmostEqual(path[10][0]-path[1][0], 27.)  # median point p1 moved 27 px
+
     def test_camera_view_goes_against_the_content(self):
         # camera.path on a view panning 114 px right read dx=-114 (synthetic crop pan, 2026-11-01)
         self.assertEqual(onion._views({0:(0.,0.,1.),9:(-114.,0.,1.)},320,240)[9],(114.,0.,434.,240.))

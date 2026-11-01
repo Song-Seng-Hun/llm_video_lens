@@ -137,13 +137,18 @@ def run(video, shots, frame, points, checkpoint, out, end=None, snap_points=True
     if relative:text.append('- 카메라 보정 수치 근거: mark.relative.json')
     # End-frame camera unknown: draw in screen coordinates and say so, as look does (the onion used to be skipped).
     screen = bool(frame_motion) and cam is None
-    onion_image, colors, peaked = _onion(source, frame, stop, [n for n, _ in parsed], tracks, cam, None if screen else frame_motion or None, root/'mark-onion.jpg', subject)
+    onion_image, colors, peaked, basis_shift = _onion(source, frame, stop, [n for n, _ in parsed], tracks, cam, None if screen else frame_motion or None, root/'mark-onion.jpg', subject)
     if onion_image:
         basis = '카메라 모름: 화면 좌표 그대로' if screen else motion_report.coordinate_label(view)
         text.append(f"- 어니언 그림: {onion_image} (청록=f{frame}, 빨강=f{stop}(진한 윤곽선 기준; 배경보다 밝은 면은 띠 색이 반대(청록 띠=간 쪽); 카메라가 움직였으면 끝 프레임을 카메라만큼 되돌려 겹침), 색 점선=찍은 점의 프레임마다 위치({basis}; "
                     + ', '.join(f'{c}={n}' for n, c in colors) + "), "
                     f"큰 원·네모=각 연속 관측의 시작·끝, 선 끊김=관측 누락, 이어진 점 간격이 좁으면 느림·넓으면 빠름, 조금 큰 점={onion.TRAILS['tick_seconds']:g}초마다; {'왼쪽 회색=시작과 가장 다른 가운데 프레임; ' if peaked else ''}"
-                    "맨 오른쪽 spacing=점마다 지나온 길이를 같은 길이 줄로 펼친 것(줄 이름=점 이름, 눈금 색=궤적 색), 굵은 눈금이 모이면 느림·벌어지면 빠름, still=거의 안 움직인 점, 그 아래 작은 그림=구간 첫 프레임 전체(노란 테두리=어니언이 잘라 보여 준 범위"+(", 초록 테두리=box로 준 상자" if subject else '')+"))")
+                    "맨 오른쪽 spacing=점마다 지나온 길이를 같은 길이 줄로 펼친 것(줄 이름=점 이름, 눈금 색=궤적 색), 굵은 눈금이 모이면 느림·벌어지면 빠름, still=거의 안 움직인 점, 맨 위 camera·body(또는 subject) 줄=화면 전체·대상 중심의 이동(움직였을 때만), 그 아래 작은 그림=구간 첫 프레임 전체(노란 테두리=어니언이 잘라 보여 준 범위"+(", 초록 테두리=box로 준 상자" if subject else '')+"))")
+        kind, shift = basis_shift or (None, None)
+        if shift:
+            who = '몸' if kind == 'body' else '대상(찍은 점들의 가운데)'
+            text.append(f"  - {who} 기준 그림: {who} 중심이 {motion_report.KO[motion_report.direction(*shift)].replace('화면 ', '')} {math.hypot(*shift):.0f}px "
+                        f"움직여 끝 프레임과 궤적을 그만큼 되돌려 겹침(아래 점별 숫자는 위 기준 그대로). 그 이동은 차트의 {kind} 줄과 작은 그림의 빨간 선")
         text.append(f"  - {SLIP}")
     lines, summary = look._summary(view, dict(seed=frame, end=stop), 'marked', 'mark.report.md', 'mark-traj/trajectory.png')
     if relative:summary['relative_report']=relative.name
@@ -171,16 +176,25 @@ def _onion(video, frame, stop, names, tracks, moving, camera, image, subject=Non
     packet, _ = paths.load(tracks)
     trails = onion.trails([packet], names, frame, stop, camera, limit=MARK['max_points'])
     if not trails:
-        return None, [], None
-    xs = [x for t in trails for _, x, _ in t['xy']]; ys = [y for t in trails for _, _, y in t['xy']]
-    m = MARK['onion_margin_px']
+        return None, [], None, None
+    m = MARK['onion_margin_px']; palette = onion.TRAILS['colors']+MARK_COLORS
+    def extent(trails):
+        xs = [x for t in trails for _, x, _ in t['xy']]; ys = [y for t in trails for _, _, y in t['xy']]
+        return min(xs)-m, min(ys)-m, max(xs)+m, max(ys)+m
+    # A whole subject sliding (box on a Live2D figure, 2026-11-01) laid every trail along the slide, as look's onion
+    # did before its body basis: draw against the subject's centre on the same rule.
+    kind, path = onion.subject_path([packet], frame, stop)
+    shift = onion.body_basis(video, subject or extent(trails), path, [packet],
+                             onion.BODY_VIEW['subject_agree_share'] if kind == 'subject' else None)
+    if shift:
+        trails = onion.trails([packet], names, frame, stop, limit=MARK['max_points'], body=path)
+    box = extent(trails)
     # No names on the picture: big labels hid the trails; the spacing chart rows and mark.md carry the colour -> name.
-    onion.bands(video, frame, stop, (min(xs)-m, min(ys)-m, max(xs)+m, max(ys)+m), moving, image, trails,
-                onion.TRAILS['colors']+MARK_COLORS)
-    peaked = onion.peak(video, frame, stop, (min(xs)-m, min(ys)-m, max(xs)+m, max(ys)+m), image)
-    onion.spacing(video, image, trails, onion.TRAILS['colors']+MARK_COLORS,
-                  context=(frame, (min(xs)-m, min(ys)-m, max(xs)+m, max(ys)+m), None, None, subject))
-    return image.name, [(t['point'], c) for t, c in zip(trails, onion.TRAILS['names']+MARK_COLOR_NAMES)], peaked
+    onion.bands(video, frame, stop, box, moving, image, trails, palette, view_shift=shift)
+    peaked = onion.peak(video, frame, stop, box, image)
+    charted, colors = onion.references(trails, frame, stop, camera, path, kind, palette)
+    onion.spacing(video, image, charted, colors, context=(frame, box, path if shift else None, camera and onion.moved(camera), subject))
+    return image.name, [(t['point'], c) for t, c in zip(trails, onion.TRAILS['names']+MARK_COLOR_NAMES)], peaked, (kind, shift)
 
 
 def _all_moves(report):
