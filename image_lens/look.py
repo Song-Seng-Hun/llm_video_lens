@@ -453,13 +453,17 @@ def _run(video, detector, pose_model, checkpoint, out, max_shots=LOOK['max_shots
             from image_lens import onion
             picture = base.with_name(base.name+'-onion.jpg')
             try:
-                if frame_motion and cam is None:raise ValueError('onion unavailable: end-frame camera translation unknown')
+                # End-frame camera unknown (plain backgrounds): draw in screen coordinates and say so; dropping the
+                # picture left the plain-background README examples with no onion at all.
+                screen = bool(frame_motion) and cam is None
                 moving = cam
+                if screen:
+                    done['onion_basis'] = 'screen'
                 from image_lens import digest
                 # No trusted body: the "화면" moves stand in, in the order that line lists them (one trail per point).
                 leads = ([f['point'] for f in digest.limbs(done['body'])] if done.get('body')
                          else list(dict.fromkeys(m['point'] for m in digest._screen(done.get('groups', [])))))
-                done['trails'] = onion.trails(raw_packets, leads, w['seed'], end, frame_motion or None)
+                done['trails'] = onion.trails(raw_packets, leads, w['seed'], end, None if screen else frame_motion or None)
                 done['bands'] = onion.bands(source, w['seed'], end, person['bbox'], moving, picture, done['trails'])
                 if not done.get('body') and done['trails']:
                     hint = dict(frame=w['seed'], end=end, points=_seed_xy(raw_packets, [t['point'] for t in done['trails']], w['seed']))
@@ -470,7 +474,7 @@ def _run(video, detector, pose_model, checkpoint, out, max_shots=LOOK['max_shots
                 turns = [e['share'] for e in (done.get('events') or {}).get('width', []) if e['share'] >= body_motion.EVENTS['turn']]
                 if turns:
                     done['turn_share'] = max(turns); stripping.append((done, end, person['bbox'], base))
-                slot += ['  '+l for l in onion.lines(done['bands'], picture.name)]
+                slot += ['  '+l for l in onion.lines(done['bands'], picture.name, screen=done.get('onion_basis') == 'screen')]
             except Exception as error:  # OpenCV raises its own error type; the view is optional
                 errors.append(dict(window=w, step='onion', error=str(error)[:300]))
         if end < w['end']:

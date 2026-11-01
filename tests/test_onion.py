@@ -121,6 +121,30 @@ class Trails(unittest.TestCase):
             self.assertEqual(rendered[100,160].tolist(),[128]*3)  # no inferred f1->f3 path
             self.assertEqual(rendered[100,270].tolist(),list(onion.TRAILS['colors'][0]))  # real f3->f4 remains
 
+    def test_timing_dots_every_tenth_of_a_second_from_each_run_start(self):
+        self.assertEqual(onion.ticks([0,1,2,3,4,5,6,7], 30), {3,6})
+        self.assertEqual(onion.ticks([0,1,2,3,4,5,6,7], 24), {2,4,6})
+        self.assertEqual(onion.ticks([0,1,2,3,10,11,12,13], 30), {3,7})  # the gap restarts the count
+        self.assertEqual(onion.ticks([0,1,2,3], None), set())
+
+    def test_screen_basis_is_named_in_the_onion_lines(self):
+        bands=[dict(band='맨 위',dx=20.,dy=0.)]
+        self.assertIn('카메라 모름: 화면 좌표 그대로',onion.lines(bands,'x-onion.jpg',screen=True)[0])
+        self.assertTrue(all('평행이동 제외' not in l for l in onion.lines(bands,'x-onion.jpg',screen=True)))
+        self.assertIn('카메라 추정 시 평행이동 제외',onion.lines(bands,'x-onion.jpg')[0])
+
+    def test_timing_dot_is_drawn_larger(self):
+        import tempfile
+        import cv2
+        import numpy as np
+        with tempfile.TemporaryDirectory() as d:
+            image=np.full((200,320,3),128,np.uint8);out=Path(d)/'ticks.png'
+            onion._image(cv2,np,image,cv2.cvtColor(image,cv2.COLOR_BGR2GRAY),(0,0,320,200),[],out,
+                         [dict(point='wrist-l',xy=[(n,40+30*n,100) for n in range(8)])],fps=30)
+            rendered=cv2.imread(str(out)).astype(int);yellow=np.array(onion.TRAILS['colors'][0])
+            def wide(x):return int((abs(rendered[90:111,x-12:x+13]-yellow).sum(2)<90).sum())
+            self.assertGreater(wide(40+30*3),wide(40+30*2))  # f3 is a timing dot, f2 is not
+
     # A large person box shrinks more in the onion sheet; fixed 3 px dots read as single markers there.
     def test_trail_marks_grow_with_the_person_box(self):
         import tempfile

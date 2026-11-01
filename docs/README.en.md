@@ -74,7 +74,7 @@ It also makes pictures:
 One line from the `look.md` of a live-action solo dance video, the span where the dancer lifts a knee (shortened with `…`). The output text is Korean.
 
 ```text
-- 15.44–16.32s f386..407 | 전신 | 정면(사람 왼쪽=화면 오른쪽) | 팔 자세: 왼팔 가슴 높이·오른팔 허리 아래 그대로 | 전체: 카메라 모름(5%만 맞춤), 몸 왼쪽 아래 33px(속도 2.5→2.2→1.6→1.4→0.8 px/f) | 몸 기준: 오른다리(화면 왼쪽: 발목·무릎·허벅지) 오른쪽 위 147px(속도 13.3→13.3→12.2→10.4→10.2 px/f, 앞선 동작은 모름) → 오른쪽 51px(속도 9.2→7.3→5.8→6 px/f), 몸 바깥으로; 왼다리(화면 오른쪽: 허벅지·발목·무릎) 위 74px(…), 몸 쪽으로; … | 높이별: 왼쪽 아래 33 / ? / 왼쪽 위 25 / 오른쪽 위 45 / 오른쪽 아래 14 (…) | 몸 돌림 후보(어깨 폭 크게 변함, 포즈가 튄 것일 수도; 그동안 어깨 높이는 안 씀): 15.44–15.88s | …
+- 15.44–16.32s f386..407 | 전신 | 정면(사람 왼쪽=화면 오른쪽) | 팔 자세: 왼팔 가슴 높이·오른팔 허리 아래 그대로 | 전체: 카메라 모름(5%만 맞춤), 몸 왼쪽 아래 33px(속도 2.5→2.2→1.6→1.4→0.8 px/f) | 몸 기준: 오른다리(화면 왼쪽: 발목·무릎·허벅지) 오른쪽 위 147px(속도 13.3→13.3→12.2→10.4→10.2 px/f, 앞선 동작은 모름) → 오른쪽 51px(속도 9.2→7.3→5.8→6 px/f), 몸 바깥으로; 왼다리(화면 오른쪽: 허벅지·발목·무릎) 위 74px(…), 몸 쪽으로; … | 높이별(화면 좌표, 카메라 모름): 왼쪽 아래 33 / ? / 왼쪽 위 25 / 오른쪽 위 45 / 오른쪽 아래 14 (…) | 몸 돌림 후보(어깨 폭 크게 변함, 포즈가 튄 것일 수도; 그동안 어깨 높이는 안 씀): 15.44–15.88s | …
 ```
 
 - `15.44–16.32s f386..407`: time and source frame numbers, to trace back to the video.
@@ -87,7 +87,7 @@ One line from the `look.md` of a live-action solo dance video, the span where th
 
 <p align="center"><img src="../assets/example-onion.jpg" width="420" alt="An onion picture made by look. On the left the start frame (cyan) and end frame (red) are overlaid; a yellow dotted trail follows the right leg from low up to knee height, and green arrows show movement by height. On the right is the middle frame f403 with the knee raised."></p>
 
-The onion skin of the same span. The left side overlays the start (cyan) and the end (red). The dotted trails are the parts in the order `몸 기준` lists them: yellow (right leg), magenta (left leg), blue (left arm)… One dot is one frame, a circle the start, a square the end. Green arrows are the `높이별` movement. The right side is the middle frame most different from the start (f403).
+The onion skin of the same span. The left side overlays the start (cyan) and the end (red). The dotted trails are the parts in the order `몸 기준` lists them: yellow (right leg), magenta (left leg), blue (left arm)… One dot is one frame; a slightly bigger dot marks every 0.1 s, so where those get closer the part slowed down. A circle is the start, a square the end. Green arrows are the `높이별` movement. The right side is the middle frame most different from the start (f403).
 
 The tool was also confused in this example: the shoulder width changed as the leg came up, so a turn candidate was marked although the body did not turn. The left arm's speed also came out unknown.
 
