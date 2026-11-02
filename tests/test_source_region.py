@@ -73,7 +73,7 @@ class Region(unittest.TestCase):
         def step(command,args):
             self.assertEqual(command,'scan');source = Path(args[args.index('--video')+1])
             self.assertNotEqual(source,self.video)
-            paths.write_json(args[args.index('--out')+1],dict(source_sha256=paths.sha(source)))
+            paths.write_json(args[args.index('--out')+1],dict(source_sha256=paths.sha(source),analysis_segments=[],source_frame_count=4))
         def child(args):
             scan,_ = paths.load(args[args.index('--shots')+1]);self.assertTrue(scan['source_sha256'])
             raise RuntimeError('verified pose boundary')

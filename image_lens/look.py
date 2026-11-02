@@ -390,10 +390,16 @@ def _run(video, detector, pose_model, checkpoint, out, max_shots=LOOK['max_shots
             raise ValueError('source-region scan identity mismatch')
     # Pose runs in its own process and hands over runs of whole shots as it goes, so the first shots are seeded and
     # tracked while it poses the rest (clip B side by side: pose 28 -> 38 s, tracking 35 -> 41 s, 63 -> 41 s in all).
+    # It poses only up to the last shot look will analyze: past --max-shots nothing reads those frames, and posing
+    # them was most of the wait (AI clip, 1807 frames, 16 shots end at f182: pose 14 -> 112 s, tracking done at 27 s).
     global POSER
+    planned, _ = paths.load(root/'shots.json')
+    selected = clip(planned, frames)[:max_shots]
+    pose_range = [frames[0] if frames else 0, max(s['end_frame'] for s in selected) if selected else
+                  frames[1] if frames else planned['source_frame_count']-1]
     POSER = _pose_child(['--shots', root/'shots.json', '--detector', detector, '--pose-model', pose_model, '--out', root/'pose.json',
-                         '--max-seconds', max(1, min(1800, int(remaining()))), '--parts-dir', root/'pose-parts']
-                        + (['--start', frames[0], '--end', frames[1]] if frames else []))
+                         '--max-seconds', max(1, min(1800, int(remaining()))), '--parts-dir', root/'pose-parts',
+                         '--start', pose_range[0], '--end', pose_range[1]])
     # A thread reads the child's lines, so look can take a part that has arrived without waiting for the next one: the
     # next shot is seeded ahead only once its part is taken (clip B: every third shot missed it, the child idled 0.6-1 s).
     # Named apart from the local queue() below: in this scope that def would shadow the module (only hit when the
@@ -797,7 +803,7 @@ def _run(video, detector, pose_model, checkpoint, out, max_shots=LOOK['max_shots
         lines.append('')
     if pending:
         report(pending)
-    pose_for(frames[1] if frames else scan['source_frame_count']-1)  # pose.json covers the whole clip, past --max-shots too
+    pose_for(pose_range[1])  # pose.json covers every analyzed shot, not the frames past --max-shots
     if posed[-1][2] != root/'pose.json':
         with LOG.open('a') as log:
             line = heard.get()

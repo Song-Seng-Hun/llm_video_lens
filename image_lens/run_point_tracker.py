@@ -63,7 +63,7 @@ def configure_spatial_shape(predictor, shape):
 
 
 # A serving child (tracking_child.py --serve) keeps these between jobs: the checkpoint hash per file state and the loaded model.
-_CHECKED, _MODELS, _SHA, _FRAMES, _FEATURES = {}, {}, {}, [], []
+_CHECKED, _MODELS, _SHA, _FRAMES, _FEATURES, _VIDEO = {}, {}, {}, [], [], []
 
 
 def checkpoint_sha(path):
@@ -258,11 +258,23 @@ def main():
     from cotracker.predictor import CoTrackerPredictor
     print(json.dumps({'stage': 'decoded', 'job': args.job, 'frames': len(images), 'queries': len(queries)}), file=sys.stderr, flush=True)
     region_observations = region_api['track'](images, job) if region_api else None
-    video = torch.from_numpy(np.stack(images)).permute(0, 3, 1, 2).unsqueeze(0).float().to(PARAMS['device'])
+    if any(image.dtype != np.uint8 for image in images):
+        raise ValueError('invalid RGB tensor')
+    # The groups of one window resize the same frames: keep the model-size video, built 16 native frames at a time.
+    # Same values as the predictor's whole-window float resize (torch.equal), without its 1080p copies (160 frames:
+    # 4 GB CPU float + 4 GB MPS per group); the predictor's own resize of this size is then an exact identity.
+    shape = tuple(resolution)
+    if _VIDEO[:1] != [(window, shape)]:
+        import torch.nn.functional as F
+        _VIDEO[:] = []
+        _VIDEO[:] = [(window, shape), torch.cat([
+            F.interpolate(torch.from_numpy(np.stack(images[a:a+16])).permute(0, 3, 1, 2).to(PARAMS['device']).float(),
+                          shape, mode='bilinear', align_corners=True) for a in range(0, len(images), 16)]).unsqueeze(0)]
+    video = _VIDEO[1]
     del images
     q = torch.tensor(queries, dtype=torch.float32).unsqueeze(0).to(PARAMS['device'])
-    if not torch.isfinite(video).all() or not 0 <= video.min() <= video.max() <= 255:
-        raise ValueError('invalid RGB tensor')
+    # The predictor's query/track scaling, done here against the native size it no longer sees.
+    q[:, :, 1:] *= q.new_tensor([(shape[1]-1)/(width-1), (shape[0]-1)/(height-1)])
     model = _MODELS.get(str(checkpoint))
     if model is None:
         model = CoTrackerPredictor(checkpoint=str(checkpoint), offline=True, v2=False, window_len=60).to(PARAMS['device']).eval()
@@ -286,6 +298,7 @@ def main():
     inference_started = time.monotonic()
     with torch.inference_mode():
         coords, vis = model(video, queries=q, backward_tracking=False)
+        coords *= coords.new_tensor([(width-1)/(shape[1]-1), (height-1)/(shape[0]-1)])
     inference_seconds = time.monotonic() - inference_started
     if coords.shape != (1, end - start + 1, len(queries), 2) or vis.shape != coords.shape[:-1] or vis.dtype != torch.bool:
         raise ValueError('unexpected model output shape/dtype')

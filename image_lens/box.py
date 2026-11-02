@@ -76,7 +76,9 @@ def run(video, look_dir, frame, box, checkpoint, out, end=None):
         note = where+f"사람 1명(상자와 겹침 {overlap:.2f})의 관절 {len(picked)}개를 추적(이름=자세 모델의 관절)"
     else:
         picked = corners(cv2.cvtColor(bgr, cv2.COLOR_BGR2GRAY), region)
-        why = ('그 프레임의 자세 없음' if tracks is None else f'사람 없음(가장 많이 겹친 사람 {overlap:.2f})' if not who
+        why = (f"look이 자세를 본 범위(f{pose['native_range'][0]}..f{pose['native_range'][1]}) 밖: --max-shots를 늘려 look을 다시 돌리면 관절로 고름"
+               if tracks is None and not pose['native_range'][0] <= frame <= pose['native_range'][1] else
+               '그 프레임의 자세 없음' if tracks is None else f'사람 없음(가장 많이 겹친 사람 {overlap:.2f})' if not who
                else '겹친 사람의 관절이 상자 안에 없음')
         note = where+f"{why} → 상자 안 모서리 점 {len(picked)}개를 추적(이름=위에서부터 p1..)"
     if not picked:
