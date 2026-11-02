@@ -77,6 +77,9 @@ def run(video, shots, frame, points, checkpoint, out, end=None, snap_points=True
     root = paths.confined(out, new=True)
     source = paths.confined(video, exists=True, max_bytes=512*1024*1024)
     scan, scan_path = paths.load(paths.confined(shots, exists=True))
+    from image_lens import shot_boundaries
+    shot_boundaries.validate(scan)
+    if shot_boundaries.unsafe_overlap(scan,frame,frame):raise ValueError('seed frame is an excluded transition candidate')
     if paths.sha(source) != scan['source_sha256']:
         raise ValueError('shot scan belongs to another video')
     parsed = [parse_point(p) for p in points]

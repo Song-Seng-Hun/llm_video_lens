@@ -72,14 +72,17 @@ def run(look_dir, name, detector, pose_model, checkpoint, out, max_seconds=1800)
         region = source_region.validate(video,record['source_region'])
     now = person_models.resolve(detector)['kind']
     cuts=record.get('cuts','fast')
-    if cuts not in ('fast','thorough'):raise ValueError('unknown saved cut policy')
+    transitions=record.get('transitions',False)
+    from image_lens import shot_boundaries
+    shot_boundaries.parameters(cuts,transitions)
     if cuts=='thorough':
         from image_lens import shot_boundaries
         scan,_=paths.load(root/'shots.json');shot_boundaries.validate(scan)
-        if scan['parameters']!=record.get('cut_parameters') or scan['parameters']['cuts']!=cuts:raise ValueError('redo cut policy provenance mismatch')
+        if scan['parameters']!=record.get('cut_parameters') or scan['parameters']['cuts']!=cuts or scan['parameters']['transitions']!=transitions:raise ValueError('redo cut policy provenance mismatch')
     result = look.run(video, detector, pose_model, checkpoint, out, max_seconds=max_seconds, frames=(first, last),
                       redo=dict(look=root.name, window=name, detector=now, was=kind(before), boxes=REDO['picture']),
                       **(dict(cuts=cuts) if cuts!='fast' else {}),
+                      **(dict(transitions=True) if transitions else {}),
                       **(dict(source_region=region) if region is not None else {}))
     after, _ = paths.load(paths.confined(Path(out)/'pose.json', exists=True), max_bytes=64*1024*1024)
     boxes(video, before, after, picks(first, last), Path(out)/REDO['picture'])

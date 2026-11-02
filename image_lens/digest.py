@@ -427,6 +427,13 @@ def skipped_line(item):
     return f"- 건너뜀 {actor}f{item['frames'][0]}..{item['frames'][1]}: {item['reason']}"
 
 
+def transition_line(coverage):
+    rows=coverage['intervals']
+    times=', '.join(f"f{r['frames'][0]}..{r['frames'][1]} ({r['seconds'][0]:.2f}..{r['seconds'][1]:.2f}s)" for r in rows[:8])
+    if len(rows)>8:times+=f", 이후 {len(rows)-8}개"
+    return f"전환 후보: {len(rows)}개 / {coverage['excluded_frames']}/{coverage['total_frames']}프레임 제외"+(f" / {times}" if times else '')+" / 이 구간의 움직임은 미분석"
+
+
 def markdown(record, scan, full_name):
     fps = scan['fps']; total = scan['source_frame_count']
     if record.get('frames'):
@@ -457,6 +464,8 @@ def markdown(record, scan, full_name):
            '"팔 자세"(구간 처음→끝)·"끝 팔"(단계 끝)은 그 순간 손목 높이(어깨 위/어깨 높이/가슴 높이/허리 아래)와 손목이 몸 가운데선을 넘었는지. '
            '"손-몸"은 손이 반대 어깨 가까이 오거나 두 손이 모인 구간(화면 위 거리라 닿음 후보).',
            f"자세히: `image_lens focus --look <이 폴더> --shot <shot-id>` (또는 {full_name}). 점 이름·부위는 미검증, 수치는 원본 비교 전 후보.", '']
+    if record.get('transition_coverage') is not None:
+        out.insert(3,transition_line(record['transition_coverage']))
     if record.get('joint_tracking'):
         out.insert(3, '몸 관절 좌표는 pose·추적 혼합 추정(보임·관절 정답 미검증). 속도·완급은 연속된 원시 점 추적에서만 계산. *.raw-tracks.json은 원시 결과, *.tracks.json은 선택된 좌표. SD·골격 불명은 이름 없는 표면점 경로.')
     if record.get('max_people', 1) > 1:

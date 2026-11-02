@@ -20,9 +20,13 @@ LIMITS = dict(max_frames=18000, max_seconds=600, max_pixels=8294400,
               max_file_bytes=512*1024*1024, scan_timeout_seconds=120, evidence_frames=3)
 
 
-def parameters(cuts='fast'):
+def parameters(cuts='fast',transitions=False):
     if cuts not in ('fast','thorough'):raise ValueError('cuts must be fast or thorough')
-    out=dict(PARAMS,cuts=cuts)
+    if type(transitions)is not bool or transitions and cuts!='thorough':raise ValueError('--transitions requires --cuts thorough')
+    out=dict(PARAMS,cuts=cuts,transitions=transitions)
+    if transitions:
+        from image_lens import gradual_transitions
+        out['gradual']=gradual_transitions.recipe()
     if cuts=='thorough':
         from image_lens import autoshot
         out['autoshot']=autoshot.recipe()
@@ -84,7 +88,7 @@ class Scan:
         for i in range(PARAMS['edge_padding']):self.cuts.extend(self.impl.process_frame(self.n+PARAMS['edge_padding']+i,self.last))
         return sorted({i-PARAMS['edge_padding'] for i in self.cuts if 0<i-PARAMS['edge_padding']<self.n})
 
-def assemble(job,times,local_cuts,mode='fast'):
+def assemble(job,times,local_cuts,mode='fast',transitions=False,unsafe=()):
     start=job['start_frame'];end=job['end_frame'];cuts=[start+i for i in local_cuts]
     events=[]
     for i,c in enumerate(cuts):
@@ -93,18 +97,32 @@ def assemble(job,times,local_cuts,mode='fast'):
                            kind='brief_transition_ambiguous' if nearby else 'hard_cut_candidate',
                            score_is_probability=False,verified=False))
     bounds=[start,*cuts,end+1]
+    hard_ranges=list(zip(bounds,bounds[1:]));safe=[]
+    for hard_id,(a,b) in enumerate(hard_ranges):
+        cursor=a
+        for left,right in unsafe:
+            if right<cursor:continue
+            if left>=b:break
+            if cursor<left:safe.append((cursor,min(left,b),hard_id))
+            cursor=max(cursor,right+1)
+        if cursor<b:safe.append((cursor,b,hard_id))
     segments=[dict(segment_id='shot-%04d'%i,start_frame=a,end_frame=b-1,
                    start_seconds=times[a-start],last_frame_seconds=times[b-1-start],
                    analysis_eligibility='inspection_only_single_frame' if b-a==1 else 'fresh_tracking_job_required',
-                   needs_fresh_source_observations=True,identity_continues_from_previous=False)
-              for i,(a,b) in enumerate(zip(bounds,bounds[1:]))]
-    return dict(schema='team-eye.shots/1',source_video=job['source_video'],source_sha256=job['source_sha256'],
+                   needs_fresh_source_observations=True,identity_continues_from_previous=False,
+                   **(dict(original_hardshot_id='shot-%04d'%hard_id) if transitions else {}))
+              for i,(a,b,hard_id) in enumerate(safe)]
+    intervals=[dict(frames=[a,b],start_seconds=times[a-start],last_frame_seconds=times[b-start],
+                    kind='gradual_transition_candidate',verified=False,motion_analysis='excluded') for a,b in unsafe]
+    return dict(schema='team-eye.shots/2',source_video=job['source_video'],source_sha256=job['source_sha256'],
                 width=job['width'],height=job['height'],fps=job['fps'],native_range=[start,end],
                 frame_count=len(times),native_pts_seconds=times,decode_complete=True,
-                parameters=parameters(mode),detector_source_manifest_sha256=sha(HERE/'shot-detector-pins.json'),
-                detector_helper_sha256=sha(__file__),events=events,analysis_segments=segments,
-                limitations=['Hard-cut candidates only; no calibrated probability or semantic scene/identity proof.',
-                             'Gradual dissolves/fades and missed edits are not protected by this detector.',
+                parameters=parameters(mode,transitions),detector_source_manifest_sha256=sha(HERE/'shot-detector-pins.json'),
+                detector_helper_sha256=sha(__file__),events=events,analysis_segments=segments,transition_intervals=intervals,
+                frame_accounting=dict(safe=sum(s['end_frame']-s['start_frame']+1 for s in segments),
+                                      excluded_transition=sum(b-a+1 for a,b in unsafe),total=len(times)),
+                limitations=['Unverified cut/transition candidates; no calibrated probability or semantic scene/identity proof.',
+                             'Transition candidates are unverified and incomplete; missed edits are not protected.',
                              'Brief flashes and short inserted shots may be indistinguishable; retain both boundaries.',
                              'No short segment merging, frame skipping, synthesized frames or cross-boundary interpolation.'])
 
@@ -116,7 +134,8 @@ def detect_images(images,times,job):
 def validate(scan,job=None,frames=None):
     config=scan.get('parameters') if type(scan)is dict else None
     mode=config.get('cuts') if type(config)is dict else None
-    if type(scan)is not dict or scan.get('schema')!='team-eye.shots/1' or mode not in ('fast','thorough') or scan.get('parameters')!=parameters(mode) or scan.get('decode_complete')is not True:
+    enabled=config.get('transitions') if type(config)is dict else None
+    if type(scan)is not dict or scan.get('schema')!='team-eye.shots/2' or mode not in ('fast','thorough') or scan.get('parameters')!=parameters(mode,enabled) or scan.get('decode_complete')is not True:
         raise ValueError('supported complete shot scan required')
     bounds=scan.get('native_range');times=scan.get('native_pts_seconds')
     if (type(bounds)is not list or len(bounds)!=2 or any(type(n)is not int for n in bounds)
@@ -148,8 +167,13 @@ def validate(scan,job=None,frames=None):
         if (not isinstance(adaptive,list) or any(type(c)is not int or not 0<c<scan['frame_count'] for c in adaptive)
                 or adaptive!=sorted(set(adaptive)) or cuts!=sorted(set(adaptive)|set(neural))):raise ValueError('thorough union must preserve every adaptive cut')
     elif 'temporal' in scan:raise ValueError('fast scan cannot carry ignored temporal evidence')
-    expected=assemble(dict(source_video=scan['source_video'],source_sha256=scan['source_sha256'],width=scan['width'],height=scan['height'],fps=scan['fps'],start_frame=bounds[0],end_frame=bounds[1]),times,[c-bounds[0]for c in cuts],mode=mode)
-    if events!=expected['events'] or scan.get('analysis_segments')!=expected['analysis_segments']:raise ValueError('shot partition or event classification mismatch')
+    unsafe=[]
+    if enabled:
+        from image_lens import gradual_transitions
+        unsafe=gradual_transitions.validate(scan.get('transition_detection'),scan['temporal']['many'],scan['frame_count'],scan['fps'],scan['source_sha256'])
+    elif 'transition_detection' in scan:raise ValueError('off scan cannot carry ignored transition evidence')
+    expected=assemble(dict(source_video=scan['source_video'],source_sha256=scan['source_sha256'],width=scan['width'],height=scan['height'],fps=scan['fps'],start_frame=bounds[0],end_frame=bounds[1]),times,[c-bounds[0]for c in cuts],mode=mode,transitions=enabled,unsafe=unsafe)
+    if any(scan.get(k)!=expected[k] for k in ('events','analysis_segments','transition_intervals','frame_accounting')):raise ValueError('shot partition or event classification mismatch')
     if job is not None:
         if (scan['source_video']!=job['source_video'] or scan['source_sha256']!=job['source_sha256']
                 or any(scan[k]!=job[k] for k in ['width','height','fps'])
@@ -160,24 +184,32 @@ def validate(scan,job=None,frames=None):
             if f.get('pts_seconds')!=times[f['frame']-bounds[0]]:raise ValueError('shot/track native PTS mismatch')
     return scan
 
+def unsafe_overlap(scan,start,end):
+    return [row for row in scan.get('transition_intervals',[]) if start<=row['frames'][1] and row['frames'][0]<=end]
+
+def blocked(scan,start,end):
+    return bool(unsafe_overlap(scan,start,end) or any(start<e['after_frame']<=end for e in scan['events']))
+
 def context(packet):
     scan=packet.get('shot_check')
     if scan is None:return None
     validate(scan,packet['job'],packet['frames'])
     job=packet['job'];events=[e for e in scan['events']if job['start_frame']<e['after_frame']<=job['end_frame']]
-    return dict(status='requires_shot_local_retracking' if events else 'no_cut_detected_in_generation_interval',
-                detected_events=events,checked_generation_interval=[job['start_frame'],job['end_frame']],
+    intervals=unsafe_overlap(scan,job['start_frame'],job['end_frame'])
+    return dict(status='requires_shot_local_retracking' if events or intervals else 'no_cut_detected_in_generation_interval',
+                detected_events=events,transition_intervals=intervals,transitions_checked=scan['parameters']['transitions'],checked_generation_interval=[job['start_frame'],job['end_frame']],
                 scan_range=scan['native_range'],source_sha256=scan['source_sha256'],
                 detector=scan['parameters'],identity_scope='shot_local_unverified',
                 no_cut_is_not_proof_of_continuity=True)
 
-def scan_video(path,start=0,end=None,*,cuts='fast',max_seconds=None):
+def scan_video(path,start=0,end=None,*,cuts='fast',transitions=False,max_seconds=None):
     seconds=LIMITS['scan_timeout_seconds'] if max_seconds is None else max_seconds
     if not finite(seconds) or not 0<seconds<=LIMITS['scan_timeout_seconds']:raise ValueError('scan max_seconds must be >0 and <=120')
-    return _scan_video(path,start,end,cuts,time.monotonic()+seconds)
+    parameters(cuts,transitions)
+    return _scan_video(path,start,end,cuts,time.monotonic()+seconds,transitions)
 
 
-def _scan_video(path,start,end,cuts,deadline):
+def _scan_video(path,start,end,cuts,deadline,transitions=False):
     import cv2
     parameters(cuts)
     path=Path(path)
@@ -213,7 +245,14 @@ def _scan_video(path,start,end,cuts,deadline):
             temporal=autoshot.predict(np.stack(rgb),pin,deadline);temporal['adaptive_cuts']=list(found)
             found=sorted(set(found)|set(autoshot.validate(temporal,len(times),pin)))
         if sha(path)!=pin:raise ValueError('source changed during shot scan')
-        result=assemble(dict(source_video=str(path),source_sha256=pin,width=width,height=height,fps=fps,start_frame=start,end_frame=end),times,found,mode=cuts)
+        gradual=None;unsafe=[]
+        if transitions:
+            from image_lens import gradual_transitions
+            gradual=gradual_transitions.evidence(np.stack(rgb),fps,temporal['many'],pin)
+            unsafe=gradual_transitions.validate(gradual,temporal['many'],len(times),fps,pin)
+        if time.monotonic()>=deadline:raise TimeoutError('shot scan budget')
+        result=assemble(dict(source_video=str(path),source_sha256=pin,width=width,height=height,fps=fps,start_frame=start,end_frame=end),times,found,mode=cuts,transitions=transitions,unsafe=unsafe)
+        if gradual is not None:result['transition_detection']=gradual
         if temporal is not None:result['temporal']=temporal
         result.update(scan_scope='full_source' if start==0 and end==count-1 else 'partial_source',source_frame_count=count)
         validate(result);return result
@@ -263,13 +302,18 @@ def selected_frames(scan,chosen):
     if sha(path)!=scan['source_sha256']:raise ValueError('source changed during boundary rendering')
     return panels
 
-def render(scan,destination,event_index=0):
+def render(scan,destination,event_index=0,transition_index=None):
     import cv2
     from PIL import Image,ImageDraw
     dest=Path(destination).resolve()
     if not dest.is_relative_to(workspace_root()) or dest.exists():raise ValueError('new task-local boundary image directory required')
     events=scan['events']
-    if events:
+    if transition_index is not None:
+        validate(scan)
+        intervals=scan['transition_intervals']
+        if type(transition_index)is not int or not 0<=transition_index<len(intervals):raise ValueError('transition interval not present')
+        a,b=intervals[transition_index]['frames'];chosen=sorted({a,(a+b)//2,b});omitted=0
+    elif events:
         if type(event_index)is not int or not 0<=event_index<len(events):raise ValueError('boundary event index not present')
         e=events[event_index];chosen={e['before_frame'],e['after_frame']};wanted=set(chosen)
         for other in events:
@@ -286,9 +330,9 @@ def render(scan,destination,event_index=0):
         rgb=Image.fromarray(cv2.cvtColor(im,cv2.COLOR_BGR2RGB));rgb.thumbnail((380,420));panels.append((n,t,rgb))
     canvas=Image.new('RGB',(400*len(panels),470),'white');d=ImageDraw.Draw(canvas)
     for i,(n,t,im)in enumerate(panels):canvas.paste(im,(400*i,35));d.text((400*i+5,5),'native f%d / %.6fs'%(n,t),fill='black')
-    d.text((5,450),'Source frames only. Cut/flash candidates, not verified scene or identity.',fill='black')
+    d.text((5,450),'Source frames only. Unverified transition candidate; motion not analyzed.' if transition_index is not None else 'Source frames only. Cut/flash candidates, not verified scene or identity.',fill='black')
     dest.mkdir();out=dest/'boundary.png';canvas.save(out)
-    return dict(path=str(out),frames=chosen,image_cap=3,selected_event_index=event_index if events else None,
+    return dict(path=str(out),frames=chosen,image_cap=3,selected_event_index=event_index if events and transition_index is None else None,selected_transition_index=transition_index,
                 omitted_context_frame_count=omitted,other_event_count=max(0,len(events)-1),overlays=False)
 
 def render_comparison(scan,destination,frames):
@@ -318,7 +362,7 @@ def render_comparison(scan,destination,frames):
 def main():
     ap=argparse.ArgumentParser(description=__doc__);ap.add_argument('--video',required=True);ap.add_argument('--out',required=True)
     ap.add_argument('--start',type=int,default=0);ap.add_argument('--end',type=int);ap.add_argument('--evidence-dir');ap.add_argument('--event-index',type=int,default=0)
-    ap.add_argument('--cuts',choices=('fast','thorough'),default='fast');ap.add_argument('--max-seconds',type=float,default=120)
+    ap.add_argument('--cuts',choices=('fast','thorough'),default='fast');ap.add_argument('--max-seconds',type=float,default=120);ap.add_argument('--transitions',action='store_true')
     ap.add_argument('--compare-frames',help='two native frames a,b; diagnostic originals + residual only, no new cut')
     a=ap.parse_args();out=Path(a.out).resolve()
     if not out.is_relative_to(workspace_root()) or out.exists():raise ValueError('new task-local shot JSON required')
@@ -332,7 +376,7 @@ def main():
         signal.signal(signal.SIGALRM,lambda *_:(_ for _ in ()).throw(TimeoutError('shot scan wall budget')))
         if not finite(a.max_seconds) or not 0<a.max_seconds<=120:raise ValueError('scan max_seconds must be >0..120')
         signal.setitimer(signal.ITIMER_REAL,min(a.max_seconds,60) if comparison is not None else a.max_seconds)
-    result=scan_video(a.video,a.start,a.end,cuts=a.cuts,max_seconds=min(a.max_seconds,60) if comparison is not None else a.max_seconds)
+    result=scan_video(a.video,a.start,a.end,cuts=a.cuts,transitions=a.transitions,max_seconds=min(a.max_seconds,60) if comparison is not None else a.max_seconds)
     json.dumps(result,allow_nan=False)
     if comparison is not None:result['appearance_inspection']=render_comparison(result,a.evidence_dir,comparison)
     elif a.evidence_dir:result['evidence_contact']=render(result,a.evidence_dir,a.event_index)

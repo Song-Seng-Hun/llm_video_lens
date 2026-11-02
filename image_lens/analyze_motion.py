@@ -366,18 +366,24 @@ def main():
                                  analysis_eligibility='inspection_only_single_frame'if a==b else'fresh_tracking_job_required'))
         result=dict(schema='team-eye.shot-blocked-report/1',state='requires_shot_local_retracking',label='unknown',
                     requested_frames=[args.start,args.end],shot_context=shot_context,
-                    reasons=['Old whole-clip inference saw multiple detected shots; cropping its output cannot remove that context.'],
+                    reasons=['Original generation overlaps a detected cut or transition candidate; cropping its output cannot remove that context.'],
                     analysis_segments=segments,segment_scope='intersection with original bounded generation job; new explicit seeds required',
                     source_tracks=str(Path(args.tracks).resolve()),source_tracks_sha256=pin,
                     source_video=packet['job']['source_video'],source_video_sha256=packet['job']['source_sha256'],
                     model_loaded=False,raw_coordinates_modified=False,generated_coordinates=False,
                     motion_inference=False,interpolation=False,identity_transfer=False)
         if args.evidence_dir:
-            index=packet['shot_check']['events'].index(shot_context['detected_events'][0])
-            result['evidence_contact']=SHOT['render'](packet['shot_check'],args.evidence_dir,index)
+            if shot_context['detected_events']:
+                index=scan['events'].index(shot_context['detected_events'][0])
+                result['evidence_contact']=SHOT['render'](scan,args.evidence_dir,index)
+            else:
+                index=scan['transition_intervals'].index(shot_context['transition_intervals'][0])
+                result['evidence_contact']=SHOT['render'](scan,args.evidence_dir,transition_index=index)
         text=json.dumps(result,indent=2,ensure_ascii=False,allow_nan=False)+'\n'
         if args.format=='markdown':
-            text='# 컷 경계를 포함한 추적 — 구간별 재추적 필요\n\n기존 전체 영상 추적에 여러 컷이 섞여 있어 움직임·속도·ease를 계산하지 않았습니다. 각 구간에서 새 기준점을 지정하세요.\n\n'+''.join(
+            notice=('원래 추적 생성 구간에 전환 후보가 포함되어 움직임·속도·ease를 계산하지 않았습니다. 안전 구간에서 새 기준점을 지정하세요.'
+                    if shot_context['transition_intervals'] else '기존 전체 영상 추적에 여러 컷이 섞여 있어 움직임·속도·ease를 계산하지 않았습니다. 각 구간에서 새 기준점을 지정하세요.')
+            text='# 구간별 재추적 필요\n\n'+notice+'\n\n'+''.join(
                 '- %s: native f%d..%d / %.6f..%.6fs (마지막 프레임 시각)\n'%(s['segment_id'],s['start_frame'],s['end_frame'],s['start_seconds'],s['last_frame_seconds'])for s in result['analysis_segments'])
             if result.get('evidence_contact'):text+='\n경계 검수 이미지: '+result['evidence_contact']['path']+'\n'
         with out.open('x')as f:f.write(text)

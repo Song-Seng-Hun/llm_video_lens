@@ -61,6 +61,25 @@ One integrated CPU check over 39 files / 6,645 frames (about 200 seconds of summ
 
 Scan parameters, helper/model-source pins and canonical references bind the selected mode. Regenerate old scans/freezes with the new helper. Preparing, validating or consuming a cached thorough scan never downloads or runs the model. This option is currently for the local CLI; LAN client/server forwarding and installed-service rollout are separate work.
 
+## Optional gradual-transition intervals
+
+When fades or dissolves matter, use `--cuts thorough --transitions` on `scan` or `look`. The flag is off by default and requires thorough; an incompatible request fails before loading a model. It reuses the already computed AutoShot auxiliary multi-frame head and adds a small endpoint-mixture check. It adds no neural forward calls, model or dependency. The auxiliary head was trained to mark transition frames, not calibrated to certify a real edit.
+
+```sh
+python -m image_lens --workspace W scan --video clip.mp4 --cuts thorough --transitions --out transition-shots.json
+python -m image_lens --workspace W look --video clip.mp4 --cuts thorough --transitions --out look-transitions
+```
+
+`transition_intervals` are inclusive native-frame ranges with native first/last-frame PTS. They are unverified gradual-transition candidates, without a reliable fade-versus-dissolve subtype. Actual hard-cut events remain intact. Analysis segments contain only the remaining contiguous frames; pose emits dense `excluded_transition` rows, and point tracking starts afresh in eligible segments. `look.md` labels excluded ranges and counts. JSON/Markdown briefs show at most eight interval rows, total/omitted counts and the complete raw-scan locator.
+
+`--max-shots` still defaults to 16 safe segments, including existing short/untracked cases. Transition ranges consume no slot, but splitting can increase the number of safe segments and reduce later selection. `transition_coverage` separates excluded, selected-safe and cap-omitted frames; selected does not mean successfully tracked. `mark`/`box` reject excluded seeds, and `redo` inherits the selected policy. A cached inference whose original generation touched an excluded span cannot regain motion claims by cropping its output to a safe range. Raw manual analysis without a protected canonical scan remains unchecked.
+
+Stored scans now use `team-eye.shots/2`; regenerate old scans, freezes and reports from source. Cached admission remains model/network-free. This flag is local CLI functionality; installed services and LAN clients do not forward it yet.
+
+Known-material confirmation: eight newly authored fades/dissolves contained 152 mixed frames, all excluded. Of 2,248 clean frames, 106 were additionally excluded (4.72%); the eight no-transition controls lost 0/1,200 frames, separately measured. False ranges concentrated in black tails and 3D motion; one 150-frame example lost 43 extra frames. This is not real-transition human ground truth or evidence of uniform accuracy. Weak/truncated/long transitions can be missed; ordinary motion, exposure and blends can be ambiguous. Inspect source evidence before treating an interval as an edit. An extra interval means unknown motion, never a stationary pose.
+
+One ordered cached-model CPU batch over sixteen clips: thorough alone 14.19 s, with exclusions 13.92 s; process peaks were both about 1.95 GiB. The small timing difference is not a speedup claim. Existing 39-source hard-cut predictions were unchanged. One actual 150-frame moving-person fade ran pose and MPS point tracking: 21 excluded pose rows, five generated track packets wholly outside those ranges, zero errors. Other styles and longer live workloads remain unmeasured.
+
 ## Fresh jobs and optional tracking
 
 See [the job contract](jobs.md). `prepare` accepts a fresh query packet and canonical full-source scan, validates one shot-local job, and creates a new immutable freeze. Its default permits validation only. `validate` checks source bytes, queries, vendor/helper pins, decode/PTS and cuts **without importing Torch**, without a checkpoint and without producing tracks. It requires the core decode dependencies.

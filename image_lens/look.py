@@ -336,11 +336,27 @@ def run(*args, **kwargs):
         _stop_pose()
 
 
-def _run(video, detector, pose_model, checkpoint, out, max_shots=LOOK['max_shots'], max_seconds=1800, frames=None, redo=None, max_people=1, scene_box=None, source_region=None, cuts='fast'):
+def transition_coverage(scan,frames=None,max_shots=LOOK['max_shots']):
+    """Native source accounting; selected safe frames are scheduled, never claimed analyzed."""
+    first,last=frames or scan['native_range'];segments=clip(scan,frames);shown=segments[:max_shots]
+    excluded=[]
+    for row in scan['transition_intervals']:
+        a=max(first,row['frames'][0]);b=min(last,row['frames'][1])
+        if a<=b:excluded.append(dict(frames=[a,b],seconds=[scan['native_pts_seconds'][a],scan['native_pts_seconds'][b]]))
+    return dict(native_range=[first,last],total_frames=last-first+1,intervals=excluded,
+                excluded_frames=sum(b-a+1 for a,b in (r['frames']for r in excluded)),
+                selected_safe_frames=sum(s['end_frame']-s['start_frame']+1 for s in shown),
+                cap_omitted_safe_frames=sum(s['end_frame']-s['start_frame']+1 for s in segments[max_shots:]),
+                selected_safe_segments=len(shown),cap_omitted_safe_segments=len(segments[max_shots:]),
+                selection_is_not_motion_coverage=True)
+
+
+def _run(video, detector, pose_model, checkpoint, out, max_shots=LOOK['max_shots'], max_seconds=1800, frames=None, redo=None, max_people=1, scene_box=None, source_region=None, cuts='fast', transitions=False):
     """frames=(first, last): look at that native range only; redo: what redo re-ran, for look.md's header."""
     if type(max_people) is not int or not 1 <= max_people <= 8:
         raise ValueError('--max-people integer1..8 required')
-    if cuts not in ('fast','thorough'):raise ValueError('cuts must be fast or thorough')
+    from image_lens import shot_boundaries
+    shot_boundaries.parameters(cuts,transitions)
     started = time.monotonic()
     def remaining():
         return max_seconds-(time.monotonic()-started)
@@ -360,11 +376,11 @@ def _run(video, detector, pose_model, checkpoint, out, max_shots=LOOK['max_shots
         source, scaled = fit(source, root)
     if cuts=='thorough' and remaining()<=0:raise TimeoutError('look budget exhausted before thorough cuts')
     _step('scan', ['--video', source, '--out', root/'shots.json']+
-          (['--cuts',cuts,'--max-seconds',min(120.,remaining())] if cuts=='thorough' else []))
+          (['--cuts',cuts,'--max-seconds',min(120.,remaining())] if cuts=='thorough' else [])+(['--transitions'] if transitions else []))
     if cuts=='thorough':
         from image_lens import shot_boundaries
         selected,_=paths.load(root/'shots.json')
-        if selected.get('parameters')!=shot_boundaries.parameters(cuts):raise ValueError('look scan lost the selected cut policy')
+        if selected.get('parameters')!=shot_boundaries.parameters(cuts,transitions):raise ValueError('look scan lost the selected cut policy')
         if remaining()<=0:raise TimeoutError('look budget exhausted during thorough cuts')
     if source_region is not None:
         scanned,_ = paths.load(root/'shots.json')
@@ -786,6 +802,9 @@ def _run(video, detector, pose_model, checkpoint, out, max_shots=LOOK['max_shots
     head = ['# 영상 움직임 자세히 (요약은 look.md)', '',
             f"영상 {source.name}: {scan['source_frame_count']}프레임, {scan['fps']:g}fps, 장면 {len(segments)}개. 점은 포즈 기준 자동 배치(머리카락은 눈 기준 기하), 부위·동일인 미검증.",
             '경고는 "원본부터 비교하라"는 뜻이다. 가짜 움직임이라는 판정이 아니다. 자세한 수치는 장면별 report.json에 있다.', '']
+    if transitions:
+        from image_lens import digest
+        head.insert(3,digest.transition_line(transition_coverage(scan,frames,max_shots)))
     if source_region is not None:
         from image_lens.source_region import header
         head.insert(3,header(source_region))
@@ -826,6 +845,8 @@ def _run(video, detector, pose_model, checkpoint, out, max_shots=LOOK['max_shots
                   max_shots=max_shots, scaled=scaled, onion_sheets=sheets, frame_sheets=frame_sheets, errors=errors, shots=shots,
                   joint_tracking=joint_tracking.PARAMS, **(dict(frames=list(frames)) if frames else {}), **(dict(redo=redo) if redo else {}))
     record['cuts']=cuts
+    record['transitions']=transitions
+    if transitions:record['transition_coverage']=transition_coverage(scan,frames,max_shots)
     if scan.get('parameters') is not None:record['cut_parameters']=scan['parameters']
     if source_region is not None:record['source_region'] = source_region
     if max_people > 1:
