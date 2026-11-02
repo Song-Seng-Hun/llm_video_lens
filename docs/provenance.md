@@ -14,6 +14,10 @@ The portable engine set is `shot_boundaries`, `appearance_inspection`, `analyze_
 
 `vendor/local-patch.json` records the sole vendor patch: `torch.load(..., weights_only=True)`. The before/after hashes are preserved. Tracking checks the patched hash rather than silently weakening restricted loading. Checkpoint acquisition source/hash/size/license are in `checkpoint-manifest.json`, with no personal machine path. No automatic model or source download exists.
 
+## AutoShot
+
+Three exact upstream files (`linear.py`, the supernet definition and `LICENSE`) from https://github.com/wentaozhu/AutoShot commit `77c82ff826a9301bb173d9be786297a49d73d081` are under `image_lens/vendor/source/autoshot`, with no local patches. Their hashes are in `image_lens/autoshot-pins.json`, and the **MIT** notice is retained. The checkpoint `ckpt_0_200_0.pth` (57,243,097 bytes, SHA-256 `3e85290546ce6d32f4a3581ec2cae87aedd2402246a0d46b4d361a330b4b1fa6`) is not bundled; only `--cuts thorough` downloads it, from the third-party Hugging Face mirror `backseollgi/AutoShot` revision `9dbc41acb14de0dc32509f7c7d0a9876a6f44105`. Whether the mirror equals the author's checkpoint, and the checkpoint's own license terms, are unverified.
+
 ## Authored code and excluded assets
 
 No blanket redistribution license has been granted to the user's authored code by this extraction. No root MIT/Apache license is asserted. Upstream notices apply to their own files; they do not relicense the rest of the repository. The repository's owner must choose authored-code terms separately if needed.

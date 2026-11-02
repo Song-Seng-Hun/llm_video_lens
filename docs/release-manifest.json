@@ -22,7 +22,7 @@
   ],
   "manifest_self_excluded": true,
   "file_count": 182,
-  "total_bytes": 2464427,
+  "total_bytes": 2470329,
   "files": [
     {
       "path": ".gitattributes",
@@ -41,8 +41,8 @@
     },
     {
       "path": "README.md",
-      "bytes": 17769,
-      "sha256": "185440195e234b942c45d07a99c4d3767bac4675c4a6ff94e273c48366116805"
+      "bytes": 18422,
+      "sha256": "8fa69f86340280b3aa60750fba99ef487b933dfc8377e04ee45220ae62d86b22"
     },
     {
       "path": "assets/banner-dark.svg",
@@ -61,18 +61,18 @@
     },
     {
       "path": "assets/example-onion.jpg",
-      "bytes": 100682,
-      "sha256": "e967b9c5fac840fb55425b1e4469ed1350559609ffe69aa1b9f0de5889d060e7"
+      "bytes": 103743,
+      "sha256": "a8ed6e82b041e471e1cb482f8abe94dbf67dc956b8ab861c5e41fc1bf874c4c6"
     },
     {
       "path": "docs/README.en.md",
-      "bytes": 15269,
-      "sha256": "2d85c7910ceb9379f586cd4b70d72a69d30627ed01a28a53551eb64ad29e1538"
+      "bytes": 15932,
+      "sha256": "a9fa285b9b6f7362555f2681f5950d3873018a4e72f0503d2fb8b5fb31bb499f"
     },
     {
       "path": "docs/README.ja.md",
-      "bytes": 18606,
-      "sha256": "8c767151f62e81a42f4e7a891fc89f089451d980a750c870661409169788a88d"
+      "bytes": 19379,
+      "sha256": "628865efb450c23f24cfbc5b4593c7a08c93740051da6735513f739c2f312e5d"
     },
     {
       "path": "docs/guide.md",
@@ -106,8 +106,8 @@
     },
     {
       "path": "docs/provenance.md",
-      "bytes": 3974,
-      "sha256": "0f53be77a8f705c8dd5df7b80ef556c1527a46348a2c97a86132d05059ad24ae"
+      "bytes": 4726,
+      "sha256": "ea9b37be21efe6d6f1e54d451585d3f4087b32a6509784f67181d3379d306223"
     },
     {
       "path": "docs/verification.md",
