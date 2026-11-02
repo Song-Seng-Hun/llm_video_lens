@@ -64,7 +64,12 @@ assert 'torch' not in sys.modules and 'einops' not in sys.modules
         def predict(frames,source_sha,deadline):
             self.assertEqual(frames.shape,(16,27,48,3));np.testing.assert_array_equal(frames[0,0,0],[100,20,10])
             return self.evidence(len(frames),source_sha)
-        with patch.object(autoshot,'predict',side_effect=predict) as inference:
+        class Stream:
+            def __init__(self,source_sha,deadline):self.source_sha=source_sha;self.deadline=deadline;self.frames=[]
+            def feed(self,rgb):self.frames.append(rgb)
+            def finish(self):return predict(np.stack(self.frames),self.source_sha,self.deadline)
+            def close(self):pass
+        with patch.object(autoshot,'Stream',side_effect=Stream) as inference:
             scan=shot_boundaries.scan_video(self.video,cuts='thorough')
             self.assertEqual([e['after_frame'] for e in scan['events']],[6,8])
             with self.assertRaisesRegex(ValueError,'full-source'):shot_boundaries.scan_video(self.video,start=1,cuts='thorough')
@@ -98,7 +103,7 @@ assert 'torch' not in sys.modules and 'einops' not in sys.modules
         with patch.object(paths,'sha',side_effect=lambda path:'0'*64 if str(path).endswith('/linear.py') else original(path)):
             with self.assertRaisesRegex(ValueError,'source pin'):autoshot.recipe()
         frames=np.broadcast_to(np.arange(51,dtype=np.uint8)[:,None,None,None],(51,27,48,3)).copy()
-        windows=list(autoshot.windows(frames));self.assertEqual(len(windows),2)
+        windows=[autoshot.window(frames,k) for k in range(2)]
         np.testing.assert_array_equal(np.concatenate([w[25:75,0,0,0] for w in windows])[:51],np.arange(51))
 
     def test_hash_pinned_fetch_cache_and_own_partial_cleanup(self):

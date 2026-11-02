@@ -90,11 +90,10 @@ def validate(evidence,n,source_sha):
     return [r['first_new'] for r in expected if r['first_new'] is not None]
 
 
-def windows(frames):
+def window(frames,k):
+    """The k-th 100-frame input: native frames 50k-25..50k+74, the first and last frame repeated past the ends."""
     import numpy as np
-    right=25+(-len(frames))%50
-    padded=np.concatenate([np.repeat(frames[:1],25,0),frames,np.repeat(frames[-1:],right,0)])
-    for at in range(0,len(padded)-99,50):yield padded[at:at+100]
+    return np.stack([frames[min(max(n,0),len(frames)-1)] for n in range(50*k-25,50*k+75)])
 
 
 def dependencies():
@@ -132,21 +131,60 @@ def load_model(torch,weights):
     return model
 
 
+class Stream:
+    """predict, fed a frame at a time while the scan decodes: a thread readies the model and runs each window once its
+    frames are in, so AutoShot overlaps the decode instead of following it (AI clip, 1807 f: scan 13.9 -> 9.9 s).
+    Same windows, same inputs, same CPU4/interop1 settings as one call on the stacked frames."""
+    def __init__(self,source_sha,deadline):
+        import queue,threading
+        self.source_sha=source_sha;self.deadline=deadline;self.frames=[];self.sent=0;self.todo=queue.Queue()
+        self.error=None;self.single=[];self.many=[];self.calls=0
+        self.thread=threading.Thread(target=self._run,daemon=True);self.thread.start()
+
+    def feed(self,rgb):
+        import numpy as np
+        if self.error is not None:raise self.error
+        if rgb.dtype!=np.uint8 or rgb.shape!=(27,48,3):raise ValueError('native RGB27x48 uint8 input required')
+        self.frames.append(rgb)
+        if len(self.frames)==50*self.sent+75:self.todo.put(self.sent);self.sent+=1  # its last native frame is in
+
+    def finish(self):
+        import numpy as np
+        n=len(self.frames)
+        if n<2:raise ValueError('native RGB27x48 uint8 input required')
+        for k in range(self.sent,(n+49)//50):self.todo.put(k)
+        self.close();self.thread.join()
+        if self.error is not None:raise self.error
+        bounded(self.deadline);single=np.concatenate(self.single)[:n].tolist();many=np.concatenate(self.many)[:n].tolist()
+        evidence=dict(recipe=self.configuration,source_sha256=self.source_sha,frame_count=n,single=single,many=many,positive_runs=runs(single),
+                      model_loaded=True,forward_calls=self.calls,weights=str(self.weights),downloaded=self.downloaded,torch_version=str(self.torch.__version__))
+        validate(evidence,n,self.source_sha)
+        return evidence
+
+    def close(self):
+        self.todo.put(None)
+
+    def _run(self):
+        try:
+            import numpy as np
+            bounded(self.deadline);self.configuration=recipe();torch=self.torch=dependencies();bounded(self.deadline)
+            self.weights,self.downloaded=checkpoint(self.deadline);model=load_model(torch,self.weights);bounded(self.deadline)
+            with torch.inference_mode():
+                while (k:=self.todo.get()) is not None:
+                    bounded(self.deadline);a,b=model(torch.from_numpy(window(self.frames,k)[None]).permute(0,4,1,2,3).float());self.calls+=1
+                    if tuple(a.shape)!=(1,100,1) or tuple(b.shape)!=(1,100,1):raise ValueError('AutoShot official head shape mismatch')
+                    a=torch.sigmoid(a)[0,:,0].cpu().numpy();b=torch.sigmoid(b)[0,:,0].cpu().numpy()
+                    if not np.isfinite(a).all() or not np.isfinite(b).all():raise ValueError('nonfinite AutoShot head')
+                    self.single.append(a[25:75]);self.many.append(b[25:75])
+        except BaseException as error:
+            self.error=error
+
+
 def predict(frames,source_sha,deadline):
     import numpy as np
     if frames.dtype!=np.uint8 or frames.ndim!=4 or frames.shape[1:]!=(27,48,3) or len(frames)<2:raise ValueError('native RGB27x48 uint8 input required')
-    bounded(deadline);configuration=recipe();torch=dependencies();bounded(deadline)
-    weights,downloaded=checkpoint(deadline);model=load_model(torch,weights);bounded(deadline)
-    single=[];many=[];calls=0
-    with torch.inference_mode():
-        for batch in windows(frames):
-            bounded(deadline);a,b=model(torch.from_numpy(batch[None]).permute(0,4,1,2,3).float());calls+=1
-            if tuple(a.shape)!=(1,100,1) or tuple(b.shape)!=(1,100,1):raise ValueError('AutoShot official head shape mismatch')
-            a=torch.sigmoid(a)[0,:,0].cpu().numpy();b=torch.sigmoid(b)[0,:,0].cpu().numpy()
-            if not np.isfinite(a).all() or not np.isfinite(b).all():raise ValueError('nonfinite AutoShot head')
-            single.append(a[25:75]);many.append(b[25:75])
-    bounded(deadline);single=np.concatenate(single)[:len(frames)].tolist();many=np.concatenate(many)[:len(frames)].tolist()
-    evidence=dict(recipe=configuration,source_sha256=source_sha,frame_count=len(frames),single=single,many=many,positive_runs=runs(single),
-                  model_loaded=True,forward_calls=calls,weights=str(weights),downloaded=downloaded,torch_version=str(torch.__version__))
-    validate(evidence,len(frames),source_sha)
-    return evidence
+    stream=Stream(source_sha,deadline)
+    try:
+        for rgb in frames:stream.feed(rgb)
+        return stream.finish()
+    finally:stream.close()

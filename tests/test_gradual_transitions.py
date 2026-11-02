@@ -77,7 +77,7 @@ class Intervals(unittest.TestCase):
 
     def test_policy_requires_thorough_and_static_validation_has_no_optional_imports(self):
         """Invalid opt-in must fail before model work; static scans need no array/model runtime."""
-        with patch.object(autoshot,'predict') as model:
+        with patch.object(autoshot,'Stream') as model:
             with self.assertRaisesRegex(ValueError,'requires --cuts thorough'):shots.scan_video(self.video,transitions=True)
             model.assert_not_called()
         scan=self.scan();original=__import__
