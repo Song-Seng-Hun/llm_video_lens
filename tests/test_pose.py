@@ -84,6 +84,41 @@ class Seeds(unittest.TestCase):
                 pose.seed(str(root/'pose.json'), 0, 'j', 'crops')
             self.assertFalse((root/'crops').exists())
 
+    def test_tracking_resolution_preserves_default_and_reaches_every_seed_group(self):
+        """Resolution must change only model-input metadata, never anchors or source seed geometry."""
+        import tempfile
+        from unittest.mock import patch
+        from image_lens import paths,onion,body_motion
+        previous=paths.workspace_root()
+        try:
+            with tempfile.TemporaryDirectory(dir=REPO/'workspace') as folder:
+                root=Path(folder);paths.configure(root);video=root/'v.bin';video.write_bytes(b'authored seed input')
+                paths.write_json('shots.json',dict(analysis_segments=[dict(start_frame=0,end_frame=9)]))
+                packet=dict(schema='image-lens.pose/1',source_video=str(video),source_sha256=paths.sha(video),width=1440,height=1200,fps=25.,
+                            canonical_shots=dict(path=str(root/'shots.json'),sha256=paths.sha(root/'shots.json')),
+                            flags=dict(frames=[]),frames=[dict(frame=0,tracks=[track()])])
+                paths.write_json('pose.json',packet)
+                names={group:values[0] for group,values in pose.GROUPS.items()}
+                seeds={name:dict(xy=[100.,200.],seed_rule='authored unchanged seed')for group,name in names.items() if group!='move'}
+                crops={name:dict(path='fixed-reference.png',sha256='0'*64)for name in names.values()}
+                with (patch.object(pose,'seed_points',return_value=seeds),patch.object(pose,'_marked_crops',return_value=crops),
+                     patch.object(onion,'gap_seeds',return_value={names['move']:dict(xy=[120.,220.],seed_rule='authored gap')}),
+                     patch.object(body_motion,'skeleton_check',return_value=(True,'authored')),patch.object(body_motion,'framing',return_value='full'),patch.object(body_motion,'chibi',return_value=None)):
+                    standard=pose.seed(root/'pose.json',0,'job',root/'crops')
+                    explicit=pose.seed(root/'pose.json',0,'job',root/'crops',inference_resolution=[384,512])
+                    detail=pose.seed(root/'pose.json',0,'job',root/'crops',inference_resolution=[576,768])
+                self.assertEqual(standard,explicit);self.assertEqual({j['group']for j in detail['jobs']},set(pose.GROUPS))
+                from image_lens import cli
+                args=['--pose','pose.json','--frame','0','--job','job','--evidence-dir','crops']
+                with patch.object(pose,'seed',return_value=standard) as route:
+                    cli.dispatch('seed',args+['--out','default.obs.json']);self.assertNotIn('inference_resolution',route.call_args.kwargs)
+                    cli.dispatch('seed',args+['--out','detail.obs.json','--tracking-resolution','detail'])
+                    self.assertEqual(route.call_args.kwargs['inference_resolution'],[576,768])
+                for a,b in zip(standard['jobs'],detail['jobs']):
+                    self.assertNotIn('inference_resolution',a);self.assertEqual(b.pop('inference_resolution'),[576,768]);self.assertEqual(a,b)
+                with self.assertRaisesRegex(ValueError,'shapes supported'):pose.seed('absent',0,'j','crops',inference_resolution=[576,512])
+        finally:paths.configure(previous)
+
     def test_groups_fit_report_and_observation_caps(self):
         from image_lens import onion
         # move tracks up to 12 candidates (observation cap) but reports at most onion.GAPS['points'] (report cap 8)

@@ -15,7 +15,11 @@ class Redo(unittest.TestCase):
     def test_thorough_redo_inherits_validated_policy(self):
         """Redo cannot silently rescan a saved thorough look using fast cuts."""
         from unittest.mock import patch
-        from image_lens import autoshot,shot_boundaries,person_models,gradual_transitions
+        from image_lens import autoshot,shot_boundaries,person_models,gradual_transitions,cli
+        args=['--look','x','--window','s-w0','--detector','d','--pose-model','p','--checkpoint','c','--out','o']
+        with patch.object(cli,'models',side_effect=lambda a,*_:a),patch.object(redo,'run',return_value={}) as route:
+            cli.dispatch('redo',args);self.assertNotIn('inference_resolution',route.call_args.kwargs)
+            cli.dispatch('redo',args+['--tracking-resolution','standard']);self.assertEqual(route.call_args.kwargs['inference_resolution'],[384,512])
         previous=paths.workspace_root()
         try:
             with tempfile.TemporaryDirectory() as d:
@@ -26,13 +30,21 @@ class Redo(unittest.TestCase):
                             single=[0.]*10,many=[0.]*10,positive_runs=[],adaptive_cuts=[],model_loaded=True,forward_calls=1))
                 scan['transition_detection']=dict(recipe=gradual_transitions.recipe(),source_sha256=pin,frame_count=10,many_runs=[],cheap_intervals=[])
                 paths.write_json(first/'shots.json',scan)
-                paths.write_json(first/'look.json',dict(source_video=str(video),source_sha256=pin,cuts='thorough',transitions=True,cut_parameters=scan['parameters'],
+                paths.write_json(first/'look.json',dict(source_video=str(video),source_sha256=pin,cuts='thorough',transitions=True,inference_resolution=[576,768],cut_parameters=scan['parameters'],
                                  shots=[dict(segment_id='s',windows=[dict(window=dict(seed=0,end=9))])]))
                 pose=dict(packet({}),source_sha256=pin);paths.write_json(first/'pose.json',pose)
+                expected_shape=[576,768]
                 def run(*args,**kwargs):
-                    self.assertEqual(kwargs['cuts'],'thorough');self.assertTrue(kwargs['transitions']);out=Path(args[4]);out.mkdir();paths.write_json(out/'pose.json',pose);return dict(status='written')
+                    self.assertEqual(kwargs['cuts'],'thorough');self.assertTrue(kwargs['transitions']);self.assertEqual(kwargs['inference_resolution'],expected_shape);out=Path(args[4]);out.mkdir();paths.write_json(out/'pose.json',pose);return dict(status='written')
                 with patch.object(look,'run',side_effect=run),patch.object(person_models,'resolve',return_value=dict(kind='humanart')),patch.object(redo,'boxes'):
                     redo.run(first,'s-w0','d','p','c',root/'redo')
+                    expected_shape=[384,512]
+                    redo.run(first,'s-w0','d','p','c',root/'standard',inference_resolution=[384,512])
+                saved,_=paths.load(first/'look.json');saved['inference_resolution']=[768,576]
+                (first/'look.json').write_text(__import__('json').dumps(saved))
+                with patch.object(look,'run') as execute,patch.object(person_models,'resolve') as resolve:
+                    with self.assertRaisesRegex(ValueError,'shapes supported'):redo.run(first,'s-w0','d','p','c',root/'bad',inference_resolution=[384,512])
+                    execute.assert_not_called();resolve.assert_not_called()
         finally:paths.configure(previous)
 
     def test_window_names_follow_the_file_names(self):

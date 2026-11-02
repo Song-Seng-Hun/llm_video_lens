@@ -351,12 +351,14 @@ def transition_coverage(scan,frames=None,max_shots=LOOK['max_shots']):
                 selection_is_not_motion_coverage=True)
 
 
-def _run(video, detector, pose_model, checkpoint, out, max_shots=LOOK['max_shots'], max_seconds=1800, frames=None, redo=None, max_people=1, scene_box=None, source_region=None, cuts='fast', transitions=False):
+def _run(video, detector, pose_model, checkpoint, out, max_shots=LOOK['max_shots'], max_seconds=1800, frames=None, redo=None, max_people=1, scene_box=None, source_region=None, cuts='fast', transitions=False, inference_resolution=None):
     """frames=(first, last): look at that native range only; redo: what redo re-ran, for look.md's header."""
     if type(max_people) is not int or not 1 <= max_people <= 8:
         raise ValueError('--max-people integer1..8 required')
     from image_lens import shot_boundaries
     shot_boundaries.parameters(cuts,transitions)
+    from image_lens.run_point_tracker import spatial_shape
+    resolution=spatial_shape({} if inference_resolution is None else dict(inference_resolution=inference_resolution))
     started = time.monotonic()
     def remaining():
         return max_seconds-(time.monotonic()-started)
@@ -632,10 +634,16 @@ def _run(video, detector, pose_model, checkpoint, out, max_shots=LOOK['max_shots
         base = root/f'{sid}-w{i}'
         receipt = _step('seed', ['--pose', selected_pose or pose_for(w['seed']), '--frame', w['seed'], '--job', f'{sid}-w{i}', '--length', w['end']-w['seed']+1,
                               '--out', base.with_suffix('.obs.json'), '--evidence-dir', base.with_name(base.name+'-crops')]
-                             + (['--track', actor['track_id']] if actor else []))
-        if actor:
+                             + (['--track', actor['track_id']] if actor else [])
+                             + (['--tracking-resolution','detail'] if resolution==(576,768) else []))
+        if receipt['jobs'] or actor:
             observations, _ = paths.load(base.with_suffix('.obs.json'))
-            if observations['seed_source']['track_id'] != actor['track_id']:
+            generated=observations.get('jobs')
+            if (type(generated)is not list or not generated or len(generated)!=len(receipt['jobs'])
+                    or {j['name'] for j in generated}!=set(receipt['jobs'])
+                    or any(spatial_shape(j)!=resolution for j in generated)):
+                raise ValueError('seed tracking resolution/group mismatch; no jobs queued')
+            if actor and observations['seed_source']['track_id'] != actor['track_id']:
                 raise ValueError('seed selected a different actor ID')
         return receipt
     def queue(base, receipt):
@@ -844,6 +852,7 @@ def _run(video, detector, pose_model, checkpoint, out, max_shots=LOOK['max_shots
     record = dict(schema='image-lens.look/1', source_video=str(source), source_sha256=scan['source_sha256'], params=LOOK,
                   max_shots=max_shots, scaled=scaled, onion_sheets=sheets, frame_sheets=frame_sheets, errors=errors, shots=shots,
                   joint_tracking=joint_tracking.PARAMS, **(dict(frames=list(frames)) if frames else {}), **(dict(redo=redo) if redo else {}))
+    record['inference_resolution']=list(resolution)
     record['cuts']=cuts
     record['transitions']=transitions
     if transitions:record['transition_coverage']=transition_coverage(scan,frames,max_shots)
