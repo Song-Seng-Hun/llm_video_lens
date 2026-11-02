@@ -22,7 +22,7 @@
   ],
   "manifest_self_excluded": true,
   "file_count": 182,
-  "total_bytes": 2456943,
+  "total_bytes": 2460147,
   "files": [
     {
       "path": ".gitattributes",
@@ -371,8 +371,8 @@
     },
     {
       "path": "image_lens/pose.py",
-      "bytes": 29047,
-      "sha256": "e30a7c73fee370d73556982d4231acef51dd2c6c35209cb6d5b69e7382b60ac7"
+      "bytes": 31575,
+      "sha256": "9c8e020281d2511e50e78805ef49d1a3d8a445a8ad74b53128c6168ae60a8d2b"
     },
     {
       "path": "image_lens/redo.py",
@@ -861,8 +861,8 @@
     },
     {
       "path": "tests/test_gradual_transitions.py",
-      "bytes": 16554,
-      "sha256": "a8a8ecb0ee7dc7ed93e7eff1e60ae09632da1ac4631e28dff08de96b9887027b"
+      "bytes": 16808,
+      "sha256": "75b2f10df280abd3c57df18ee8a404472628038847a2c724cd67aa064e9bb33f"
     },
     {
       "path": "tests/test_joint_tracking.py",
@@ -901,13 +901,13 @@
     },
     {
       "path": "tests/test_person_models.py",
-      "bytes": 11515,
-      "sha256": "294df3ea59b37913173c79fe08e6d3026fb2c0b6d1947e21c8916425a94c8817"
+      "bytes": 11858,
+      "sha256": "ff841292886a4f822877a5b3724640ac5fd6462d37916d3336cf0699d563ba4f"
     },
     {
       "path": "tests/test_pose.py",
-      "bytes": 14060,
-      "sha256": "abc671c247af08861f5ff486bf965e26b4520512744ed9f38275d720e77226ba"
+      "bytes": 14139,
+      "sha256": "e89f6b2aa519aa1b4b3bee8a7bb442d748cb5bbadb7aaa0e89d8f30f12d9a2fe"
     },
     {
       "path": "tests/test_redo.py",

@@ -18,6 +18,13 @@ FLAGS = dict(overlap_iou=.10, jump_diagonals=.15, min_score=.30)
 # stacked copies and that one close-up.
 SPLIT = dict(min_detection=.30, crop=.60, head_score=.45, head_gap=.35, min_eyes=.06)
 PART_FRAMES = 90  # a pose part is written at the first cut after this many frames
+# Crops of POSE_CHUNK frames go through the pose model together, POSE_BATCH at a time (the last batch padded with zeros).
+# One fixed shape keeps CoreML from recompiling: 14.4 -> 9.7 ms a crop, but opening the batch session costs ~2.2 s more,
+# so it pays from ~480 crops (kaguya look 59 -> 51 s; AI clip, 167 crops: 25 -> 26 s). Kaguya: 10 of 172,900 joints moved
+# (one 0.32-score hand point 10.6 px, the rest <= 2.5 px), 59 scores changed in the 4th decimal; boxes, IDs and splits
+# unchanged. That is batch-size numerics: padding rows change nothing. A batch fixed in the graph opens fast but moved 791 of
+# 59,584 joints.
+POSE_BATCH, POSE_CHUNK = 8, 16
 SEED = dict(min_score=.30, max_frames=160, border_px=32, uncertainty_px=(8., 24.))
 BODY = dict(nose=0, eye_l=1, eye_r=2, ear_l=3, ear_r=4, shoulder_l=5, shoulder_r=6, elbow_l=7, elbow_r=8,
             wrist_l=9, wrist_r=10, hip_l=11, hip_r=12, knee_l=13, knee_r=14, ankle_l=15, ankle_r=16)
@@ -127,16 +134,31 @@ def run(shots, detector, pose_model, start=0, end=None, part=None):
     # the same outputs). The pose session is rtmlib's 'mps' one (CoreML default options) plus the cache.
     det = person_detector(selection)
     estimator = RTMPose(str(models['pose']), model_input_size=tuple(PARAMS['pose_input']), to_openpose=False, backend='onnxruntime', device='cpu')
+    # CoreML caches by model only, so the batch shape gets its own folder.
     estimator.session = onnxruntime.InferenceSession(str(models['pose']), providers=[
-        ('CoreMLExecutionProvider', dict(ModelCacheDirectory=_coreml_cache('pose'))), 'CPUExecutionProvider'])
+        ('CoreMLExecutionProvider', dict(ModelCacheDirectory=str(Path(_coreml_cache('pose'))/f'b{POSE_BATCH}'))), 'CPUExecutionProvider'])
     # Pose on CoreML (29 -> 8 ms a crop, keypoints within 0.01).
     if estimator.session.get_providers() != ['CoreMLExecutionProvider', 'CPUExecutionProvider']:
         raise ValueError('unexpected execution provider')
     # RTMW-l 384 scores run about 6.2x the earlier RTMW 256x192 ones at every quantile (seven clips, 90k body joints), so they
     # are divided back to the 0..1 scale every score threshold was calibrated on.
-    def pose(image, bboxes):
-        k, s = estimator(image, bboxes=bboxes)
-        return k, s/PARAMS['pose_score_scale']
+    def pose(requests):
+        """[(image, boxes)] -> [(keypoints, scores)], every crop through the model in fixed batches of POSE_BATCH."""
+        crops = [estimator.preprocess(image, box) for image, boxes in requests for box in boxes]
+        out = []
+        if crops:
+            x = np.zeros((-(-len(crops)//POSE_BATCH)*POSE_BATCH, *crops[0][0].transpose(2, 0, 1).shape), np.float32)
+            for j, (c, _, _) in enumerate(crops):
+                x[j] = c.transpose(2, 0, 1)
+            name = estimator.session.get_inputs()[0].name
+            simcc = [np.concatenate(o) for o in zip(*(estimator.session.run(None, {name: x[j:j+POSE_BATCH]}) for j in range(0, len(x), POSE_BATCH)))]
+            out = [estimator.postprocess([simcc[0][j:j+1], simcc[1][j:j+1]], c, sc) for j, (_, c, sc) in enumerate(crops)]
+        posed = []
+        for _, boxes in requests:
+            mine, out = out[:len(boxes)], out[len(boxes):]
+            posed.append((np.concatenate([k for k, _ in mine]) if mine else np.empty((0, 133, 2), np.float32),
+                          np.concatenate([s for _, s in mine])/PARAMS['pose_score_scale'] if mine else np.empty((0, 133), np.float32)))
+        return posed
     segments = {n: s['segment_id'] for s in scan['analysis_segments'] for n in range(s['start_frame'], s['end_frame']+1)}
     fps = scan['fps']; frames = []; tracker = None; segment = None; parted = 0
     def packet(rows):
@@ -167,54 +189,62 @@ def run(shots, detector, pose_model, start=0, end=None, part=None):
         boxes, conf = det(image)
         diagnostics = [dict(item) for item in getattr(det, 'diagnostics', [])]
         return image, np.asarray(boxes, np.float32).reshape(-1, 4), np.asarray(conf, np.float32), diagnostics
+    def frame(n, boxes, conf, diagnostics, tries, keypoints, scores):
+        nonlocal segment, tracker, parted
+        current=segments.get(n)
+        if current is None:
+            if part and len(frames)-parted>=PART_FRAMES:
+                part(packet(frames[parted:]));parted=len(frames)
+            segment=None;tracker=None
+            frames.append(dict(frame=n,pts_seconds=scan['native_pts_seconds'][n],segment_id=None,
+                               status='excluded_transition',reason='gradual_transition_candidate',detections=0,split_boxes=0,tracks=[]))
+            return
+        if current != segment:
+            if part and len(frames)-parted >= PART_FRAMES:
+                part(packet(frames[parted:])); parted = len(frames)
+            # Track IDs never cross a detected cut.
+            segment = current
+            tracker = supervision.ByteTrack(track_activation_threshold=PARAMS['track_activation'], lost_track_buffer=PARAMS['lost_track_buffer'],
+                                            minimum_matching_threshold=PARAMS['minimum_matching_threshold'], frame_rate=round(fps),
+                                            minimum_consecutive_frames=1)
+        # A detector miss stays a miss: no box, no crop.
+        m = len(boxes)
+        if keypoints.shape != (m+2*len(tries), 133, 2) or scores.shape != (m+2*len(tries), 133):
+            raise ValueError('unexpected pose shape')
+        boxes, conf, keypoints, scores, split = _split(boxes, conf, keypoints[:m], scores[:m], [
+            (j, c, keypoints[m+2*i:m+2*i+2], scores[m+2*i:m+2*i+2]) for i, (j, c) in enumerate(tries)])
+        if not all(np.isfinite(a).all() for a in (boxes, conf, keypoints, scores)):
+            raise ValueError('nonfinite model output')
+        tracks = tracker.update_with_detections(supervision.Detections(
+            xyxy=boxes, confidence=conf, class_id=np.zeros(len(boxes), int), data=dict(keypoints=keypoints, scores=scores)))
+        frames.append(dict(frame=n, pts_seconds=scan['native_pts_seconds'][n], segment_id=segment, detections=len(boxes)-split, split_boxes=split,
+            **(dict(detector_diagnostics=diagnostics) if diagnostics else {}), tracks=[
+            dict(track_id=f'{segment}/{int(tracks.tracker_id[j])}', bbox=[round(float(v), 2) for v in tracks.xyxy[j]],
+                 detection_score=round(float(tracks.confidence[j]), 4),
+                 keypoints=[[round(float(x), 2), round(float(y), 2)] for x, y in tracks.data['keypoints'][j]],
+                 scores=[round(float(s), 4) for s in tracks.data['scores'][j]]) for j in range(len(tracks))]))
     from concurrent.futures import ThreadPoolExecutor
     cap = cv2.VideoCapture(str(video))
     try:
         if not cap.isOpened():
             raise ValueError('video decode failed')
         cap.set(cv2.CAP_PROP_POS_FRAMES, start)
-        # The next frame is decoded and detected while this one is posed (clip B: 22.9 -> 13.8 ms a frame, the same
+        # The next chunk is decoded and detected while this one is posed (clip B: 22.9 -> 13.8 ms a frame, the same
         # boxes and keypoints); frames still come in order, one read at a time.
+        def chunk(lo):
+            rows = [detected(n) for n in range(lo, min(lo+POSE_CHUNK, end+1))]
+            # Split candidates depend on the box alone, so their crops are posed with the boxes.
+            tries = [_split_crops(boxes, conf) for _, boxes, conf, _ in rows]
+            requests = [(image, np.concatenate([boxes, *(c for _, c in t)])) for (image, boxes, _, _), t in zip(rows, tries)]
+            return rows, tries, requests
         with ThreadPoolExecutor(1) as ahead:
-            following = ahead.submit(detected, start)
-            for n in range(start, end+1):
-                image, boxes, conf, diagnostics = following.result()
-                if n < end:
-                    following = ahead.submit(detected, n+1)
-                current=segments.get(n)
-                if current is None:
-                    if part and len(frames)-parted>=PART_FRAMES:
-                        part(packet(frames[parted:]));parted=len(frames)
-                    segment=None;tracker=None
-                    frames.append(dict(frame=n,pts_seconds=scan['native_pts_seconds'][n],segment_id=None,
-                                       status='excluded_transition',reason='gradual_transition_candidate',detections=0,split_boxes=0,tracks=[]))
-                    continue
-                if current != segment:
-                    if part and len(frames)-parted >= PART_FRAMES:
-                        part(packet(frames[parted:])); parted = len(frames)
-                    # Track IDs never cross a detected cut.
-                    segment = current
-                    tracker = supervision.ByteTrack(track_activation_threshold=PARAMS['track_activation'], lost_track_buffer=PARAMS['lost_track_buffer'],
-                                                    minimum_matching_threshold=PARAMS['minimum_matching_threshold'], frame_rate=round(fps),
-                                                    minimum_consecutive_frames=1)
-                # RTMPose falls back to a full-image crop for empty boxes; a detector miss stays a miss.
-                if len(boxes):
-                    keypoints, scores = pose(image, bboxes=boxes)
-                else:
-                    keypoints = np.empty((0, 133, 2), np.float32); scores = np.empty((0, 133), np.float32)
-                if keypoints.shape != (len(boxes), 133, 2) or scores.shape != (len(boxes), 133):
-                    raise ValueError('unexpected pose shape')
-                boxes, conf, keypoints, scores, split = _split(image, boxes, conf, keypoints, scores, pose)
-                if not all(np.isfinite(a).all() for a in (boxes, conf, keypoints, scores)):
-                    raise ValueError('nonfinite model output')
-                tracks = tracker.update_with_detections(supervision.Detections(
-                    xyxy=boxes, confidence=conf, class_id=np.zeros(len(boxes), int), data=dict(keypoints=keypoints, scores=scores)))
-                frames.append(dict(frame=n, pts_seconds=scan['native_pts_seconds'][n], segment_id=segment, detections=len(boxes)-split, split_boxes=split,
-                    **(dict(detector_diagnostics=diagnostics) if diagnostics else {}), tracks=[
-                    dict(track_id=f'{segment}/{int(tracks.tracker_id[j])}', bbox=[round(float(v), 2) for v in tracks.xyxy[j]],
-                         detection_score=round(float(tracks.confidence[j]), 4),
-                         keypoints=[[round(float(x), 2), round(float(y), 2)] for x, y in tracks.data['keypoints'][j]],
-                         scores=[round(float(s), 4) for s in tracks.data['scores'][j]]) for j in range(len(tracks))]))
+            following = ahead.submit(chunk, start)
+            for lo in range(start, end+1, POSE_CHUNK):
+                rows, tries, requests = following.result()
+                if lo+POSE_CHUNK <= end:
+                    following = ahead.submit(chunk, lo+POSE_CHUNK)
+                for n, (_, boxes, conf, diagnostics), t, (keypoints, scores) in zip(range(lo, end+1), rows, tries, pose(requests)):
+                    frame(n, boxes, conf, diagnostics, t, keypoints, scores)
     finally:
         cap.release()
     if part and parted:
@@ -222,16 +252,22 @@ def run(shots, detector, pose_model, start=0, end=None, part=None):
     return packet(frames)
 
 
-def _split(image, boxes, conf, keypoints, scores, pose):
-    """Replace each merged two-person box by its left and right crops; returns the arrays and how many boxes were split."""
+def _split_crops(boxes, conf):
+    """[(box index, its left and right crops)] for every box that may hold two people pressed together."""
+    import numpy as np
+    return [(j, np.array([[x0, y0, x0+SPLIT['crop']*(x1-x0), y1], [x1-SPLIT['crop']*(x1-x0), y0, x1, y1]], np.float32))
+            for j, (x0, y0, x1, y1) in enumerate(boxes) if conf[j] >= SPLIT['min_detection'] and x1-x0 > y1-y0]
+
+
+def _split(boxes, conf, keypoints, scores, tries):
+    """Replace each merged two-person box by its posed left and right crops; returns the arrays and how many boxes were split."""
     import numpy as np
     head = [BODY['nose'], BODY['eye_l'], BODY['eye_r']]
-    out = []; split = 0
+    out = []; split = 0; tries = {j: (c, k, s) for j, c, k, s in tries}
     for j, (x0, y0, x1, y1) in enumerate(boxes):
         w = x1-x0
-        if conf[j] >= SPLIT['min_detection'] and w > y1-y0:
-            crops = np.array([[x0, y0, x0+SPLIT['crop']*w, y1], [x1-SPLIT['crop']*w, y0, x1, y1]], np.float32)
-            k, s = pose(image, bboxes=crops)
+        if j in tries:
+            crops, k, s = tries[j]
             if (k.shape == (2, 133, 2) and min(s[0][head].min(), s[1][head].min()) >= SPLIT['head_score']
                     and k[1][BODY['nose']][0]-k[0][BODY['nose']][0] >= SPLIT['head_gap']*w
                     and min(math.dist(k[i][BODY['eye_l']], k[i][BODY['eye_r']]) for i in (0, 1)) >= SPLIT['min_eyes']*w):
