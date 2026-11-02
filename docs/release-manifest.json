@@ -1,6 +1,6 @@
 {
   "schema": "image-lens.source-release/1",
-  "date_kst": "2026-11-02",
+  "date_kst": "2026-11-03",
   "source_only": true,
   "authored_code_license": "MIT (LICENSE); vendored code keeps its own terms",
   "vendor_licenses": {
@@ -22,7 +22,7 @@
   ],
   "manifest_self_excluded": true,
   "file_count": 186,
-  "total_bytes": 2488975,
+  "total_bytes": 2492082,
   "files": [
     {
       "path": ".gitattributes",
@@ -96,8 +96,8 @@
     },
     {
       "path": "docs/look-notes.md",
-      "bytes": 93594,
-      "sha256": "1dc68756cbbed2a3124161a56bf3b43e28174b38623344bc0838ec1d9a54a7f4"
+      "bytes": 95433,
+      "sha256": "c6d198673f1520718e1a7a07f1a87110b6c72e9bf928f205e8ecfeaf989aab03"
     },
     {
       "path": "docs/person-detectors.md",
@@ -266,8 +266,8 @@
     },
     {
       "path": "image_lens/camera.py",
-      "bytes": 19956,
-      "sha256": "55d0433f55983acf0fd2df9f331b89ce0de9acc46f3b4078437fb8b6186c3002"
+      "bytes": 19567,
+      "sha256": "fa0f74a0a2a145fe2c2448a9c423726c81d2c52f0d4aebab1bd4b6fca0779e86"
     },
     {
       "path": "image_lens/check.py",
@@ -846,8 +846,8 @@
     },
     {
       "path": "tests/test_check.py",
-      "bytes": 17793,
-      "sha256": "9d92ca1781a247451cf7836ed6b053ec9cf5760e91555aa16d614d687d99eed3"
+      "bytes": 19450,
+      "sha256": "8c3da1318950a903f64c850397b6285a2c5024f137a88955b7498b69a093f1e6"
     },
     {
       "path": "tests/test_check_examples.py",
