@@ -5,7 +5,7 @@ from pathlib import Path
 import sys
 from image_lens import paths
 
-COMMANDS = ('look', 'scan', 'compare', 'brief', 'catalog', 'pose', 'seed', 'bind', 'prepare', 'validate', 'track', 'analyze', 'grid', 'mark', 'box', 'redo', 'focus', 'zoom', 'at')
+COMMANDS = ('look', 'scan', 'compare', 'brief', 'catalog', 'pose', 'seed', 'bind', 'prepare', 'validate', 'track', 'analyze', 'grid', 'mark', 'box', 'redo', 'focus', 'zoom', 'crowd', 'at')
 
 
 def parser(command, description):
@@ -189,6 +189,14 @@ def dispatch(command, arguments):
         ap.add_argument('--even', action='store_true', help='control: 24 frames spread evenly over the clip, as many as two full --at spans')
         a = ap.parse_args(arguments)
         return zoom.run(a.video, a.out, a.at, a.even)
+    if command == 'crowd':
+        from image_lens import crowd
+        ap = parser(command, 'Before look: the frames with the most detected people, boxes numbered, to choose look --max-people by eye.')
+        ap.add_argument('--video', required=True); ap.add_argument('--detector', help='default: models.json')
+        ap.add_argument('--every', type=float, default=crowd.CROWD['every_s'], help='seconds between checked frames, 0.1..5')
+        ap.add_argument('--out', required=True, help='new output directory')
+        a = models(ap.parse_args(arguments), 'detector')
+        return crowd.run(a.video, a.detector, a.out, a.every)
     if command == 'at':
         from image_lens import check
         ap = parser(command, 'Everything a look run has on one span the reader asks about, with dense frames of the span.')
