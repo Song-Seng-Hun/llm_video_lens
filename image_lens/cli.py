@@ -8,8 +8,35 @@ from image_lens import paths
 COMMANDS = ('look', 'scan', 'compare', 'brief', 'catalog', 'pose', 'seed', 'bind', 'prepare', 'validate', 'track', 'analyze', 'grid', 'mark', 'box', 'redo', 'focus', 'zoom', 'crowd', 'at')
 
 
-def parser(command, description):
-    return argparse.ArgumentParser(prog='image-lens '+command, description=description)
+WORKFLOW = """reading a clip, in this order:
+  1. crowd --video clip.mp4 --out crowd-clip
+     open crowd.jpg and count the people yourself (the box count is rough)
+  2. look --video clip.mp4 --out look-clip --max-people N
+  3. before any text or JSON numbers, open look-clip/onion-sheet-N.jpg: in each window, is the trail of
+     every point named in the spacing chart (elbow-l, move-b, ...) on that body part? A trail on the
+     background, another part or another person means that point slipped: drop its lines and JSON
+     numbers for that window and read them as unknown.
+  4. read look.md, then look.json / *.report.json for the points that passed step 3.
+  5. questions about one span: at --look look-clip --span 18-22; one shot in full: focus.
+
+commands: crowd (people count by eye), look (whole clip), at / focus / zoom (second reads),
+  box / mark / grid (re-track a box or hand-placed points), redo (another detector for one window),
+  scan / brief / catalog / compare (cuts and frames, no models), pose / seed / bind / prepare /
+  validate / track / analyze (look's steps one by one).
+'image-lens <command> --help' shows each command's options. Full guide: docs/guide.md."""
+
+LOOK_READING = """read the output in this order:
+  1. onion-sheet-N.jpg first: in each window, check that every point named in the spacing chart
+     (elbow-l, move-b, ...) has its trail on that body part. A trail on the background, another part
+     or another person means that point slipped: drop its lines and JSON numbers for that window.
+  2. look.md ("먼저 확인할 곳" spans have check-sheet-N.jpg), then frame-sheet-N.jpg.
+  3. look.json and *.report.json only for points that passed step 1.
+Several people may appear? Run crowd first and choose --max-people by eye."""
+
+
+def parser(command, description, epilog=None):
+    return argparse.ArgumentParser(prog='image-lens '+command, description=description, epilog=epilog,
+                                   formatter_class=argparse.RawDescriptionHelpFormatter)
 
 
 def models(a, *names):
@@ -206,7 +233,7 @@ def dispatch(command, arguments):
         return check.at(a.look, a.span, a.out)
     if command == 'look':
         from image_lens import look
-        ap = parser(command, 'One-command look: scan, pose, pose-seeded tracking per shot window, one short look.md.')
+        ap = parser(command, 'One-command look: scan, pose, pose-seeded tracking per shot window, one short look.md.', LOOK_READING)
         ap.add_argument('--video', required=True); ap.add_argument('--detector', help='default: models.json')
         ap.add_argument('--pose-model', help='default: models.json'); ap.add_argument('--checkpoint', help='default: models.json')
         ap.add_argument('--out', required=True, help='new output directory inside the workspace')
@@ -346,7 +373,8 @@ def finish_track(reply):
 
 
 def main(argv=None):
-    ap = argparse.ArgumentParser(prog='image-lens', description='Source-bound video inspection and compact LLM shot briefs. Default zero images. Optional tracking is experimental.')
+    ap = argparse.ArgumentParser(prog='image-lens', description='Source-bound video inspection and compact LLM shot briefs. Default zero images. Optional tracking is experimental.',
+                                 epilog=WORKFLOW, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument('--workspace', help='explicit data/output boundary; default repository/workspace')
     ap.add_argument('command', choices=COMMANDS)
     ap.add_argument('arguments', nargs=argparse.REMAINDER)

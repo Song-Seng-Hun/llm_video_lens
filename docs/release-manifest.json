@@ -21,7 +21,7 @@
   ],
   "manifest_self_excluded": true,
   "file_count": 170,
-  "total_bytes": 2302587,
+  "total_bytes": 2307783,
   "files": [
     {
       "path": ".gitattributes",
@@ -75,8 +75,8 @@
     },
     {
       "path": "docs/guide.md",
-      "bytes": 20252,
-      "sha256": "f57fdd60c8e6958589dfda45c80b903525a1070ce5f28e85f27742df4533d989"
+      "bytes": 21086,
+      "sha256": "11e8de4f981a7d1d91fe6570a8000e36b1a2a257ec45d2db0f93ad63dcd25dbf"
     },
     {
       "path": "docs/import-provenance.json",
@@ -270,8 +270,8 @@
     },
     {
       "path": "image_lens/cli.py",
-      "bytes": 24136,
-      "sha256": "4bd7722bac2d341b8e0d14790bf2a2109241e6b76e96a87199c44bfa4b56622c"
+      "bytes": 26148,
+      "sha256": "fb1f8e4ecc125a4e3c2709dfb3bea422539071ac3877d283375bec75ca980c18"
     },
     {
       "path": "image_lens/crowd.py",
@@ -280,8 +280,8 @@
     },
     {
       "path": "image_lens/digest.py",
-      "bytes": 38939,
-      "sha256": "3e7b4f8c185bca4c41bf6a257f136a8364c932a9d50badb94c2a0e8ed9b589f0"
+      "bytes": 39740,
+      "sha256": "b007073f981e274b1b9b7603bdd1308e3f827aa41a7f99bf5fc572e50bac7aa1"
     },
     {
       "path": "image_lens/foreground_regions.py",
@@ -790,8 +790,8 @@
     },
     {
       "path": "tests/test_check.py",
-      "bytes": 16244,
-      "sha256": "7e10a6b974784b8b89530fa1fe600fbe46564e7704dfc1799ad14dc5f262cc93"
+      "bytes": 17793,
+      "sha256": "9d92ca1781a247451cf7836ed6b053ec9cf5760e91555aa16d614d687d99eed3"
     },
     {
       "path": "tests/test_contracts.py",
