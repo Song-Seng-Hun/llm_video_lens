@@ -4,6 +4,7 @@ from pathlib import Path
 import subprocess
 import sys
 import tempfile
+import types
 import unittest
 from unittest import mock
 
@@ -163,15 +164,18 @@ class DetectorBound(unittest.TestCase):
                 return True, image
             def get(self, prop): return self.index if prop == cv2.CAP_PROP_POS_FRAMES else (self.index-1)*40.
             def release(self): pass
-        def estimate(image, bboxes):
+        def crop(image, bbox):
             if image[0, 0, 0] == 0:
                 self.assertTrue(ready.wait(2), 'second detection must overwrite mutable state before first frame is consumed')
-            return np.zeros((len(bboxes), 133, 2), np.float32), np.zeros((len(bboxes), 133), np.float32)
+            return np.zeros((2, 2, 3)), None, None
         scan = dict(scan_scope='full_source', source_video='/private/tmp/synthetic.bin', source_sha256='hash',
                     source_frame_count=2, width=8, height=8, fps=25., native_pts_seconds=[0., .04],
                     analysis_segments=[dict(segment_id='shot-0000', start_frame=0, end_frame=1)])
-        estimator = mock.Mock(side_effect=estimate)
-        session = mock.Mock(get_providers=mock.Mock(return_value=['CoreMLExecutionProvider', 'CPUExecutionProvider']))
+        estimator = mock.Mock(preprocess=mock.Mock(side_effect=crop),
+                              postprocess=mock.Mock(return_value=(np.zeros((1, 133, 2), np.float32), np.zeros((1, 133), np.float32))))
+        session = mock.Mock(get_providers=mock.Mock(return_value=['CoreMLExecutionProvider', 'CPUExecutionProvider']),
+                            get_inputs=mock.Mock(return_value=[types.SimpleNamespace(name='x')]),
+                            run=mock.Mock(side_effect=lambda names, feed: [np.zeros((len(feed['x']), 1)), np.zeros((len(feed['x']), 1))]))
         tracker = mock.Mock(update_with_detections=mock.Mock(return_value=supervision.Detections.empty()))
         with mock.patch.object(pose.paths, 'load', return_value=(scan, Path('/private/tmp/shots.json'))), \
              mock.patch.object(pose.shot_boundaries, 'validate'), \

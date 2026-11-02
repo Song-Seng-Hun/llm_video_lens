@@ -30,7 +30,8 @@ class Split(unittest.TestCase):
                 k[i, pose.BODY['nose']] = (x, 200); k[i, pose.BODY['eye_l']] = (x+eyes/2, 180); k[i, pose.BODY['eye_r']] = (x-eyes/2, 180)
             return k, s
         boxes = np.array([box], np.float32); conf = np.array([.85], np.float32)
-        return pose._split(None, boxes, conf, np.zeros((1, 133, 2), np.float32), np.zeros((1, 133), np.float32), fake)
+        tries = [(j, c, *fake(None, c)) for j, c in pose._split_crops(boxes, conf)]
+        return pose._split(boxes, conf, np.zeros((1, 133, 2), np.float32), np.zeros((1, 133), np.float32), tries)
 
     def test_two_far_heads_split_the_box(self):
         boxes, conf, _, _, split = self.run_split([(200, 100), (800, 100)])

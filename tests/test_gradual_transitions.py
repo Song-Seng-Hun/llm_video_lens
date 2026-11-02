@@ -137,8 +137,9 @@ class Intervals(unittest.TestCase):
                         detected.append(int(image[0,0,0]));return np.array([[1,1,2,6]],np.float32),np.array([.9],np.float32)
                 class Estimator:
                     session=None
-                    def __call__(self,image,bboxes):
-                        estimated.append(int(image[0,0,0]));return np.zeros((len(bboxes),133,2),np.float32),np.zeros((len(bboxes),133),np.float32)
+                    def preprocess(self,image,bbox):
+                        estimated.append(int(image[0,0,0]));return np.zeros((2,2,3)),None,None
+                    def postprocess(self,outputs,center,scale):return np.zeros((1,133,2),np.float32),np.zeros((1,133),np.float32)
                 class Detections:
                     def __init__(self,**kwargs):self.__dict__.update(kwargs)
                     def __len__(self):return len(self.xyxy)
@@ -153,7 +154,8 @@ class Intervals(unittest.TestCase):
                         image=np.full((48,64,3),self.index,np.uint8);self.index+=1;return True,image
                     def get(self,prop):return self.index if prop==cv2.CAP_PROP_POS_FRAMES else (self.index-1)*1000/24
                     def release(self):pass
-                session=types.SimpleNamespace(get_providers=lambda:['CoreMLExecutionProvider','CPUExecutionProvider'])
+                session=types.SimpleNamespace(get_providers=lambda:['CoreMLExecutionProvider','CPUExecutionProvider'],get_inputs=lambda:[types.SimpleNamespace(name='x')],
+                                         run=lambda names,feed:[np.zeros((len(feed['x']),1)),np.zeros((len(feed['x']),1))])
                 modules={'onnxruntime':types.SimpleNamespace(__version__='fake',InferenceSession=lambda *a,**k:session),
                          'rtmlib':types.SimpleNamespace(RTMPose=lambda *a,**k:Estimator()),
                          'supervision':types.SimpleNamespace(__version__='fake',ByteTrack=Tracker,Detections=Detections)}
