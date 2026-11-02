@@ -22,7 +22,7 @@
   ],
   "manifest_self_excluded": true,
   "file_count": 187,
-  "total_bytes": 2432989,
+  "total_bytes": 2432993,
   "files": [
     {
       "path": ".gitattributes",
@@ -41,8 +41,8 @@
     },
     {
       "path": "README.md",
-      "bytes": 19937,
-      "sha256": "496ba9faa45a08dcb8dd0321be7658c11be1015a217fa57ecf6d0a442e703cd2"
+      "bytes": 19941,
+      "sha256": "cf863a6b4ca6c971aa12810fc85f4dbd3114e3d34764d7e0b4154791f3e56462"
     },
     {
       "path": "assets/banner-dark.svg",
