@@ -32,6 +32,16 @@ Local-only evidence is saved under Git-ignored `workspace/final-smoke/smoke-resu
 
 Syntax was checked by AST parsing without writing bytecode. Test discovery ran the full 19 checks.
 
+## README examples (local check before merging)
+
+Unit tests do not run the models on real footage: #83 passed them and still read the Live2D clip's static camera as a 3° rotation. Before merging a change to camera, pose, tracking or the motion text, run look on the two README clips and compare with what the README says:
+
+```sh
+python tools/check_examples.py --workspace W --video dancer=W/dancer-0-20.mp4 --video live2d=W/mao-sweep2.mp4
+```
+
+The clips are not in the repository (see [provenance](provenance.md#readme-example-images)); the script checks their SHA-256. It prints each README piece that look no longer writes and exits 1. A deliberate change updates the README, its picture and `EXAMPLES` in the script together. `--look name=DIR` checks an existing look folder instead of running look.
+
 ## Unverified boundaries
 
 Actual CoTracker inference, inference numerical behavior and model quality were not run. The hard watchdog was tested on a sleeping process, not a model. Windows core execution, optional tracking on non-POSIX systems, installed-wheel runtime, and broad real-world detector/foreground robustness remain unverified. Optional tracking is experimental and explicitly refuses a non-POSIX parent watchdog. No performance/pose/action/easing accuracy improvement is claimed. Source-consistency status does not independently verify cut accuracy or semantic identity.

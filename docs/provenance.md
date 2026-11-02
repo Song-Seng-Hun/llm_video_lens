@@ -30,3 +30,5 @@ Source videos, generated crops/contacts (except the README examples below), mode
 
 `assets/example-live2d-onion.jpg` is a `look` onion picture of a 1.5 s clip of the Live2D Inc. sample model "Mao", used under the Live2D Free Material License Agreement (https://www.live2d.com/eula/live2d-free-material-license-agreement_en.html). The clip was animated locally with the Live2D Cubism SDK for Web (Cubism Core) and pixi-live2d-display; the model files, the SDK and the clip are not in the repository and must not be redistributed from it.
 This content uses sample data owned and copyrighted by Live2D Inc.
+
+`tools/check_examples.py` identifies the local copies of the two clips by SHA-256: dancer (0–20 s, 1280×674) `cfd7de8fd37b5668876f3eb846b8b8d8a17a71dfbb508c0a03345b87775831c2`, Live2D `mao-sweep2.mp4` `4a62d052cb2a55250f409c01d5460e23845f86e4725e6c6fb10d150310f1aced`.
