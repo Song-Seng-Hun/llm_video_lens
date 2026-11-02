@@ -142,17 +142,22 @@ def run(shots, detector, pose_model, start=0, end=None, part=None):
         raise ValueError('unexpected execution provider')
     # RTMW-l 384 scores run about 6.2x the earlier RTMW 256x192 ones at every quantile (seven clips, 90k body joints), so they
     # are divided back to the 0..1 scale every score threshold was calibrated on.
-    def pose(requests):
-        """[(image, boxes)] -> [(keypoints, scores)], every crop through the model in fixed batches of POSE_BATCH."""
+    def crops(requests):
+        """Model input for every box of [(image, boxes)], padded to whole batches of POSE_BATCH, and each crop's (center, scale)."""
         crops = [estimator.preprocess(image, box) for image, boxes in requests for box in boxes]
+        if not crops:
+            return None, []
+        x = np.zeros((-(-len(crops)//POSE_BATCH)*POSE_BATCH, *crops[0][0].transpose(2, 0, 1).shape), np.float32)
+        for j, (c, _, _) in enumerate(crops):
+            x[j] = c.transpose(2, 0, 1)
+        return x, [(c, sc) for _, c, sc in crops]
+    def pose(requests, x, places):
+        """[(keypoints, scores)] for each of [(image, boxes)], from crops() output, through the model in fixed batches."""
         out = []
-        if crops:
-            x = np.zeros((-(-len(crops)//POSE_BATCH)*POSE_BATCH, *crops[0][0].transpose(2, 0, 1).shape), np.float32)
-            for j, (c, _, _) in enumerate(crops):
-                x[j] = c.transpose(2, 0, 1)
+        if places:
             name = estimator.session.get_inputs()[0].name
             simcc = [np.concatenate(o) for o in zip(*(estimator.session.run(None, {name: x[j:j+POSE_BATCH]}) for j in range(0, len(x), POSE_BATCH)))]
-            out = [estimator.postprocess([simcc[0][j:j+1], simcc[1][j:j+1]], c, sc) for j, (_, c, sc) in enumerate(crops)]
+            out = [estimator.postprocess([simcc[0][j:j+1], simcc[1][j:j+1]], c, sc) for j, (c, sc) in enumerate(places)]
         posed = []
         for _, boxes in requests:
             mine, out = out[:len(boxes)], out[len(boxes):]
@@ -236,14 +241,15 @@ def run(shots, detector, pose_model, start=0, end=None, part=None):
             # Split candidates depend on the box alone, so their crops are posed with the boxes.
             tries = [_split_crops(boxes, conf) for _, boxes, conf, _ in rows]
             requests = [(image, np.concatenate([boxes, *(c for _, c in t)])) for (image, boxes, _, _), t in zip(rows, tries)]
-            return rows, tries, requests
+            # Cropping here too keeps 1.1 ms a crop off the model's path (kaguya: ~3 s).
+            return rows, tries, requests, *crops(requests)
         with ThreadPoolExecutor(1) as ahead:
             following = ahead.submit(chunk, start)
             for lo in range(start, end+1, POSE_CHUNK):
-                rows, tries, requests = following.result()
+                rows, tries, requests, x, places = following.result()
                 if lo+POSE_CHUNK <= end:
                     following = ahead.submit(chunk, lo+POSE_CHUNK)
-                for n, (_, boxes, conf, diagnostics), t, (keypoints, scores) in zip(range(lo, end+1), rows, tries, pose(requests)):
+                for n, (_, boxes, conf, diagnostics), t, (keypoints, scores) in zip(range(lo, end+1), rows, tries, pose(requests, x, places)):
                     frame(n, boxes, conf, diagnostics, t, keypoints, scores)
     finally:
         cap.release()
