@@ -42,6 +42,8 @@ Every shot retains its fresh-source-observation/retracking obligation. A single-
 
 `scan --cuts thorough` and `look --cuts thorough` add fixed AutoShot candidates to the existing adaptive detector. The default is `--cuts fast`. Thorough uses the sorted union: it never removes an adaptive cut, merges a short shot or tracks across an added boundary. `redo` inherits the recorded cut mode. A thorough scan requires the complete source; partial `scan --start/--end` requests are refused before model loading or download. Both components see the same actual analysis video after any explicit region selection or resizing.
 
+Thorough decodes through FFmpeg with 4 threads; fast uses OpenCV's default backend. Their adaptive boundaries matched on the tested Mac. Equivalence to a separately produced fast scan is unverified on hosts whose default decoder differs; the union retains every adaptive cut from its own decode.
+
 ```sh
 # Install optional dependencies yourself in your environment.
 python -m pip install '.[core,cuts]'
@@ -50,6 +52,8 @@ python -m image_lens --workspace W look --video clip.mp4 --cuts thorough --out l
 ```
 
 Only an explicitly requested thorough scan imports Torch and may download a model. First use fetches 57,243,097 bytes into `W/models/autoshot/` from the pinned third-party Hugging Face mirror `backseollgi/AutoShot` revision `9dbc41acb14de0dc32509f7c7d0a9876a6f44105`. The expected SHA-256 is `3e85290546ce6d32f4a3581ec2cae87aedd2402246a0d46b4d361a330b4b1fa6`; size and hash are checked before publication. Model bytes are not bundled or committed. The vendored source has its MIT notice; equivalence of this checkpoint to the author's original distribution and checkpoint-specific license terms remain unverified. Missing optional dependencies, corrupt assets, failed downloads and timeouts are errors; none silently switches to fast or installs packages. Fast scans and cached readers do not download or import Torch.
+
+A killed process can leave `W/models/autoshot/ckpt_0_200_0.pth.partial`, which later runs refuse to overwrite. Recovery is manual after confirming that no download is active.
 
 This is additional boundary evidence, not a calibrated semantic edit classifier. AutoShot can miss abrupt pose/outfit replacements within a stable layout, so it must not veto the adaptive detector. Existing false cuts remain, and AutoShot can add false cuts on other inputs. More cuts may consume `look`'s default 16-shot cap earlier. Choose `--max-shots` explicitly for the needed coverage (maximum 256); the default cap is unchanged. A scan's last selected segment is only planned coverage, not proof of successful pose/tracking.
 

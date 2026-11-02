@@ -22,7 +22,7 @@
   ],
   "manifest_self_excluded": true,
   "file_count": 180,
-  "total_bytes": 2400630,
+  "total_bytes": 2401103,
   "files": [
     {
       "path": ".gitattributes",
@@ -76,8 +76,8 @@
     },
     {
       "path": "docs/guide.md",
-      "bytes": 27250,
-      "sha256": "d237d19fa34cf86b9e240b4e2ab9b5d9117122a35655e0315b7275ba5e18c465"
+      "bytes": 27723,
+      "sha256": "d5dfacde595d77551e3c0a3e5d7cd75155909462891df843609c9c6e9456f880"
     },
     {
       "path": "docs/import-provenance.json",
