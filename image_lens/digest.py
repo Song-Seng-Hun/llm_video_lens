@@ -429,9 +429,9 @@ def skipped_line(item):
 
 def transition_line(coverage):
     rows=coverage['intervals']
-    times=', '.join(f"f{r['frames'][0]}..{r['frames'][1]} ({r['seconds'][0]:.6f}..{r['seconds'][1]:.6f}s)" for r in rows[:8])
+    times=', '.join(f"f{r['frames'][0]}..{r['frames'][1]} ({r['seconds'][0]:.2f}..{r['seconds'][1]:.2f}s)" for r in rows[:8])
     if len(rows)>8:times+=f", 이후 {len(rows)-8}개"
-    return f"전환 후보: {len(rows)}개 / {coverage['excluded_frames']}프레임"+(f" / {times}" if times else '')+" / 이 구간의 움직임은 미분석"
+    return f"전환 후보: {len(rows)}개 / {coverage['excluded_frames']}/{coverage['total_frames']}프레임 제외"+(f" / {times}" if times else '')+" / 이 구간의 움직임은 미분석"
 
 
 def markdown(record, scan, full_name):

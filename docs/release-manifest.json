@@ -22,7 +22,7 @@
   ],
   "manifest_self_excluded": true,
   "file_count": 182,
-  "total_bytes": 2439026,
+  "total_bytes": 2439161,
   "files": [
     {
       "path": ".gitattributes",
@@ -291,8 +291,8 @@
     },
     {
       "path": "image_lens/digest.py",
-      "bytes": 40646,
-      "sha256": "c7b4a1e266a3961cbc0d5f81500e8f2bed2c9e4d6a51d7a71fda6d896f105e6a"
+      "bytes": 40680,
+      "sha256": "fca160fd4ad9fdb40f9b7c6ca2890588e6a7b1d23c81288074b843c36a7de36c"
     },
     {
       "path": "image_lens/foreground_regions.py",
@@ -861,8 +861,8 @@
     },
     {
       "path": "tests/test_gradual_transitions.py",
-      "bytes": 16454,
-      "sha256": "9c910fc6e0456886c647f1aa88ca1b661b4dd6595254936b7d441a3ee213c635"
+      "bytes": 16555,
+      "sha256": "bd23b2f83c98c474e98f5214006bddd03886245679a1ecd294b38ab492f29578"
     },
     {
       "path": "tests/test_joint_tracking.py",

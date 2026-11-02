@@ -187,6 +187,7 @@ class Intervals(unittest.TestCase):
         self.assertEqual(coverage['excluded_frames']+coverage['selected_safe_frames']+coverage['cap_omitted_safe_frames'],20)
         self.assertEqual(coverage['selected_safe_segments'],1);self.assertEqual(coverage['cap_omitted_safe_segments'],2)
         self.assertIn('이 구간의 움직임은 미분석',digest.transition_line(coverage))
+        self.assertIn('3/20프레임 제외 / f4..6 (0.17..0.25s)',digest.transition_line(coverage))
         for action in (lambda:mark.run(self.video,self.root/'shots.json',4,['p=1,1'],'fake',self.root/'m'),
                        lambda:box.run(self.video,self.root,4,'0,0,32,32','fake',self.root/'b')):
             with patch.object(mark,'_frame') as frame,patch.object(box,'corners') as corners:
