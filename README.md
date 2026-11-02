@@ -52,6 +52,16 @@ LLM Video Lens는 이를 돕는 보조 도구입니다. 프레임 사이의 움�
 
 5. 결과 폴더의 `look.md`를 엽니다. 맨 위 "먼저 확인할 곳"부터 보세요.
 
+### 필요한 메모리와 걸리는 시간
+
+Apple M4 Max(메모리 64GB)에서 잰 값입니다. 다른 기기, 특히 메모리 8GB·16GB Mac에서는 아직 재 보지 않았습니다.
+
+- 메모리: 기본 `look`은 약 2GB, `--cuts thorough`는 약 3.5GB, SAM3 검출기를 쓰면 약 5GB까지 씁니다.
+- 시간: 사람이 계속 움직이는 20초 영상이 약 1분 20초 걸립니다. 대부분은 점 추적이 차지합니다(움직이는 1~2초 구간 하나에 약 4초). 자세 추정은 프레임당 20~27ms, SAM3 검출기를 쓰면 프레임당 약 0.7초입니다.
+- 디스크: 기본 모델 세 개가 0.4GB이고, SAM3 묶음을 쓰면 3.4GB가 더 필요합니다.
+
+잰 방법과 단계별 숫자는 [메모리와 시간](docs/performance.md)에 있습니다.
+
 ## 사용 예
 
 ### 영상 하나를 요약해서 읽기
@@ -182,5 +192,6 @@ AI 에이전트가 이 도구를 바로 쓰도록 [`skills/`](skills/) 폴더에
 - [전체 안내](docs/guide.md): 모든 명령과 옵션, `look.md` 읽는 법 전체, 결과 파일 목록, brief 형식, 작업(job)과 추적, 자세 초기값(seed)
 - [LAN API](lan/README.md): 같은 네트워크의 다른 PC(Windows 등)에서 이 Mac의 `look`과 `at`을 쓰게 해 주는 서버와 클라이언트
 - [look 노트](docs/look-notes.md): `look`의 기준값과 그 근거가 된 확인 기록
+- [메모리와 시간](docs/performance.md): 측정 기기, 단계별 시간, 메모리 최고치
 - [한계](docs/limitations.md) · [검증](docs/verification.md) · [출처와 라이선스](docs/provenance.md) · [작업 명세](docs/jobs.md)
 - 테스트 실행: `python -B -m unittest discover -s tests -v`

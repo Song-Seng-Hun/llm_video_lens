@@ -50,6 +50,16 @@ Give it one video with people or characters in it, and for each shot (cut) it wr
 
 5. Open `look.md` in the output folder. Start with "먼저 확인할 곳" at the top.
 
+### Memory and time
+
+Measured on an Apple M4 Max with 64 GB of memory. Other machines, notably 8 GB and 16 GB Macs, have not been measured yet.
+
+- Memory: a default `look` uses about 2 GB, `--cuts thorough` about 3.5 GB, and the SAM3 detector up to about 5 GB.
+- Time: a 20 s clip of a person moving throughout takes about 1 min 20 s. Most of it is point tracking (about 4 s per moving span of 1–2 s). Pose takes 20–27 ms per frame, about 0.7 s per frame with the SAM3 detector.
+- Disk: the three default models take 0.4 GB; the SAM3 bundle needs 3.4 GB more.
+
+How it was measured, and the numbers per step: [Memory and time](performance.md).
+
 ## Examples
 
 ### Summarize a video and read it
@@ -178,5 +188,6 @@ Install by copying the whole folder: `~/.claude/skills/` (or a project's `.claud
 - [Full guide](guide.md): every command and option, the full way to read `look.md`, output files, the brief format, jobs and tracking, pose seeds
 - [LAN API](../lan/README.md): a server and client for running this Mac's `look` and `at` from another PC on the home LAN
 - [look notes](look-notes.md): `look`'s limits and the checks behind them
+- [Memory and time](performance.md): the machine measured, time per step, peak memory
 - [Limitations](limitations.md) · [Verification](verification.md) · [Provenance and licenses](provenance.md) · [Job contract](jobs.md)
 - Run the tests: `python -B -m unittest discover -s tests -v`
