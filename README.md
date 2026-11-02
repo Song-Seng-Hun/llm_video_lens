@@ -166,6 +166,15 @@ python -m image_lens --workspace W redo --look W/look --window shot-0000-w0 --de
 - CoTracker 소스와 체크포인트는 비상업적 이용만 허용됩니다. SAM3는 SAM License를 따르며, 연구에 쓰면 SAM3를 밝혀야 합니다.
 - 모델 가중치는 저장소에 들어 있지 않습니다. SAM3 가중치는 올린 곳(mlx-community)에 apache-2.0으로 적혀 있지만, 원본(facebook/sam3)의 SAM License를 따릅니다.
 
+## 에이전트용 스킬
+
+AI 에이전트가 이 도구를 바로 쓰도록 [`skills/`](skills/) 폴더에 스킬(Agent Skills 형식의 `SKILL.md`)을 함께 둡니다.
+
+- [`llm-video-lens`](skills/llm-video-lens/SKILL.md): 이 Mac에서 직접 `look`·`at`·`box`·`redo` 등을 돌리고 결과를 읽는 순서와 주의점
+- [`image-lens-remote`](skills/image-lens-remote/SKILL.md): 같은 네트워크의 Windows PC에서 [LAN API](lan/README.md)로 쓰기
+
+폴더를 통째로 복사해 설치합니다. Claude Code는 `~/.claude/skills/`(또는 프로젝트의 `.claude/skills/`), Codex는 `~/.codex/skills/`에 둡니다.
+
 ## 더 보기
 
 상세 문서는 영어로 작성되어 있습니다.

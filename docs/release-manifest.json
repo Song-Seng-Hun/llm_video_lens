@@ -21,8 +21,8 @@
     "historical experiment outputs"
   ],
   "manifest_self_excluded": true,
-  "file_count": 182,
-  "total_bytes": 2470329,
+  "file_count": 184,
+  "total_bytes": 2481026,
   "files": [
     {
       "path": ".gitattributes",
@@ -41,8 +41,8 @@
     },
     {
       "path": "README.md",
-      "bytes": 18422,
-      "sha256": "8fa69f86340280b3aa60750fba99ef487b933dfc8377e04ee45220ae62d86b22"
+      "bytes": 19055,
+      "sha256": "e7688b631a2d3cf0542d1e4e5befcf8b2f7c42b5b8278f897ccaba367724e511"
     },
     {
       "path": "assets/banner-dark.svg",
@@ -66,13 +66,13 @@
     },
     {
       "path": "docs/README.en.md",
-      "bytes": 15932,
-      "sha256": "a9fa285b9b6f7362555f2681f5950d3873018a4e72f0503d2fb8b5fb31bb499f"
+      "bytes": 16535,
+      "sha256": "068542577defed4fafa2b0b086bb1067d5c4fe1e44925f014fdfde421e010839"
     },
     {
       "path": "docs/README.ja.md",
-      "bytes": 19379,
-      "sha256": "628865efb450c23f24cfbc5b4593c7a08c93740051da6735513f739c2f312e5d"
+      "bytes": 20120,
+      "sha256": "cd53039a829528a6b112114fa90558ceae2fb4f43582bb0810bec2b7299ba803"
     },
     {
       "path": "docs/guide.md",
@@ -751,8 +751,8 @@
     },
     {
       "path": "lan/README.md",
-      "bytes": 6480,
-      "sha256": "7e7f996387130cc8f426b475f9504d913fe32f277832e1f034c2d8148957b386"
+      "bytes": 6572,
+      "sha256": "102ca6668e30c30ff9e889305f7a4462ce1188e08eac251460f5aa45697a8fa0"
     },
     {
       "path": "lan/api.example.json",
@@ -778,11 +778,6 @@
       "path": "lan/sign.py",
       "bytes": 3799,
       "sha256": "96d6b96f4c0158ed5c82c9d2766a3af545ebf586c754f1b4d2792ca9e4582571"
-    },
-    {
-      "path": "lan/skill/image-lens-remote/SKILL.md",
-      "bytes": 4275,
-      "sha256": "6241dae4a4854a95eff819996a4f03a2ecc3ba85413584545e20b4042353fb2d"
     },
     {
       "path": "pyproject.toml",
@@ -813,6 +808,16 @@
       "path": "requirements/tracking.txt",
       "bytes": 101,
       "sha256": "9dbd66570e62f98c05dff28ec05b38256232257d81ccaf752dbb286302a7a5b0"
+    },
+    {
+      "path": "skills/image-lens-remote/SKILL.md",
+      "bytes": 4275,
+      "sha256": "6241dae4a4854a95eff819996a4f03a2ecc3ba85413584545e20b4042353fb2d"
+    },
+    {
+      "path": "skills/llm-video-lens/SKILL.md",
+      "bytes": 6631,
+      "sha256": "437046c83fe3e0e96713fb04cdd25850f2155daadbaf941e6662add536658381"
     },
     {
       "path": "tests/smoke_runtime.py",
@@ -913,6 +918,11 @@
       "path": "tests/test_redo.py",
       "bytes": 10639,
       "sha256": "158ea53d7b3ff18e4470d7d6623e6a6cf624de39570372c31f7106fef54f09d7"
+    },
+    {
+      "path": "tests/test_skills.py",
+      "bytes": 1997,
+      "sha256": "afe67cc03917422702b51411494024af778e523d61044c6bf4dcd816cf74204f"
     },
     {
       "path": "tests/test_source_region.py",
