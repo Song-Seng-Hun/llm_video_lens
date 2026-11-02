@@ -22,7 +22,7 @@
   ],
   "manifest_self_excluded": true,
   "file_count": 182,
-  "total_bytes": 2466898,
+  "total_bytes": 2470329,
   "files": [
     {
       "path": ".gitattributes",
@@ -41,8 +41,8 @@
     },
     {
       "path": "README.md",
-      "bytes": 18318,
-      "sha256": "24e1d05e4b0e2f7641aec1b0e383e8afb0878909b70d25b7c283bcd9e069459c"
+      "bytes": 18422,
+      "sha256": "8fa69f86340280b3aa60750fba99ef487b933dfc8377e04ee45220ae62d86b22"
     },
     {
       "path": "assets/banner-dark.svg",
@@ -61,18 +61,18 @@
     },
     {
       "path": "assets/example-onion.jpg",
-      "bytes": 100682,
-      "sha256": "e967b9c5fac840fb55425b1e4469ed1350559609ffe69aa1b9f0de5889d060e7"
+      "bytes": 103743,
+      "sha256": "a8ed6e82b041e471e1cb482f8abe94dbf67dc956b8ab861c5e41fc1bf874c4c6"
     },
     {
       "path": "docs/README.en.md",
-      "bytes": 15796,
-      "sha256": "3a6f986f445f74369d0544da80d224ff108a380ae0e210545f060f4e1472c6e5"
+      "bytes": 15932,
+      "sha256": "a9fa285b9b6f7362555f2681f5950d3873018a4e72f0503d2fb8b5fb31bb499f"
     },
     {
       "path": "docs/README.ja.md",
-      "bytes": 19249,
-      "sha256": "a561af365cff391af82f2b64a2b773862803b68dc698ac2bdef200be270af34e"
+      "bytes": 19379,
+      "sha256": "628865efb450c23f24cfbc5b4593c7a08c93740051da6735513f739c2f312e5d"
     },
     {
       "path": "docs/guide.md",

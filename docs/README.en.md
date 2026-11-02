@@ -74,12 +74,12 @@ It also makes pictures:
 One line from the `look.md` of a live-action solo dance video, the span where the dancer lifts a knee (shortened with `…`). The output text is Korean.
 
 ```text
-- 15.44–16.32s f386..407 | 전신 | 정면(사람 왼쪽=화면 오른쪽) | 팔 자세: 왼팔 가슴 높이·오른팔 허리 아래 그대로 | 전체: 카메라 모름(5%만 맞춤), 몸 왼쪽 아래 33px(속도 2.5→2.2→1.6→1.4→0.8 px/f) | 몸 기준: 오른다리(화면 왼쪽: 발목·무릎·허벅지) 오른쪽 위 147px(속도 13.3→13.3→12.2→10.4→10.2 px/f, 앞선 동작은 모름) → 오른쪽 51px(속도 9.2→7.3→5.8→6 px/f), 몸 바깥으로; 왼다리(화면 오른쪽: 허벅지·발목·무릎) 위 74px(…), 몸 쪽으로; … | 높이별(화면 좌표, 카메라 모름): 왼쪽 아래 33 / ? / 왼쪽 위 25 / 오른쪽 위 45 / 오른쪽 아래 14 (…) | 몸 돌림 후보(어깨 폭 크게 변함, 포즈가 튄 것일 수도; 그동안 어깨 높이는 안 씀): 15.44–15.88s | …
+- 15.44–16.32s f386..407 | 전신 | 정면(사람 왼쪽=화면 오른쪽) | 팔 자세(원본 화면·미보정): 왼팔 가슴 높이·오른팔 허리 아래 그대로 | 전체: 카메라 모름(5%만 맞춤), 몸 왼쪽 아래 33px(속도 2.5→2.2→1.6→1.4→0.8 px/f) | 몸 기준: 오른다리(화면 왼쪽: 발목·무릎·허벅지) 오른쪽 위 147px(속도 13.3→13.3→12.2→10.4→10.2 px/f, 앞선 동작은 모름) → 오른쪽 51px(속도 9.2→7.3→5.8→6 px/f), 몸 바깥으로; 왼다리(화면 오른쪽: 허벅지·발목·무릎) 위 74px(…), 몸 쪽으로; … | 높이별(화면 좌표, 카메라 모름): 왼쪽 아래 33 / ? / 왼쪽 위 25 / 오른쪽 위 45 / 오른쪽 아래 14 (…) | 몸 돌림 후보(어깨 폭 크게 변함, 포즈가 튄 것일 수도; 그동안 어깨 높이는 안 씀): 15.44–15.88s | …
 ```
 
 - `15.44–16.32s f386..407`: time and source frame numbers, to trace back to the video.
 - `전신` (full body), `정면(사람 왼쪽=화면 오른쪽)` (facing the camera, person's left = screen right): framing and facing. Left and right after this are the person's own; the brackets give the screen side.
-- `팔 자세` (arm posture): wrist height at the start and end of the span; here it stays the same (`그대로`).
+- `팔 자세(원본 화면·미보정)` (arm posture, source screen, uncorrected): wrist height at the start and end of the span, measured on the source screen before camera correction; here it stays the same (`그대로`).
 - `전체` (whole): camera and body-centre movement. The background is plain, so the camera is unknown (`모름`); the body centre went 33 px down-left. Speeds that get smaller mean it slowed down.
 - `몸 기준` (relative to the body): limb movement with the body centre removed, arrows in time order. The right leg went 147 px up-right, then 51 px further right: the knee lift.
 - `높이별` (by height): movement measured in 5 bands from top to bottom of the area where the person is; `?` means that band could not be measured.
