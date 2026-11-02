@@ -469,8 +469,12 @@ def markdown(record, scan, full_name):
         r = record['redo']
         out.insert(3, f"이 폴더는 {r['look']}의 {r['window']} 구간(f{record['frames'][0]}..{record['frames'][1]})만 검출기 {r['detector']}로 다시 본 것(처음은 {r['was']}). "
                       f"추적된 구간·건너뜀은 이 범위 안의 수. 처음과 지금의 사람 상자: {r['boxes']} (빨강=처음, 초록=지금; 같은 프레임).")
+    if record.get('source_region'):
+        from image_lens.source_region import header
+        out.insert(3,header(record['source_region']))
     if record.get('scaled'):
-        out.insert(3, f"원본 {record['scaled']['from'][0]}×{record['scaled']['from'][1]}을 {record['scaled']['to'][0]}×{record['scaled']['to'][1]}로 줄여서 봄: px는 줄인 영상 기준.")
+        origin = '선택 영역' if record.get('source_region') else '원본'
+        out.insert(3, f"{origin} {record['scaled']['from'][0]}×{record['scaled']['from'][1]}을 {record['scaled']['to'][0]}×{record['scaled']['to'][1]}로 줄여서 봄: px는 줄인 영상 기준.")
     if record.get('onion_sheets') or record.get('frame_sheets'):
         # Same 30 facts of a solo dance, fresh reader: frames only 6, this text with onion sheets 8, with every sheet 12.5.
         out.insert(-1, '그림과 같이 읽기: 글만으로는 중간 동작·손 모양·닿음이 빠진다. 아래 그림을 모두 열어 글과 같이 본다. 가장 믿을 만한 근거는 궤적이 그려진 어니언 그림이다(실제 장면 위에 추적한 점을 프레임마다 그대로 찍은 것이고, 글은 그것을 줄인 것). 글과 그림이 어긋나면 그림을 믿는다. 그다음 strip, 전체 화면 모음(시간 순서). '
@@ -543,5 +547,6 @@ def focus(look_dir, shot):
     text = paths.confined(f'{look_dir}/look-full.md', exists=True).read_text(encoding='utf-8')
     for section in text.split('\n## '):
         if section.startswith(shot+' '):
-            return '## '+section.rstrip('\n')+'\n'
+            scope = next((line for line in text.split('\n## ')[0].splitlines() if line.startswith('요청 영역 ')), None)
+            return (scope+'\n\n' if scope else '')+'## '+section.rstrip('\n')+'\n'
     raise ValueError(f'{shot} not in look-full.md')

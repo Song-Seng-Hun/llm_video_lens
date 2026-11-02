@@ -171,6 +171,9 @@ def at(look_dir, span, out):
              f"촘촘한 프레임: {', '.join(f['image'] for f in frames)}" + (f"; 구간 그림(look 폴더): {', '.join(dict.fromkeys(pictures))}" if pictures else ''), '']
             + (['## 도구가 불안하다고 본 곳'] + warned + [''] if warned else [])
             + (body or ['이 구간에 걸친 장면 없음']))
+    if record.get('source_region'):
+        from image_lens.source_region import header
+        text.insert(2,header(record['source_region']))
     md = paths.write(root/'at.md', '\n'.join(text).rstrip('\n')+'\n')
     return dict(status='written', output=str(md), frames=frames[0]['frames'] if frames else [],
                 cost=dict(images=len(frames), pixels=sum(f['pixels'] for f in frames)))

@@ -239,6 +239,8 @@ def dispatch(command, arguments):
         ap.add_argument('--out', required=True, help='new output directory inside the workspace')
         ap.add_argument('--max-shots', type=int, default=look.LOOK['max_shots']); ap.add_argument('--max-seconds', type=int, default=1800)
         ap.add_argument('--max-people', type=int, default=1, help='1..8 observed people per shot; default1 keeps largest-person behavior')
+        from image_lens.source_region import parse_box
+        ap.add_argument('--scene-box', type=parse_box, help='original input pixels X0,Y0,X1,Y1; even crop width/height')
         ap.add_argument('--peak', action='store_true', help='add the frame most unlike the start left of each onion')
         a = models(ap.parse_args(arguments), 'detector', 'pose_model', 'checkpoint')
         if not 1 <= a.max_shots <= 256 or not 60 <= a.max_seconds <= 7200:
@@ -248,7 +250,8 @@ def dispatch(command, arguments):
         from image_lens import onion
         onion.PEAK['draw'] = a.peak
         return look.run(a.video, a.detector, a.pose_model, a.checkpoint, a.out, a.max_shots, a.max_seconds,
-                        **(dict(max_people=a.max_people) if a.max_people > 1 else {}))
+                        **(dict(max_people=a.max_people) if a.max_people > 1 else {}),
+                        **(dict(scene_box=a.scene_box) if a.scene_box is not None else {}))
     if command == 'pose':
         from image_lens import pose
         ap = parser(command, 'Optional local whole-body pose (pinned user-supplied ONNX weights); per-shot track IDs and overlap flags.')

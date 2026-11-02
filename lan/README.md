@@ -31,11 +31,13 @@ Every request is signed like Music Lens: headers `X-ML-Client`, `X-ML-Time` (ske
 | Request | Does |
 | --- | --- |
 | `GET /status` | Service version, image_lens commit, whether a job is running, queue length and limits |
-| `POST /look?name=LABEL&max_shots=N` + video body | Upload (MP4/MOV, WebM/MKV or AVI, at most 512 MiB) and queue a `look`; 202 with the job. `name` at most 120 UTF-8 bytes, `max_shots` 1..256 (default 16) |
+| `POST /look?name=LABEL&max_shots=N[&scene_box=X0,Y0,X1,Y1]` + video body | Upload (MP4/MOV, WebM/MKV or AVI, at most 512 MiB) and queue a `look`; 202 with the job. `name` at most 120 UTF-8 bytes, `max_shots` 1..256 (default 16) |
 | `GET /jobs` | The client's last 20 jobs |
 | `GET /jobs/<id>` | State `uploading`, `queued`, `running`, `done` or `failed` (`error.code`: `look_failed`, `timeout`, `interrupted`); when done, `result` and the file list |
 | `GET /jobs/<id>/files/<name>` | One listed file (`.md`, `.json`, `.jpg`, `.png`; `at-<span>/` files too) with `X-Content-SHA256` |
 | `POST /jobs/<id>/at?span=18-22` (empty body) | Run `at` on a done job (at most 4 s); returns `at.md` text and its files. The same span again returns the stored result |
+
+Optional client flag `look <video> --scene-box X0,Y0,X1,Y1` forwards `scene_box` in the signed request target. Coordinates are in the uploaded original, with even crop dimensions; frame bounds are checked by the analysis CLI. The result names the cropped analysis source and includes its parent mapping (see [selected region](../docs/guide.md#a-video-region-inside-a-player-or-layout)). `at` uses that same analysis source. Deploy matching server/app/client sources to use this option; this repository change does not update installed services, clients or skills.
 
 Jobs run one at a time; the queue holds 3 (queued plus uploading), then 409 `busy`. A `look` gets the CLI's
 1800 s wall budget and is killed 300 s after it. A job and its files are removed 7 days after it finished (checked

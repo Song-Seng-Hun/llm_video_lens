@@ -267,9 +267,17 @@ def clip(scan, frames=None):
             for s in scan['analysis_segments'] if s['start_frame'] <= last and s['end_frame'] >= first]
 
 
-def fit(source, root, max_pixels=1920*1080):
+def fit(source, root, max_pixels=1920*1080, *, scene_box=None, max_seconds=1800):
     """(video, scaled) where video fits the point tracker's pixel cap. A larger source is shrunk once into the output
     directory (aspect kept, even sides); px in every report are then of that copy. scaled is None or {from, to}."""
+    if scene_box is not None:
+        from image_lens import source_region
+        source, region = source_region.prepare(source, root, scene_box, max_pixels=max_pixels, max_seconds=max_seconds)
+        before = [region['box'][2]-region['box'][0],region['box'][3]-region['box'][1]]
+        after = [region['analysis']['width'],region['analysis']['height']]
+        info = dict(source_region=region)
+        if before != after:info.update({'from':before,'to':after})
+        return source,info
     import cv2
     cap = cv2.VideoCapture(str(source))
     try:
@@ -328,7 +336,7 @@ def run(*args, **kwargs):
         _stop_pose()
 
 
-def _run(video, detector, pose_model, checkpoint, out, max_shots=LOOK['max_shots'], max_seconds=1800, frames=None, redo=None, max_people=1):
+def _run(video, detector, pose_model, checkpoint, out, max_shots=LOOK['max_shots'], max_seconds=1800, frames=None, redo=None, max_people=1, scene_box=None, source_region=None):
     """frames=(first, last): look at that native range only; redo: what redo re-ran, for look.md's header."""
     if type(max_people) is not int or not 1 <= max_people <= 8:
         raise ValueError('--max-people integer1..8 required')
@@ -340,8 +348,20 @@ def _run(video, detector, pose_model, checkpoint, out, max_shots=LOOK['max_shots
     root.mkdir(parents=True)
     global LOG
     LOG = root/'steps.log'
-    source, scaled = fit(source, root)
+    if source_region is not None:
+        if scene_box is not None:raise ValueError('cannot crop an already region-analyzed source again')
+        from image_lens import source_region as region
+        source_region = region.validate(source,source_region);scaled = None
+    elif scene_box is not None:
+        source, scaled = fit(source, root, scene_box=scene_box, max_seconds=remaining())
+        source_region = scaled['source_region'];scaled = {k:v for k,v in scaled.items() if k != 'source_region'} or None
+    else:
+        source, scaled = fit(source, root)
     _step('scan', ['--video', source, '--out', root/'shots.json'])
+    if source_region is not None:
+        scanned,_ = paths.load(root/'shots.json')
+        if scanned['source_sha256'] != source_region['analysis']['sha256']:
+            raise ValueError('source-region scan identity mismatch')
     # Pose runs in its own process and hands over runs of whole shots as it goes, so the first shots are seeded and
     # tracked while it poses the rest (clip B side by side: pose 28 -> 38 s, tracking 35 -> 41 s, 63 -> 41 s in all).
     global POSER
@@ -758,6 +778,9 @@ def _run(video, detector, pose_model, checkpoint, out, max_shots=LOOK['max_shots
     head = ['# 영상 움직임 자세히 (요약은 look.md)', '',
             f"영상 {source.name}: {scan['source_frame_count']}프레임, {scan['fps']:g}fps, 장면 {len(segments)}개. 점은 포즈 기준 자동 배치(머리카락은 눈 기준 기하), 부위·동일인 미검증.",
             '경고는 "원본부터 비교하라"는 뜻이다. 가짜 움직임이라는 판정이 아니다. 자세한 수치는 장면별 report.json에 있다.', '']
+    if source_region is not None:
+        from image_lens.source_region import header
+        head.insert(3,header(source_region))
     paths.write(root/'look-full.md', '\n'.join(head+[l for l in lines for l in (l if isinstance(l, list) else [l])]).rstrip('\n')+'\n')
     from image_lens import onion
     # Frame strips for the largest shoulder-width swings only: on clip B all 18 turn candidates got one, the sheets went
@@ -794,6 +817,7 @@ def _run(video, detector, pose_model, checkpoint, out, max_shots=LOOK['max_shots
     record = dict(schema='image-lens.look/1', source_video=str(source), source_sha256=scan['source_sha256'], params=LOOK,
                   max_shots=max_shots, scaled=scaled, onion_sheets=sheets, frame_sheets=frame_sheets, errors=errors, shots=shots,
                   joint_tracking=joint_tracking.PARAMS, **(dict(frames=list(frames)) if frames else {}), **(dict(redo=redo) if redo else {}))
+    if source_region is not None:record['source_region'] = source_region
     if max_people > 1:
         record.update(max_people=max_people, actor_selection=dict(ranking='first native observation, then descending mean bbox area; stable first-seen ties',
                       minimum_observations=2, next_shot_prefetch=False, identity_scope='shot_local_model_id_unverified'))
