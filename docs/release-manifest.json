@@ -22,7 +22,7 @@
   ],
   "manifest_self_excluded": true,
   "file_count": 186,
-  "total_bytes": 2427503,
+  "total_bytes": 2428213,
   "files": [
     {
       "path": ".gitattributes",
@@ -251,8 +251,8 @@
     },
     {
       "path": "image_lens/body_motion.py",
-      "bytes": 56365,
-      "sha256": "7c358ac2ed6a6e019a6f92f8169b5eceaa824101a1a1ad2e979f65f8d7bac92e"
+      "bytes": 56592,
+      "sha256": "6220d43ffb2d8350648c1c2693221096edfbf3335aeaacde645f8d480cbcbb48"
     },
     {
       "path": "image_lens/box.py",
@@ -831,8 +831,8 @@
     },
     {
       "path": "tests/test_body_motion.py",
-      "bytes": 24020,
-      "sha256": "32966c4b90c0969c4a54e1340f483f17f94545dd06f3636e3e6bcfa04672e4ec"
+      "bytes": 24503,
+      "sha256": "4dc11f8879f6484c7dcc4ad1289ecca2294366371c933803bcc7dd093454bad9"
     },
     {
       "path": "tests/test_box.py",

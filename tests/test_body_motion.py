@@ -289,6 +289,14 @@ class Phases(unittest.TestCase):
         step, = body_motion.phases(self.frames(joints, 51), dict(seed=0, end=50), 25)
         self.assertEqual(step['moved'][0]['part'], 'wrist'); self.assertIsNotNone(step['moved'][0]['back'])
 
+    def test_wrist_wins_a_tie_with_its_elbow(self):
+        def joints(f):
+            j = dict(self.BODY); j[7] = (550-2.4*f, 510); j[9] = (540, 620-2.4*f)  # elbow left, wrist up: 120 px each
+            return j
+        step, = body_motion.phases(self.frames(joints, 51), dict(seed=0, end=50), 25)
+        arm = [m for m in step['moved'] if m['part'] in ('wrist', 'elbow')]
+        self.assertEqual([(m['part'], m['direction'], m['amount']) for m in arm], [('wrist', 'up', .5)])
+
     def test_short_window_has_no_steps(self):
         self.assertIsNone(body_motion.phases(self.frames(lambda f: dict(self.BODY), 40), dict(seed=0, end=39), 25))
 

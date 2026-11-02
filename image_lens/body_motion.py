@@ -767,7 +767,7 @@ def phases(pose_frames, window, fps):
         return None
     step = {}
     for a, b in zip(seen, seen[1:]):
-        both = rel[a].keys() & rel[b].keys()
+        both = sorted(rel[a].keys() & rel[b].keys())  # a set's order follows the per-process string hash
         if both:
             step[b] = sum(math.dist(rel[a][j], rel[b][j]) for j in both)/len(both)/(b-a)
     half = PHASES['smooth']//2
@@ -784,16 +784,17 @@ def phases(pose_frames, window, fps):
     out = []
     for a, b in zip(cuts, cuts[1:]):
         moved = []
-        for j in rel[a].keys() & rel[b].keys():
+        for j in sorted(rel[a].keys() & rel[b].keys()):
             dx, dy = rel[b][j][0]-rel[a][j][0], rel[b][j][1]-rel[a][j][1]
             far = max((math.dist(rel[n][j], rel[a][j]) for n in seen if a <= n <= b and j in rel[n]), default=0.)
             back = far-math.hypot(dx, dy) >= PHASES['back'] and far >= PHASES['move']
             if math.hypot(dx, dy) >= PHASES['move'] or back:
                 moved.append(dict(part=j[0], side=sides[j[1]], body=j[1], direction=motion_report.direction(100*dx, 100*dy),  # torso lengths: the px resolution would hide them
                                   amount=round(math.hypot(dx, dy), 2), back=round(far, 2) if back else None))
-        # One statement per limb: the wrist or ankle unless the elbow or knee moved clearly more.
+        # One statement per limb: the wrist or ankle unless the elbow or knee moved clearly more. On a tie the wrist or
+        # ankle stays (dancer clip: right elbow and wrist both 0.41 took turns from run to run).
         best = {}
-        for m in sorted(moved, key=lambda m: -max(m['amount'], m['back'] or 0.)):
+        for m in sorted(moved, key=lambda m: (-max(m['amount'], m['back'] or 0.), m['part'] not in ('wrist', 'ankle'))):
             limb = (m['body'], m['part'] in ('wrist', 'elbow'))
             best.setdefault(limb, m)
         out.append(dict(frames=[a, b], moved=sorted(best.values(), key=lambda m: -max(m['amount'], m['back'] or 0.))))
