@@ -13,6 +13,7 @@ from image_lens import paths
 HERE=Path(__file__).resolve().parent
 WEIGHT_SHA='3e85290546ce6d32f4a3581ec2cae87aedd2402246a0d46b4d361a330b4b1fa6'
 WEIGHT_BYTES=57243097
+TORCH_THREADS=8  # 4 -> 8 on the tested Mac: AutoShot 9.6 -> 9.0 s on the AI clip, heads bit-identical; 12 adds ~0.2 s
 
 
 def pins():
@@ -32,7 +33,7 @@ def recipe():
     return dict(name='AutoShot',commit=data['commit'],source_manifest_sha256=paths.sha(HERE/'autoshot-pins.json'),helper_sha256=paths.sha(__file__),
                 checkpoint_sha256=WEIGHT_SHA,checkpoint_bytes=WEIGHT_BYTES,threshold=.296,comparison='strict_greater_float32',
                 input='native_dense_RGB_uint8_INTER_LINEAR48x27',window=100,step=50,left_repeat=25,keep=[25,75],trim='native_N',
-                mapping='positive_run_end_plus_one; prefix allowed; suffix raw/unmapped',device='cpu',torch_threads=4,interop_threads=1,decoder_threads=4)
+                mapping='positive_run_end_plus_one; prefix allowed; suffix raw/unmapped',device='cpu',torch_threads=TORCH_THREADS,interop_threads=1,decoder_threads=4)
 
 
 def bounded(deadline):
@@ -103,10 +104,10 @@ def dependencies():
     except ImportError as error:
         raise ImportError('thorough cuts require the optional cuts dependencies; install them explicitly') from error
     if str(torch.__version__).split('+')[0]!='2.9.0' or einops.__version__!='0.8.1':raise ValueError('thorough cuts require pinned torch2.9.0/einops0.8.1')
-    torch.set_num_threads(4)
+    torch.set_num_threads(TORCH_THREADS)
     if torch.get_num_interop_threads()!=1:
         try:torch.set_num_interop_threads(1)
-        except RuntimeError as error:raise ValueError('host cannot admit fixed AutoShot CPU4/interop1 settings') from error
+        except RuntimeError as error:raise ValueError(f'host cannot admit fixed AutoShot CPU{TORCH_THREADS}/interop1 settings') from error
     return torch
 
 
@@ -134,7 +135,7 @@ def load_model(torch,weights):
 class Stream:
     """predict, fed a frame at a time while the scan decodes: a thread readies the model and runs each window once its
     frames are in, so AutoShot overlaps the decode instead of following it (AI clip, 1807 f: scan 13.9 -> 9.9 s).
-    Same windows, same inputs, same CPU4/interop1 settings as one call on the stacked frames."""
+    Same windows, same inputs, same CPU/interop thread settings as one call on the stacked frames."""
     def __init__(self,source_sha,deadline):
         import queue,threading
         self.source_sha=source_sha;self.deadline=deadline;self.frames=[];self.sent=0;self.todo=queue.Queue()

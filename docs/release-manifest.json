@@ -22,7 +22,7 @@
   ],
   "manifest_self_excluded": true,
   "file_count": 182,
-  "total_bytes": 2456943,
+  "total_bytes": 2457106,
   "files": [
     {
       "path": ".gitattributes",
@@ -246,8 +246,8 @@
     },
     {
       "path": "image_lens/autoshot.py",
-      "bytes": 10037,
-      "sha256": "c6b438217b6cc1f196e28d4f0ef704329a3f0efc55c324ae947f0e3978c8d65e"
+      "bytes": 10200,
+      "sha256": "85b9579b0b9a7410e177696cc10a523e7fcef57fc6129369dd25ca8dcecb5d8f"
     },
     {
       "path": "image_lens/body_motion.py",
