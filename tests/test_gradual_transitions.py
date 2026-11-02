@@ -207,7 +207,7 @@ class Intervals(unittest.TestCase):
         def child(args):
             out=Path(args[args.index('--out')+1])
             paths.write_json(out,dict(native_range=[0,19],flags=dict(frames=[]),frames=[dict(frame=n,tracks=[])for n in range(20)]))
-            return types.SimpleNamespace(stdout=io.StringIO(''),wait=lambda:0)
+            return types.SimpleNamespace(stdin=io.StringIO(),stdout=io.StringIO(''),wait=lambda:0)
         with patch.object(look,'fit',return_value=(self.video,None)),patch.object(look,'_step',side_effect=step),patch.object(look,'_pose_child',side_effect=child),\
              patch.object(onion,'sheets',return_value=[]),patch.object(zoom,'overview',return_value=[]),patch.object(check,'sheets'):
             result=look._run(self.video,'fake','fake','fake',self.root/'look',cuts='thorough',transitions=True)

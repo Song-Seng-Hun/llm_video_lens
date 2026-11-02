@@ -325,7 +325,7 @@ class Ahead(unittest.TestCase):
                     (parts/f'pose-f{lo}-f{hi}.json').write_text(packet(lo, hi)); lines.append(json.dumps(dict(pose_part=str(parts/f'pose-f{lo}-f{hi}.json'))))
                 Path(arguments[arguments.index('--out')+1]).write_text(packet(0, 59))
             return subprocess.Popen([sys.executable, '-c', f'import sys; print({chr(10).join(["load model"]+lines)!r}); sys.exit({code})'],
-                                    stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
+                                    stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
         plain = look._step, look.fit, look._pose_child, look._submit, look._finish
         look._step, look.fit, look._pose_child = step, lambda source, root: (source, False), pose_child
         if track is not None:
@@ -484,7 +484,7 @@ class MultipleActors(unittest.TestCase):
             return dict(jobs=[])
         def child(arguments):
             Path(value(arguments, '--out')).write_text(json.dumps(packet))
-            return subprocess.Popen([sys.executable, '-c', 'pass'], stdout=subprocess.PIPE, text=True)
+            return subprocess.Popen([sys.executable, '-c', 'pass'], stdin=subprocess.PIPE, stdout=subprocess.PIPE, text=True)
         def submit(arguments):
             job = value(arguments, '--job'); lo = 0 if 'shot-0000' in job else 16
             raw = dict(frames=[dict(frame=n, points=[dict(point_id='wrist-l', visible=True, xy=[100., 100.])]) for n in range(lo, lo+16)])

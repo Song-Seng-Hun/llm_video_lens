@@ -4,7 +4,7 @@ import json
 import tempfile
 import unittest
 from pathlib import Path
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 import cv2
 import numpy as np
 from image_lens import cli,digest,look,paths,redo,source_region
@@ -74,14 +74,17 @@ class Region(unittest.TestCase):
             self.assertEqual(command,'scan');source = Path(args[args.index('--video')+1])
             self.assertNotEqual(source,self.video)
             paths.write_json(args[args.index('--out')+1],dict(source_sha256=paths.sha(source),analysis_segments=[],source_frame_count=4))
+        started = []
         def child(args):
-            scan,_ = paths.load(args[args.index('--shots')+1]);self.assertTrue(scan['source_sha256'])
+            self.assertIn('--wait',args);started.append(args);return MagicMock()
+        def go(poser,*range_and_budget):
+            args = started[-1];scan,_ = paths.load(args[args.index('--shots')+1]);self.assertTrue(scan['source_sha256'])
             raise RuntimeError('verified pose boundary')
-        with patch.object(look,'_step',side_effect=step),patch.object(look,'_pose_child',side_effect=child):
+        with patch.object(look,'_step',side_effect=step),patch.object(look,'_pose_child',side_effect=child),patch.object(look,'_pose_go',side_effect=go):
             with self.assertRaisesRegex(RuntimeError,'verified pose boundary'):
                 look._run(self.video,'d','p','c',self.root/'run',scene_box=[4,6,52,38])
         crop,info = self.prepare('reuse')
-        with patch.object(look,'fit',side_effect=AssertionError('double crop')),patch.object(look,'_step',side_effect=step),patch.object(look,'_pose_child',side_effect=child):
+        with patch.object(look,'fit',side_effect=AssertionError('double crop')),patch.object(look,'_step',side_effect=step),patch.object(look,'_pose_child',side_effect=child),patch.object(look,'_pose_go',side_effect=go):
             with self.assertRaisesRegex(RuntimeError,'verified pose boundary'):
                 look._run(crop,'d','p','c',self.root/'rerun',source_region=info['source_region'])
 

@@ -105,29 +105,13 @@ def person_detector(selection):
     return det
 
 
-def run(shots, detector, pose_model, start=0, end=None, part=None):
-    """Pose packet for start..end. With `part`, look's pose child also hands over packets for runs of whole shots as
-    they finish (track IDs and flags never cross a cut, so a part reads the same as that range of the whole)."""
-    scan, scan_path = paths.load(shots)
-    shot_boundaries.validate(scan)
-    if scan.get('scan_scope') != 'full_source':
-        raise ValueError('full-source canonical shot scan required')
-    video = paths.confined(scan['source_video'], exists=True, max_bytes=512*1024*1024)
-    if str(video) != scan['source_video'] or paths.sha(video) != scan['source_sha256']:
-        raise ValueError('shot scan source changed or not canonical')
-    last = scan['source_frame_count']-1
-    end = last if end is None else end
-    if type(start) is not int or type(end) is not int or not 0 <= start <= end <= last or end-start+1 > PARAMS['max_frames']:
-        raise ValueError('bounded native range required')
+def load(detector, pose_model):
+    """(detector selection, model paths, detector, pose estimator), opened once; look's pose child opens them while the
+    shot scan runs."""
     selection = person_models.resolve(detector)
     models = dict(detector=Path(selection['path']), pose=_model(pose_model, 'pose'))
-    import time
-    import cv2
-    import numpy as np
     import onnxruntime
-    import supervision
     from rtmlib import RTMPose
-    started = time.monotonic()
     # The detector's CoreML part needs static input shapes; without them every CoreML format fails on the dynamic NMS
     # input. Clip B, 390 frames: 104 -> 11 ms a frame, the same box count on every frame, boxes within 0.01 px of CPU.
     # The compiled CoreML models are kept per pinned model hash (fresh process: pose 2.0 -> 0.1 s, detector 0.5 -> 0.1 s,
@@ -140,6 +124,31 @@ def run(shots, detector, pose_model, start=0, end=None, part=None):
     # Pose on CoreML (29 -> 8 ms a crop, keypoints within 0.01).
     if estimator.session.get_providers() != ['CoreMLExecutionProvider', 'CPUExecutionProvider']:
         raise ValueError('unexpected execution provider')
+    return selection, models, det, estimator
+
+
+def run(shots, detector, pose_model, start=0, end=None, part=None, loaded=None):
+    """Pose packet for start..end. With `part`, look's pose child also hands over packets for runs of whole shots as
+    they finish (track IDs and flags never cross a cut, so a part reads the same as that range of the whole).
+    `loaded`: load()'s models, already open."""
+    scan, scan_path = paths.load(shots)
+    shot_boundaries.validate(scan)
+    if scan.get('scan_scope') != 'full_source':
+        raise ValueError('full-source canonical shot scan required')
+    video = paths.confined(scan['source_video'], exists=True, max_bytes=512*1024*1024)
+    if str(video) != scan['source_video'] or paths.sha(video) != scan['source_sha256']:
+        raise ValueError('shot scan source changed or not canonical')
+    last = scan['source_frame_count']-1
+    end = last if end is None else end
+    if type(start) is not int or type(end) is not int or not 0 <= start <= end <= last or end-start+1 > PARAMS['max_frames']:
+        raise ValueError('bounded native range required')
+    import time
+    import cv2
+    import numpy as np
+    import onnxruntime
+    import supervision
+    started = time.monotonic()
+    selection, models, det, estimator = loaded or load(detector, pose_model)
     # RTMW-l 384 scores run about 6.2x the earlier RTMW 256x192 ones at every quantile (seven clips, 90k body joints), so they
     # are divided back to the 0..1 scale every score threshold was calibrated on.
     def crops(requests):

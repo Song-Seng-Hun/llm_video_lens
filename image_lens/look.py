@@ -58,10 +58,18 @@ def _pose_child(arguments):
         print(json.dumps(dict(step='pose', arguments=[str(a) for a in arguments])), file=log, flush=True)
     return subprocess.Popen([sys.executable, '-I', '-B', str(Path(__file__).resolve().parents[1]/'tools'/'image_lens_cli.py'),
                              '--workspace', str(paths.workspace_root()), 'pose', *[str(a) for a in arguments]],
-                            stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, start_new_session=True)
+                            stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, start_new_session=True)
 
 
 POSER = None
+
+
+def _pose_go(poser, start, end, seconds):
+    """Hand the waiting pose child its native frame range and posing budget."""
+    try:
+        poser.stdin.write(f'{start} {end} {seconds}\n'); poser.stdin.flush()  # left open: _stop_pose's communicate() closes it
+    except BrokenPipeError:
+        pass  # the child already failed; its error line is read like any other
 
 
 def _stop_pose():
@@ -377,6 +385,11 @@ def _run(video, detector, pose_model, checkpoint, out, max_shots=LOOK['max_shots
     else:
         source, scaled = fit(source, root)
     if cuts=='thorough' and remaining()<=0:raise TimeoutError('look budget exhausted before thorough cuts')
+    # The pose child starts now and opens its models while the scan runs, then waits for its frame range: its 2.9 s of
+    # imports and model loading came off the wait (kaguya look 48.0 -> 45.6 s, AI clip 25.7 -> 23.4 s; scan +0.1 s).
+    global POSER
+    POSER = _pose_child(['--shots', root/'shots.json', '--detector', detector, '--pose-model', pose_model, '--out', root/'pose.json',
+                         '--max-seconds', max(1, min(1800, int(remaining()))), '--parts-dir', root/'pose-parts', '--wait'])
     _step('scan', ['--video', source, '--out', root/'shots.json']+
           (['--cuts',cuts,'--max-seconds',min(120.,remaining())] if cuts=='thorough' else [])+(['--transitions'] if transitions else []))
     if cuts=='thorough':
@@ -392,14 +405,11 @@ def _run(video, detector, pose_model, checkpoint, out, max_shots=LOOK['max_shots
     # tracked while it poses the rest (clip B side by side: pose 28 -> 38 s, tracking 35 -> 41 s, 63 -> 41 s in all).
     # It poses only up to the last shot look will analyze: past --max-shots nothing reads those frames, and posing
     # them was most of the wait (AI clip, 1807 frames, 16 shots end at f182: pose 14 -> 112 s, tracking done at 27 s).
-    global POSER
     planned, _ = paths.load(root/'shots.json')
     selected = clip(planned, frames)[:max_shots]
     pose_range = [frames[0] if frames else 0, max(s['end_frame'] for s in selected) if selected else
                   frames[1] if frames else planned['source_frame_count']-1]
-    POSER = _pose_child(['--shots', root/'shots.json', '--detector', detector, '--pose-model', pose_model, '--out', root/'pose.json',
-                         '--max-seconds', max(1, min(1800, int(remaining()))), '--parts-dir', root/'pose-parts',
-                         '--start', pose_range[0], '--end', pose_range[1]])
+    _pose_go(POSER, *pose_range, max(1, min(1800, int(remaining()))))
     # A thread reads the child's lines, so look can take a part that has arrived without waiting for the next one: the
     # next shot is seeded ahead only once its part is taken (clip B: every third shot missed it, the child idled 0.6-1 s).
     # Named apart from the local queue() below: in this scope that def would shadow the module (only hit when the
