@@ -355,8 +355,10 @@ def _marked_crops(video, frame, width, height, seeds, directory):
     return written
 
 
-def seed(pose_path, frame, job, evidence_dir, track_id=None, length=SEED['max_frames']):
+def seed(pose_path, frame, job, evidence_dir, track_id=None, length=SEED['max_frames'], *, inference_resolution=None):
     """One observation job per seed group (the surface contract allows twelve points per job)."""
+    from image_lens.run_point_tracker import spatial_shape
+    resolution=spatial_shape({} if inference_resolution is None else dict(inference_resolution=inference_resolution))
     packet, pose_file = paths.load(pose_path, max_bytes=64*1024*1024)
     if type(packet) is not dict or packet.get('schema') != 'image-lens.pose/1':
         raise ValueError('image-lens pose packet required')
@@ -417,7 +419,8 @@ def seed(pose_path, frame, job, evidence_dir, track_id=None, length=SEED['max_fr
             jobs.append(dict(name=f'{job}-{group}', group=group, source_video=packet['source_video'], source_sha256=packet['source_sha256'],
                              width=packet['width'], height=packet['height'], fps=packet['fps'],
                              start_frame=frame, end_frame=end, seed_frame=frame, points=points, mode='single-anchor',
-                             observation_scope='visible_surface_2d', anatomical_claims=False, common_metric_excluded_frames=[frame]))
+                             observation_scope='visible_surface_2d', anatomical_claims=False, common_metric_excluded_frames=[frame],
+                             **(dict(inference_resolution=list(resolution)) if resolution!=(384,512) else {})))
     flagged = any(r['frame'] == frame for r in packet['flags']['frames'])
     return dict(schema='team-eye.observations/1', seed_source=dict(pose=str(pose_file), pose_sha256=paths.sha(pose_file),
                 track_id=track['track_id'], frame=frame, seed_frame_flagged=flagged, skeleton=dict(plausible=plausible, reason=reason, scope=scope, framing=shot, chibi=head),

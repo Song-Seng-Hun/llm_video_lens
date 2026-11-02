@@ -143,6 +143,19 @@ python -m image_lens --workspace W crowd --video clip.mp4 --out crowd-clip
 - Look at `crowd.jpg` and count the people yourself. The count is rough: two people overlapping can share one box, and close-up eyes, posters or drawn figures can get boxes. `crowd.json` holds the count for every checked frame and `suggested_max_people`, the largest count capped at 8.
 - Then run `look --max-people N` with your own count. The cap is per shot, so a shot with fewer people only tracks the people it has.
 
+### Tracking input resolution
+
+`look --tracking-resolution detail` uses the existing 576×768 (height×width) point-tracker input instead of the 384×512 `standard` default. It changes point-model input detail, including every automatic seed group; it does not select another detector or pose model.
+
+```sh
+python -m image_lens --workspace W look --video clip.mp4 --tracking-resolution detail --out look-detail
+python -m image_lens --workspace W redo --look look-detail --window shot-0000-w0 --detector MODEL --tracking-resolution standard --out redo-standard
+```
+
+`redo` inherits `look.json`'s `inference_resolution` when the option is omitted; an older record without that field means standard. Either explicit value overrides the saved choice, and malformed saved shapes are refused. Standalone `seed` accepts the same option. Frozen jobs bind the chosen shape through their query hash; changed helper pins require a fresh `prepare`.
+
+Detail is an optional tradeoff for inspecting difficult tracking. In five selected development jobs, it returned three additional correctly labelled observations and lost one previously correct observation. Much of the change was model visibility with similar coordinates; this can also change visibility-driven reseeding and coverage. The tested 160-frame forwards took about 1.7× as long; this is not a whole-clip performance estimate or a universal accuracy gain. Inspect the points in both results. Native frames, anchor exclusions and raw-coordinate conventions are unchanged. See [the bounded comparison](look-notes.md#optional-tracking-input-resolution-2026-11-02).
+
 ### What it runs
 
 - `scan`, one `pose` pass, then for each shot `seed` / `prepare` / `track` / `bind` / `analyze`, seeded from pose. The first 16 shots by default; `--max-shots` goes up to 256.

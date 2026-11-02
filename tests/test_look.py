@@ -277,7 +277,7 @@ if __name__ == '__main__': unittest.main()
 
 
 class Ahead(unittest.TestCase):
-    def look(self, d, said, code=0, track=None, cuts='fast', max_seconds=1800):
+    def look(self, d, said, code=0, track=None, cuts='fast', max_seconds=1800, inference_resolution=None, lost_shape=False):
         """look._run on a 60-frame pan with three 20-frame shots; the fake pose child writes parts 0..39 and 40..59 and
         pose.json, then prints `said` (a list of lines, or None for the two part lines). Returns the seed calls.
         With a `track` list, each seed queues one job, and submits and takes are logged to it (every take fails)."""
@@ -290,9 +290,10 @@ class Ahead(unittest.TestCase):
         person = [dict(track_id='t', bbox=[100, 50, 300, 350], score=.9, keypoints=[[150+j%20*5, 60+j//20*40] for j in range(133)], scores=[.9]*133)]
         def packet(lo, hi):
             return json.dumps(dict(native_range=[lo, hi], frames=[dict(frame=n, tracks=person) for n in range(lo, hi+1)], flags=dict(frames=[])))
-        calls = []
+        calls = []; self.seed_arguments=[]
         def step(command, arguments):
             if command == 'seed':
+                self.seed_arguments.append(list(arguments))
                 calls.append((arguments[arguments.index('--frame')+1], Path(arguments[arguments.index('--pose')+1]).name))
                 if track is not None:
                     track.append(('seed', arguments[arguments.index('--frame')+1]))
@@ -305,7 +306,11 @@ class Ahead(unittest.TestCase):
             elif command == 'seed' and arguments[arguments.index('--frame')+1] == 40:
                 raise ValueError('no seed')
             if command == 'seed' and track is not None:
-                return dict(jobs=[arguments[arguments.index('--job')+1]+'-head'])
+                name=arguments[arguments.index('--job')+1]+'-head'
+                job=dict(name=name)
+                if '--tracking-resolution' in arguments and not lost_shape:job['inference_resolution']=[576,768]
+                out.write_text(json.dumps(dict(jobs=[job])))
+                return dict(jobs=[name])
             return dict(jobs=[])
         def submit(arguments):
             track.append(('submit', arguments[arguments.index('--job')+1])); return arguments[arguments.index('--job')+1]
@@ -327,10 +332,34 @@ class Ahead(unittest.TestCase):
             look._submit, look._finish = submit, finish
         try:
             look.run(video, 'det', 'pose', 'ckpt', Path(d)/'look', max_seconds=max_seconds,
-                     **(dict(cuts=cuts) if cuts!='fast' else {}))
+                     **(dict(cuts=cuts) if cuts!='fast' else {}),
+                     **(dict(inference_resolution=inference_resolution) if inference_resolution is not None else {}))
         finally:
             look._step, look.fit, look._pose_child, look._submit, look._finish = plain
         return calls
+
+    def test_detail_shared_seed_prefetch_record_and_lost_shape_refusal(self):
+        """A detail request must reach ordinary/prefetched seeds, and a lost field must queue no NN jobs."""
+        import json,tempfile
+        from image_lens import paths
+        previous=paths.workspace_root()
+        try:
+            for lost in (False,True):
+                with tempfile.TemporaryDirectory(dir=REPO/'workspace') as d:
+                    tracking=[];self.look(d,None,track=tracking,inference_resolution=[576,768],lost_shape=lost)
+                    self.assertTrue(all(a[a.index('--tracking-resolution')+1]=='detail' for a in self.seed_arguments))
+                    record=json.loads((Path(d)/'look/look.json').read_text())
+                    self.assertEqual(record['inference_resolution'],[576,768])
+                    if lost:
+                        self.assertFalse(any(event[0]=='submit' for event in tracking))
+                        self.assertIn('resolution/group mismatch',record['shots'][0]['errors'][0]['error'])
+                    else:
+                        self.assertEqual(tracking[:5],[('seed',0),('submit','shot-0000-w0-head'),('seed',20),('submit','shot-0001-w0-head'),('take','shot-0000-w0-head')])
+            from unittest.mock import patch
+            with patch.object(look,'fit') as fit:
+                with self.assertRaisesRegex(ValueError,'shapes supported'):look._run('v','d','p','c','out',inference_resolution=[512,384])
+                fit.assert_not_called()
+        finally:paths.configure(previous)
 
     def test_thorough_policy_reaches_actual_scan_and_saved_look(self):
         """The in-process look pipeline must forward its choice/budget and persist it for redo."""
@@ -444,7 +473,8 @@ class MultipleActors(unittest.TestCase):
                 self.assertTrue(all(all(p['track_id'] == identity for p in r['tracks']) for r in selected['frames']))
                 seed_calls.append((identity, value(arguments, '--frame')))
                 if fail_second and identity == 'b': raise ValueError('no usable seeds for b')
-                out.write_text(json.dumps(dict(seed_source=dict(track_id=identity))))
+                out.write_text(json.dumps(dict(seed_source=dict(track_id=identity),
+                                               jobs=[dict(name=value(arguments,'--job')+'-'+group) for group in ('arms','move')])))
                 return dict(jobs=[value(arguments, '--job')+'-'+group for group in ('arms', 'move')], skeleton=dict(plausible=True))
             elif command == 'analyze':
                 selected = json.loads(Path(value(arguments, '--pose')).read_text())
@@ -601,6 +631,8 @@ class MultipleActors(unittest.TestCase):
         args = ['--video', 'v', '--detector', 'd', '--pose-model', 'p', '--checkpoint', 'c', '--out', 'o']
         with patch.object(cli, 'models', side_effect=lambda value, *roles: value), patch.object(look, 'run', return_value={}) as run:
             cli.dispatch('look', args); self.assertEqual(run.call_args.kwargs, {})
+            cli.dispatch('look', args+['--tracking-resolution','standard']);self.assertEqual(run.call_args.kwargs,{})
+            cli.dispatch('look', args+['--tracking-resolution','detail']);self.assertEqual(run.call_args.kwargs,dict(inference_resolution=[576,768]))
             cli.dispatch('look', args+['--max-people', '1']); self.assertEqual(run.call_args.kwargs, {})
             cli.dispatch('look', args+['--max-people', '2']); self.assertEqual(run.call_args.kwargs, dict(max_people=2))
             for value in ('0', '9'):
