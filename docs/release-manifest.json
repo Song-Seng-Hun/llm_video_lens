@@ -22,7 +22,7 @@
   ],
   "manifest_self_excluded": true,
   "file_count": 186,
-  "total_bytes": 2492082,
+  "total_bytes": 2427503,
   "files": [
     {
       "path": ".gitattributes",
@@ -56,8 +56,8 @@
     },
     {
       "path": "assets/example-live2d-onion.jpg",
-      "bytes": 164380,
-      "sha256": "f1046b961e83336b8ed820e5550ecea37208b848ede9717c1899502a2649dfc7"
+      "bytes": 99801,
+      "sha256": "992300b41ece1a9400bfac52f6c91a04e3a3a8f548f189c0c18acad857ede0b1"
     },
     {
       "path": "assets/example-onion.jpg",
