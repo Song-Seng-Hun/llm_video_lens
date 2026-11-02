@@ -1,0 +1,4 @@
+# Optional thorough cuts; no automatic dependency installation.
+-r base.txt
+torch==2.9.0
+einops==0.8.1

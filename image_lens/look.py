@@ -336,10 +336,11 @@ def run(*args, **kwargs):
         _stop_pose()
 
 
-def _run(video, detector, pose_model, checkpoint, out, max_shots=LOOK['max_shots'], max_seconds=1800, frames=None, redo=None, max_people=1, scene_box=None, source_region=None):
+def _run(video, detector, pose_model, checkpoint, out, max_shots=LOOK['max_shots'], max_seconds=1800, frames=None, redo=None, max_people=1, scene_box=None, source_region=None, cuts='fast'):
     """frames=(first, last): look at that native range only; redo: what redo re-ran, for look.md's header."""
     if type(max_people) is not int or not 1 <= max_people <= 8:
         raise ValueError('--max-people integer1..8 required')
+    if cuts not in ('fast','thorough'):raise ValueError('cuts must be fast or thorough')
     started = time.monotonic()
     def remaining():
         return max_seconds-(time.monotonic()-started)
@@ -357,7 +358,14 @@ def _run(video, detector, pose_model, checkpoint, out, max_shots=LOOK['max_shots
         source_region = scaled['source_region'];scaled = {k:v for k,v in scaled.items() if k != 'source_region'} or None
     else:
         source, scaled = fit(source, root)
-    _step('scan', ['--video', source, '--out', root/'shots.json'])
+    if cuts=='thorough' and remaining()<=0:raise TimeoutError('look budget exhausted before thorough cuts')
+    _step('scan', ['--video', source, '--out', root/'shots.json']+
+          (['--cuts',cuts,'--max-seconds',min(120.,remaining())] if cuts=='thorough' else []))
+    if cuts=='thorough':
+        from image_lens import shot_boundaries
+        selected,_=paths.load(root/'shots.json')
+        if selected.get('parameters')!=shot_boundaries.parameters(cuts):raise ValueError('look scan lost the selected cut policy')
+        if remaining()<=0:raise TimeoutError('look budget exhausted during thorough cuts')
     if source_region is not None:
         scanned,_ = paths.load(root/'shots.json')
         if scanned['source_sha256'] != source_region['analysis']['sha256']:
@@ -817,6 +825,8 @@ def _run(video, detector, pose_model, checkpoint, out, max_shots=LOOK['max_shots
     record = dict(schema='image-lens.look/1', source_video=str(source), source_sha256=scan['source_sha256'], params=LOOK,
                   max_shots=max_shots, scaled=scaled, onion_sheets=sheets, frame_sheets=frame_sheets, errors=errors, shots=shots,
                   joint_tracking=joint_tracking.PARAMS, **(dict(frames=list(frames)) if frames else {}), **(dict(redo=redo) if redo else {}))
+    record['cuts']=cuts
+    if scan.get('parameters') is not None:record['cut_parameters']=scan['parameters']
     if source_region is not None:record['source_region'] = source_region
     if max_people > 1:
         record.update(max_people=max_people, actor_selection=dict(ranking='first native observation, then descending mean bbox area; stable first-seen ties',

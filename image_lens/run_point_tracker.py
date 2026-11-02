@@ -146,8 +146,14 @@ def main():
         raise ValueError('job must match exactly once')
     job = selected[0]
     from image_lens.jobs import check_job
-    ref = frozen['canonical_shots']
-    scan_packet, _ = paths.load(ref['path'])
+    ref = frozen.get('canonical_shots')
+    if type(ref)is not dict or set(ref)!={'path','sha256'} or type(ref.get('path'))is not str:
+        raise ValueError('frozen canonical shot reference required; no implicit cut rescan')
+    scan_path=paths.confined(ref['path'],exists=True,max_bytes=16*1024*1024)
+    if sha(scan_path)!=ref['sha256']:raise ValueError('frozen canonical shot reference mismatch')
+    scan_packet, _ = paths.load(scan_path)
+    from image_lens.jobs import check_cut_policy
+    check_cut_policy(frozen,scan_packet)
     check_job(packet, args.job, scan_packet)
     resolution = spatial_shape(job)
     start, end, seed = job['start_frame'], job['end_frame'], job['seed_frame']
@@ -221,16 +227,7 @@ def main():
             cap.release()
         _FRAMES[:] = [window, images, timestamps]
     images, timestamps = list(_FRAMES[1]), list(_FRAMES[2])
-    cached_scan=None
-    if 'canonical_shots' in frozen:
-        ref=frozen['canonical_shots']
-        if type(ref)is not dict or set(ref)!={'path','sha256'} or type(ref['path'])is not str:
-            raise ValueError('canonical shot reference requires path and SHA256')
-        scan_path=paths.confined(ref['path'], exists=True, max_bytes=16*1024*1024)
-        if sha(scan_path)!=ref['sha256']:
-            raise ValueError('frozen canonical shot reference mismatch')
-        cached_scan=json.loads(scan_path.read_text())
-    shot_check=shot_api['canonical_scan'](job,timestamps,cached_scan)
+    shot_check=shot_api['canonical_scan'](job,timestamps,scan_packet)
     internal_events=[e for e in shot_check['events']if start<e['after_frame']<=end]
     if internal_events:
         print(json.dumps(dict(status='needs_shot_split',model_loaded=False,forward_calls=0,

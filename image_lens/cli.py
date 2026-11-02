@@ -21,7 +21,7 @@ WORKFLOW = """reading a clip, in this order:
 
 commands: crowd (people count by eye), look (whole clip), at / focus / zoom (second reads),
   box / mark / grid (re-track a box or hand-placed points), redo (another detector for one window),
-  scan / brief / catalog / compare (cuts and frames, no models), pose / seed / bind / prepare /
+  scan (fast: no model; thorough: optional AutoShot union), brief / catalog / compare (no models), pose / seed / bind / prepare /
   validate / track / analyze (look's steps one by one).
 'image-lens <command> --help' shows each command's options. Full guide: docs/guide.md."""
 
@@ -111,6 +111,8 @@ def dispatch(command, arguments):
         ap = parser(command, 'Native-PTS hard-cut candidates; no images unless requested.')
         ap.add_argument('--video', required=True); ap.add_argument('--out', required=True)
         ap.add_argument('--start', type=int, default=0); ap.add_argument('--end', type=int)
+        ap.add_argument('--cuts', choices=('fast','thorough'), default='fast', help='fast default; thorough unions AutoShot (full source, optional cuts deps, first-use pinned57MB download)')
+        ap.add_argument('--max-seconds', type=float, default=120, help='scan/dependency/download/inference budget, >0..120')
         ap.add_argument('--evidence-dir'); ap.add_argument('--event-index', type=int, default=0)
         a = ap.parse_args(arguments)
         source = paths.confined(a.video, exists=True, max_bytes=512*1024*1024)
@@ -123,13 +125,16 @@ def dispatch(command, arguments):
         import signal
         if hasattr(signal, 'SIGALRM'):
             signal.signal(signal.SIGALRM, lambda *_: (_ for _ in ()).throw(TimeoutError('scan wall budget exhausted')))
-            signal.alarm(120)
-        scan = shot_boundaries.scan_video(source, a.start, a.end)
+            if not shot_boundaries.finite(a.max_seconds) or not 0<a.max_seconds<=120:raise ValueError('scan max-seconds must be >0..120')
+            signal.setitimer(signal.ITIMER_REAL,a.max_seconds)
+        scan = shot_boundaries.scan_video(source, a.start, a.end,
+                                         **(dict(cuts=a.cuts,max_seconds=a.max_seconds) if a.cuts!='fast' or a.max_seconds!=120 else {}))
         if a.evidence_dir:
             scan['evidence_contact'] = shot_boundaries.render(scan, evidence, a.event_index)
         output = paths.write_json(a.out, scan)
         return dict(status='written', output=str(output), frames=scan['frame_count'],
-                    events=len(scan['events']), images_written=1 if a.evidence_dir else 0, model_loaded=False)
+                    events=len(scan['events']), images_written=1 if a.evidence_dir else 0,
+                    model_loaded=(scan.get('temporal') or {}).get('model_loaded',False),forward_calls=(scan.get('temporal') or {}).get('forward_calls',0))
     if command == 'compare':
         from image_lens import brief, shot_boundaries
         ap = parser(command, 'Two native originals + one unverified residual panel; no automatic redraw decision.')
@@ -239,6 +244,7 @@ def dispatch(command, arguments):
         ap.add_argument('--out', required=True, help='new output directory inside the workspace')
         ap.add_argument('--max-shots', type=int, default=look.LOOK['max_shots']); ap.add_argument('--max-seconds', type=int, default=1800)
         ap.add_argument('--max-people', type=int, default=1, help='1..8 observed people per shot; default1 keeps largest-person behavior')
+        ap.add_argument('--cuts', choices=('fast','thorough'), default='fast', help='fast default; thorough unions AutoShot (optional cuts deps, first-use pinned57MB download)')
         from image_lens.source_region import parse_box
         ap.add_argument('--scene-box', type=parse_box, help='original input pixels X0,Y0,X1,Y1; even crop width/height')
         ap.add_argument('--peak', action='store_true', help='add the frame most unlike the start left of each onion')
@@ -251,6 +257,7 @@ def dispatch(command, arguments):
         onion.PEAK['draw'] = a.peak
         return look.run(a.video, a.detector, a.pose_model, a.checkpoint, a.out, a.max_shots, a.max_seconds,
                         **(dict(max_people=a.max_people) if a.max_people > 1 else {}),
+                        **(dict(cuts=a.cuts) if a.cuts!='fast' else {}),
                         **(dict(scene_box=a.scene_box) if a.scene_box is not None else {}))
     if command == 'pose':
         from image_lens import pose

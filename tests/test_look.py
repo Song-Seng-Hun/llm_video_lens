@@ -277,7 +277,7 @@ if __name__ == '__main__': unittest.main()
 
 
 class Ahead(unittest.TestCase):
-    def look(self, d, said, code=0, track=None):
+    def look(self, d, said, code=0, track=None, cuts='fast', max_seconds=1800):
         """look._run on a 60-frame pan with three 20-frame shots; the fake pose child writes parts 0..39 and 40..59 and
         pose.json, then prints `said` (a list of lines, or None for the two part lines). Returns the seed calls.
         With a `track` list, each seed queues one job, and submits and takes are logged to it (every take fails)."""
@@ -298,7 +298,10 @@ class Ahead(unittest.TestCase):
                     track.append(('seed', arguments[arguments.index('--frame')+1]))
             out = Path(arguments[arguments.index('--out')+1]) if '--out' in arguments else None
             if command == 'scan':
-                out.write_text(json.dumps(dict(fps=10, width=640, height=360, source_frame_count=60, source_sha256='0', analysis_segments=segments)))
+                from image_lens import shot_boundaries
+                self.scan_arguments=arguments
+                out.write_text(json.dumps(dict(fps=10, width=640, height=360, source_frame_count=60, source_sha256='0', analysis_segments=segments,
+                                               parameters=shot_boundaries.parameters(cuts))))
             elif command == 'seed' and arguments[arguments.index('--frame')+1] == 40:
                 raise ValueError('no seed')
             if command == 'seed' and track is not None:
@@ -323,10 +326,25 @@ class Ahead(unittest.TestCase):
         if track is not None:
             look._submit, look._finish = submit, finish
         try:
-            look.run(video, 'det', 'pose', 'ckpt', Path(d)/'look')
+            look.run(video, 'det', 'pose', 'ckpt', Path(d)/'look', max_seconds=max_seconds,
+                     **(dict(cuts=cuts) if cuts!='fast' else {}))
         finally:
             look._step, look.fit, look._pose_child, look._submit, look._finish = plain
         return calls
+
+    def test_thorough_policy_reaches_actual_scan_and_saved_look(self):
+        """The in-process look pipeline must forward its choice/budget and persist it for redo."""
+        import json,tempfile
+        from image_lens import paths,shot_boundaries
+        previous=paths.workspace_root()
+        try:
+            with tempfile.TemporaryDirectory(dir=REPO/'workspace') as d:
+                self.look(d,None,cuts='thorough',max_seconds=120)
+                args=self.scan_arguments;self.assertEqual(args[args.index('--cuts')+1],'thorough')
+                self.assertTrue(0<float(args[args.index('--max-seconds')+1])<=120)
+                record=json.loads((Path(d)/'look/look.json').read_text())
+                self.assertEqual(record['cuts'],'thorough');self.assertEqual(record['cut_parameters'],shot_boundaries.parameters('thorough'))
+        finally:paths.configure(previous)
 
     def test_shots_are_seeded_from_their_pose_part_once_and_a_failure_stays_in_place(self):
         import json, tempfile

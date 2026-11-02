@@ -12,6 +12,28 @@ def packet(frames, kind=None):
 
 
 class Redo(unittest.TestCase):
+    def test_thorough_redo_inherits_validated_policy(self):
+        """Redo cannot silently rescan a saved thorough look using fast cuts."""
+        from unittest.mock import patch
+        from image_lens import autoshot,shot_boundaries,person_models
+        previous=paths.workspace_root()
+        try:
+            with tempfile.TemporaryDirectory() as d:
+                root=Path(d).resolve();paths.configure(root);first=root/'first';first.mkdir();video=root/'source.bin';video.write_bytes(b'authored contract fixture')
+                pin=paths.sha(video);job=dict(source_video=str(video),source_sha256=pin,width=320,height=240,fps=25.,start_frame=0,end_frame=9)
+                scan=shot_boundaries.assemble(job,[n/25 for n in range(10)],[],mode='thorough')
+                scan.update(scan_scope='full_source',source_frame_count=10,temporal=dict(recipe=autoshot.recipe(),source_sha256=pin,frame_count=10,
+                            single=[0.]*10,many=[0.]*10,positive_runs=[],adaptive_cuts=[],model_loaded=True,forward_calls=1))
+                paths.write_json(first/'shots.json',scan)
+                paths.write_json(first/'look.json',dict(source_video=str(video),source_sha256=pin,cuts='thorough',cut_parameters=scan['parameters'],
+                                 shots=[dict(segment_id='s',windows=[dict(window=dict(seed=0,end=9))])]))
+                pose=dict(packet({}),source_sha256=pin);paths.write_json(first/'pose.json',pose)
+                def run(*args,**kwargs):
+                    self.assertEqual(kwargs['cuts'],'thorough');out=Path(args[4]);out.mkdir();paths.write_json(out/'pose.json',pose);return dict(status='written')
+                with patch.object(look,'run',side_effect=run),patch.object(person_models,'resolve',return_value=dict(kind='humanart')),patch.object(redo,'boxes'):
+                    redo.run(first,'s-w0','d','p','c',root/'redo')
+        finally:paths.configure(previous)
+
     def test_window_names_follow_the_file_names(self):
         record = dict(shots=[dict(segment_id='shot-0002', windows=[dict(window=dict(seed=40, end=199)), dict(window=dict(seed=200, end=230))])])
         self.assertEqual(redo.window(record, 'shot-0002-w1'), (200, 230))

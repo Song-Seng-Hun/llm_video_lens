@@ -1,0 +1,18 @@
+{
+  "schema": "image-lens.autoshot-pins/1",
+  "repository": "wentaozhu/AutoShot",
+  "commit": "77c82ff826a9301bb173d9be786297a49d73d081",
+  "files": {
+    "vendor/source/autoshot/linear.py": "bc5eb81c94c142625435fb8b85b9ecc815c3507be67733dcfb83c12f1c79a885",
+    "vendor/source/autoshot/supernet_flattransf_3_8_8_8_13_12_0_16_60.py": "8a3fe9cf079a5020950758e67e7ddf079cfac4b3fa916844d11eba6226ff7382",
+    "vendor/source/autoshot/LICENSE": "04922ee7e57da9af2a0e279be94d4b22920d2dd420c0253fa5d03b0d92f51512",
+    "vendor/source/autoshot/PROVENANCE.md": "74a353abdbf0f199a665f4518b3b19779499bfce374b7e767d6d814222cf6644"
+  },
+  "checkpoint": {
+    "filename": "ckpt_0_200_0.pth",
+    "url": "https://huggingface.co/backseollgi/AutoShot/resolve/9dbc41acb14de0dc32509f7c7d0a9876a6f44105/ckpt_0_200_0.pth",
+    "bytes": 57243097,
+    "sha256": "3e85290546ce6d32f4a3581ec2cae87aedd2402246a0d46b4d361a330b4b1fa6",
+    "provenance": "Pinned public HF mirror; equality to author distribution and checkpoint-specific license unverified."
+  }
+}

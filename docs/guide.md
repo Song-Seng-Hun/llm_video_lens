@@ -26,7 +26,7 @@ From a different working directory, including isolated Python, use the absolute 
 python -I /path/to/llm_video_lens/tools/image_lens_cli.py --workspace /path/to/workspace brief --shots shots.json --out brief.json
 ```
 
-An optional installation exposes `image-lens`; extras are `.[core]`, `.[tracking]` and `.[pose]`. A stdlib-only installation has no mandatory runtime dependencies. Pinned PySceneDetect source is already vendored. The public CLI is the supported entrypoint; individual engine mains are internal adapters.
+An optional installation exposes `image-lens`; extras are `.[core]`, `.[tracking]`, `.[pose]` and `.[cuts]`. A stdlib-only installation has no mandatory runtime dependencies. Pinned PySceneDetect source is already vendored. The public CLI is the supported entrypoint; individual engine mains are internal adapters.
 
 All relative data/output paths are relative to the selected workspace, default `<repository>/workspace`. Source inputs must be copied there explicitly. Inputs and outputs cannot escape this boundary; symlink components and overwrites are refused. The optional checkpoint is the sole explicit external input exception. Workspaces, videos, models, generated images and results are Git-ignored.
 
@@ -37,6 +37,29 @@ All relative data/output paths are relative to the selected workspace, default `
 An optional `--report report.json` adds only supported cached motion reports that can be recomputed from their pinned source tracks and bindings under the exact canonical scan. Missing, outdated, unsupported or cross-cut reports are listed as `not_admitted`; their coverage remains unknown. Eight report references maximum. No LLM/API call, network, image generation, raw-coordinate dump or model import is performed by a brief. Labels in reports are untrusted quoted data.
 
 Every shot retains its fresh-source-observation/retracking obligation. A single-frame shot permits inspection only. A missed cut or dissolve is possible; no detected cut does not prove continuity or identity. Do not crop coordinates from a whole-clip offline inference and call them shot-local tracking.
+
+## Optional additional cuts
+
+`scan --cuts thorough` and `look --cuts thorough` add fixed AutoShot candidates to the existing adaptive detector. The default is `--cuts fast`. Thorough uses the sorted union: it never removes an adaptive cut, merges a short shot or tracks across an added boundary. `redo` inherits the recorded cut mode. A thorough scan requires the complete source; partial `scan --start/--end` requests are refused before model loading or download. Both components see the same actual analysis video after any explicit region selection or resizing.
+
+Thorough decodes through FFmpeg with 4 threads; fast uses OpenCV's default backend. Their adaptive boundaries matched on the tested Mac. Equivalence to a separately produced fast scan is unverified on hosts whose default decoder differs; the union retains every adaptive cut from its own decode.
+
+```sh
+# Install optional dependencies yourself in your environment.
+python -m pip install '.[core,cuts]'
+python -m image_lens --workspace W scan --video clip.mp4 --cuts thorough --out thorough-shots.json
+python -m image_lens --workspace W look --video clip.mp4 --cuts thorough --out look-thorough
+```
+
+Only an explicitly requested thorough scan imports Torch and may download a model. First use fetches 57,243,097 bytes into `W/models/autoshot/` from the pinned third-party Hugging Face mirror `backseollgi/AutoShot` revision `9dbc41acb14de0dc32509f7c7d0a9876a6f44105`. The expected SHA-256 is `3e85290546ce6d32f4a3581ec2cae87aedd2402246a0d46b4d361a330b4b1fa6`; size and hash are checked before publication. Model bytes are not bundled or committed. The vendored source has its MIT notice; equivalence of this checkpoint to the author's original distribution and checkpoint-specific license terms remain unverified. Missing optional dependencies, corrupt assets, failed downloads and timeouts are errors; none silently switches to fast or installs packages. Fast scans and cached readers do not download or import Torch.
+
+A killed process can leave `W/models/autoshot/ckpt_0_200_0.pth.partial`, which later runs refuse to overwrite. Recovery is manual after confirming that no download is active.
+
+This is additional boundary evidence, not a calibrated semantic edit classifier. AutoShot can miss abrupt pose/outfit replacements within a stable layout, so it must not veto the adaptive detector. Existing false cuts remain, and AutoShot can add false cuts on other inputs. More cuts may consume `look`'s default 16-shot cap earlier. Choose `--max-shots` explicitly for the needed coverage (maximum 256); the default cap is unchanged. A scan's last selected segment is only planned coverage, not proof of successful pose/tracking.
+
+One integrated CPU check over 39 files / 6,645 frames (about 200 seconds of summed source spans): fast took 16.82 seconds, thorough 56.45 seconds including its first-use download. Process peak RSS was 0.47 GiB and 2.22 GiB respectively, not incremental memory measurements. The known synthetic set gained 8 exact cuts (63 to 71 of 84) at the same 18 false cuts; the 7 provisionally labelled real spans were unchanged. This is known development material, not held-out human ground truth. CPU-only, one ordered sample; MPS and new-style accuracy are unmeasured. In those six full real sources, the default 16-shot selection ended at the same native frame in both modes; this does not establish successful tracking or guarantee unchanged coverage on other clips.
+
+Scan parameters, helper/model-source pins and canonical references bind the selected mode. Regenerate old scans/freezes with the new helper. Preparing, validating or consuming a cached thorough scan never downloads or runs the model. This option is currently for the local CLI; LAN client/server forwarding and installed-service rollout are separate work.
 
 ## Fresh jobs and optional tracking
 
