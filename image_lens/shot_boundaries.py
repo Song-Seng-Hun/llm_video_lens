@@ -19,6 +19,16 @@ PARAMS = dict(detector='PySceneDetect.AdaptiveDetector', version='0.6.7.1',
 LIMITS = dict(max_frames=18000, max_seconds=600, max_pixels=8294400,
               max_file_bytes=512*1024*1024, scan_timeout_seconds=120, evidence_frames=3)
 
+
+def parameters(cuts='fast'):
+    if cuts not in ('fast','thorough'):raise ValueError('cuts must be fast or thorough')
+    out=dict(PARAMS,cuts=cuts)
+    if cuts=='thorough':
+        from image_lens import autoshot
+        out['autoshot']=autoshot.recipe()
+    return out
+
+
 _SHA={}
 
 def _state(path):
@@ -74,7 +84,7 @@ class Scan:
         for i in range(PARAMS['edge_padding']):self.cuts.extend(self.impl.process_frame(self.n+PARAMS['edge_padding']+i,self.last))
         return sorted({i-PARAMS['edge_padding'] for i in self.cuts if 0<i-PARAMS['edge_padding']<self.n})
 
-def assemble(job,times,local_cuts):
+def assemble(job,times,local_cuts,mode='fast'):
     start=job['start_frame'];end=job['end_frame'];cuts=[start+i for i in local_cuts]
     events=[]
     for i,c in enumerate(cuts):
@@ -91,7 +101,7 @@ def assemble(job,times,local_cuts):
     return dict(schema='team-eye.shots/1',source_video=job['source_video'],source_sha256=job['source_sha256'],
                 width=job['width'],height=job['height'],fps=job['fps'],native_range=[start,end],
                 frame_count=len(times),native_pts_seconds=times,decode_complete=True,
-                parameters=PARAMS,detector_source_manifest_sha256=sha(HERE/'shot-detector-pins.json'),
+                parameters=parameters(mode),detector_source_manifest_sha256=sha(HERE/'shot-detector-pins.json'),
                 detector_helper_sha256=sha(__file__),events=events,analysis_segments=segments,
                 limitations=['Hard-cut candidates only; no calibrated probability or semantic scene/identity proof.',
                              'Gradual dissolves/fades and missed edits are not protected by this detector.',
@@ -104,7 +114,9 @@ def detect_images(images,times,job):
     return canonical_scan(job,times)
 
 def validate(scan,job=None,frames=None):
-    if type(scan)is not dict or scan.get('schema')!='team-eye.shots/1' or scan.get('parameters')!=PARAMS or scan.get('decode_complete')is not True:
+    config=scan.get('parameters') if type(scan)is dict else None
+    mode=config.get('cuts') if type(config)is dict else None
+    if type(scan)is not dict or scan.get('schema')!='team-eye.shots/1' or mode not in ('fast','thorough') or scan.get('parameters')!=parameters(mode) or scan.get('decode_complete')is not True:
         raise ValueError('supported complete shot scan required')
     bounds=scan.get('native_range');times=scan.get('native_pts_seconds')
     if (type(bounds)is not list or len(bounds)!=2 or any(type(n)is not int for n in bounds)
@@ -129,7 +141,14 @@ def validate(scan,job=None,frames=None):
         c=e['after_frame'];cuts.append(c)
         if e.get('before_seconds')!=times[c-bounds[0]-1] or e.get('after_seconds')!=times[c-bounds[0]]:raise ValueError('shot event PTS mismatch')
     if cuts!=sorted(set(cuts)):raise ValueError('duplicate/unordered shot boundary')
-    expected=assemble(dict(source_video=scan['source_video'],source_sha256=scan['source_sha256'],width=scan['width'],height=scan['height'],fps=scan['fps'],start_frame=bounds[0],end_frame=bounds[1]),times,[c-bounds[0]for c in cuts])
+    if mode=='thorough':
+        from image_lens import autoshot
+        if scan.get('scan_scope')!='full_source' or bounds!=[0,scan.get('source_frame_count',0)-1]:raise ValueError('thorough cuts require full-source context')
+        evidence=scan.get('temporal');neural=autoshot.validate(evidence,scan['frame_count'],scan['source_sha256']);adaptive=evidence.get('adaptive_cuts')
+        if (not isinstance(adaptive,list) or any(type(c)is not int or not 0<c<scan['frame_count'] for c in adaptive)
+                or adaptive!=sorted(set(adaptive)) or cuts!=sorted(set(adaptive)|set(neural))):raise ValueError('thorough union must preserve every adaptive cut')
+    elif 'temporal' in scan:raise ValueError('fast scan cannot carry ignored temporal evidence')
+    expected=assemble(dict(source_video=scan['source_video'],source_sha256=scan['source_sha256'],width=scan['width'],height=scan['height'],fps=scan['fps'],start_frame=bounds[0],end_frame=bounds[1]),times,[c-bounds[0]for c in cuts],mode=mode)
     if events!=expected['events'] or scan.get('analysis_segments')!=expected['analysis_segments']:raise ValueError('shot partition or event classification mismatch')
     if job is not None:
         if (scan['source_video']!=job['source_video'] or scan['source_sha256']!=job['source_sha256']
@@ -149,23 +168,32 @@ def context(packet):
     return dict(status='requires_shot_local_retracking' if events else 'no_cut_detected_in_generation_interval',
                 detected_events=events,checked_generation_interval=[job['start_frame'],job['end_frame']],
                 scan_range=scan['native_range'],source_sha256=scan['source_sha256'],
-                detector=PARAMS,identity_scope='shot_local_unverified',
+                detector=scan['parameters'],identity_scope='shot_local_unverified',
                 no_cut_is_not_proof_of_continuity=True)
 
-def scan_video(path,start=0,end=None):
+def scan_video(path,start=0,end=None,*,cuts='fast',max_seconds=None):
+    seconds=LIMITS['scan_timeout_seconds'] if max_seconds is None else max_seconds
+    if not finite(seconds) or not 0<seconds<=LIMITS['scan_timeout_seconds']:raise ValueError('scan max_seconds must be >0 and <=120')
+    return _scan_video(path,start,end,cuts,time.monotonic()+seconds)
+
+
+def _scan_video(path,start,end,cuts,deadline):
     import cv2
+    parameters(cuts)
     path=Path(path)
     if path.is_symlink() or not path.resolve().is_relative_to(workspace_root()) or not path.is_file() or path.stat().st_size>LIMITS['max_file_bytes']:
         raise ValueError('bounded task-local regular video required')
-    path=path.resolve();pin=sha(path);cap=cv2.VideoCapture(str(path));started=time.monotonic()
+    path=path.resolve();pin=sha(path)
+    cap=(cv2.VideoCapture(str(path),cv2.CAP_FFMPEG,[cv2.CAP_PROP_N_THREADS,4]) if cuts=='thorough' else cv2.VideoCapture(str(path)))
     try:
         width,height,count=(int(cap.get(v))for v in [cv2.CAP_PROP_FRAME_WIDTH,cv2.CAP_PROP_FRAME_HEIGHT,cv2.CAP_PROP_FRAME_COUNT]);fps=cap.get(cv2.CAP_PROP_FPS)
         if not cap.isOpened() or not finite(fps) or not 0<fps<=240 or count<2 or width*height>LIMITS['max_pixels']:raise ValueError('unsupported video metadata')
         if end is None:end=count-1
+        if cuts=='thorough' and (start!=0 or end!=count-1):raise ValueError('thorough cuts require a full-source scan; partial ranges are unsupported')
         if type(start)is not int or type(end)is not int or not 0<=start<end<count or end-start+1>LIMITS['max_frames'] or (end-start)/fps>LIMITS['max_seconds']:raise ValueError('bounded native scan interval required')
-        scan=Scan();times=[]
+        scan=Scan();times=[];rgb=[]
         for n in range(end+1):
-            if time.monotonic()-started>LIMITS['scan_timeout_seconds']:raise TimeoutError('shot scan budget')
+            if time.monotonic()>=deadline:raise TimeoutError('shot scan budget')
             ok,im=cap.read()
             if not ok:raise ValueError('incomplete video decode; no scan published')
             if n<start:continue
@@ -173,17 +201,26 @@ def scan_video(path,start=0,end=None):
             t=cap.get(cv2.CAP_PROP_POS_MSEC)/1000.
             if not finite(t) or t<0 or times and t<=times[-1]:raise ValueError('nonincreasing/nonfinite decoder PTS')
             times.append(t);scan.add(im)
+            if cuts=='thorough':rgb.append(cv2.cvtColor(cv2.resize(im,(48,27),interpolation=cv2.INTER_LINEAR),cv2.COLOR_BGR2RGB))
         if end==count-1:
             ok,_=cap.read()
             if ok:raise ValueError('decoder frame count disagrees; no scan published')
         if sha(path)!=pin:raise ValueError('source changed during shot scan')
-        result=assemble(dict(source_video=str(path),source_sha256=pin,width=width,height=height,fps=fps,start_frame=start,end_frame=end),times,scan.finish())
+        found=scan.finish();temporal=None
+        if cuts=='thorough':
+            import numpy as np
+            from image_lens import autoshot
+            temporal=autoshot.predict(np.stack(rgb),pin,deadline);temporal['adaptive_cuts']=list(found)
+            found=sorted(set(found)|set(autoshot.validate(temporal,len(times),pin)))
+        if sha(path)!=pin:raise ValueError('source changed during shot scan')
+        result=assemble(dict(source_video=str(path),source_sha256=pin,width=width,height=height,fps=fps,start_frame=start,end_frame=end),times,found,mode=cuts)
+        if temporal is not None:result['temporal']=temporal
         result.update(scan_scope='full_source' if start==0 and end==count-1 else 'partial_source',source_frame_count=count)
         validate(result);return result
     finally:cap.release()
 
 def canonical_scan(job,times,cached=None):
-    """One full-source detector context, including for a short tracking job."""
+    """One full-source context. Uncached direct legacy calls are fast-only; frozen runs require their reference."""
     import cv2
     path=Path(job['source_video'])
     if (path.is_symlink() or not path.resolve().is_relative_to(workspace_root()) or not path.is_file()
@@ -281,6 +318,7 @@ def render_comparison(scan,destination,frames):
 def main():
     ap=argparse.ArgumentParser(description=__doc__);ap.add_argument('--video',required=True);ap.add_argument('--out',required=True)
     ap.add_argument('--start',type=int,default=0);ap.add_argument('--end',type=int);ap.add_argument('--evidence-dir');ap.add_argument('--event-index',type=int,default=0)
+    ap.add_argument('--cuts',choices=('fast','thorough'),default='fast');ap.add_argument('--max-seconds',type=float,default=120)
     ap.add_argument('--compare-frames',help='two native frames a,b; diagnostic originals + residual only, no new cut')
     a=ap.parse_args();out=Path(a.out).resolve()
     if not out.is_relative_to(workspace_root()) or out.exists():raise ValueError('new task-local shot JSON required')
@@ -291,8 +329,10 @@ def main():
         if not a.evidence_dir or a.event_index or len(parts)!=2 or any(not x.isascii()or not x.isdecimal()for x in parts):raise ValueError('--compare-frames needs a,b plus --evidence-dir, without --event-index')
         comparison=[int(x)for x in parts]
     if hasattr(signal, 'SIGALRM'):
-        signal.signal(signal.SIGALRM,lambda *_:(_ for _ in ()).throw(TimeoutError('shot scan wall budget')));signal.alarm(60 if comparison is not None else 120)
-    result=scan_video(a.video,a.start,a.end)
+        signal.signal(signal.SIGALRM,lambda *_:(_ for _ in ()).throw(TimeoutError('shot scan wall budget')))
+        if not finite(a.max_seconds) or not 0<a.max_seconds<=120:raise ValueError('scan max_seconds must be >0..120')
+        signal.setitimer(signal.ITIMER_REAL,min(a.max_seconds,60) if comparison is not None else a.max_seconds)
+    result=scan_video(a.video,a.start,a.end,cuts=a.cuts,max_seconds=min(a.max_seconds,60) if comparison is not None else a.max_seconds)
     json.dumps(result,allow_nan=False)
     if comparison is not None:result['appearance_inspection']=render_comparison(result,a.evidence_dir,comparison)
     elif a.evidence_dir:result['evidence_contact']=render(result,a.evidence_dir,a.event_index)

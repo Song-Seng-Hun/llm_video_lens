@@ -8,11 +8,21 @@ HERE = Path(__file__).resolve().parent
 HELPERS = ('run_point_tracker.py', 'observations.py', 'shot_boundaries.py',
            'shot-detector-pins.json', 'part_regions.py', 'source-manifest.json',
            'vendor/local-patch.json', 'jobs.py', 'paths.py', 'cli.py',
-           'tracking_child.py', 'watchdog.py')
+           'tracking_child.py', 'watchdog.py', 'autoshot.py', 'autoshot-pins.json')
 
 
 def helper_pins():
     return {name: paths.sha(HERE/name) for name in HELPERS}
+
+
+def check_cut_policy(frozen,scan=None):
+    # Mode-less manually authored freezes retain fast-only compatibility, never thorough inference.
+    mode=frozen.get('cuts_mode','fast')
+    if mode not in ('fast','thorough'):raise ValueError('unknown frozen cut policy')
+    if mode=='thorough' and not frozen.get('canonical_shots'):raise ValueError('thorough freeze requires its canonical shot reference; no fast fallback')
+    if scan is not None and (scan['parameters']['cuts']!=mode or frozen.get('shot_parameters',scan['parameters'])!=scan['parameters']):
+        raise ValueError('frozen canonical shot policy mismatch')
+    return mode
 
 
 def verify_frozen(frozen_path, queries_path):
@@ -25,6 +35,7 @@ def verify_frozen(frozen_path, queries_path):
         raise ValueError('query packet changed after freeze')
     if type(frozen.get('validation_only')) is not bool:
         raise ValueError('explicit freeze validation policy required')
+    check_cut_policy(frozen)
     return frozen
 
 
@@ -102,6 +113,7 @@ def prepare(queries, shots, out, name, allow_tracking=False, max_seconds=120):
                   source_manifest_sha256=pins['source-manifest.json'], local_patch_sha256=pins['vendor/local-patch.json'],
                   checkpoint_sha256=CHECKPOINT_SHA,
                   canonical_shots=dict(path=str(scan_path), sha256=paths.sha(scan_path)))
+    frozen.update(cuts_mode=scan['parameters']['cuts'],shot_parameters=scan['parameters'])
     output = paths.write_json(out, frozen)
     return dict(status='prepared', freeze=str(output), job=name, queries=count,
                 validation_only=not allow_tracking, model_loaded=False, forward_calls=0)

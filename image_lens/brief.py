@@ -125,6 +125,7 @@ def build(shots, reports=(), offset=0, limit=8):
                 provenance=dict(scan_path=str(location), scan_sha256=paths.sha(location),
                                 detector_helper_sha256=scan['detector_helper_sha256'],
                                 detector_source_manifest_sha256=scan['detector_source_manifest_sha256'],
+                                cut_parameters=scan['parameters'],
                                 brief_helper_sha256=paths.sha(__file__)),
                 coverage=dict(full_source=full, decoded_scan_frames=scan['frame_count'],
                               source_frame_count=scan.get('source_frame_count'), total_segments=len(segments),

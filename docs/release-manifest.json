@@ -7,7 +7,8 @@
     "PySceneDetect": "BSD-3-Clause plus embedded MIT notice",
     "CoTracker": "CC-BY-NC-4.0",
     "rtmlib-derived detector postprocess": "Apache-2.0 (pose.py ScoredYOLOX)",
-    "SAM3 MLX image implementation": "Meta custom SAM License (image_lens/_sam3_mlx/LICENSE)"
+    "SAM3 MLX image implementation": "Meta custom SAM License (image_lens/_sam3_mlx/LICENSE)",
+    "AutoShot source": "MIT (image_lens/vendor/source/autoshot/LICENSE); checkpoint-specific terms unverified, no weights bundled"
   },
   "excluded": [
     "workspace",
@@ -20,8 +21,8 @@
     "historical experiment outputs"
   ],
   "manifest_self_excluded": true,
-  "file_count": 172,
-  "total_bytes": 2340573,
+  "file_count": 180,
+  "total_bytes": 2400630,
   "files": [
     {
       "path": ".gitattributes",
@@ -75,8 +76,8 @@
     },
     {
       "path": "docs/guide.md",
-      "bytes": 23900,
-      "sha256": "0ad149e724562d24f134b291c0b5a341b65910517a27a0eba0641d94b265355e"
+      "bytes": 27250,
+      "sha256": "d237d19fa34cf86b9e240b4e2ab9b5d9117122a35655e0315b7275ba5e18c465"
     },
     {
       "path": "docs/import-provenance.json",
@@ -239,6 +240,16 @@
       "sha256": "430a74560012f3a335e812c02547a59b90e2b00ea7f7b6a6a4d99d55beabbe07"
     },
     {
+      "path": "image_lens/autoshot-pins.json",
+      "bytes": 1034,
+      "sha256": "eceed9b485f66cd77e82ec41996ee3fc57d2a3608efae0c6845f25e5bde1d460"
+    },
+    {
+      "path": "image_lens/autoshot.py",
+      "bytes": 8174,
+      "sha256": "58397d17c712220e1e22cdfba245cc6d3d84b01442e1acca288bf64d8b3040ea"
+    },
+    {
       "path": "image_lens/body_motion.py",
       "bytes": 56365,
       "sha256": "7c358ac2ed6a6e019a6f92f8169b5eceaa824101a1a1ad2e979f65f8d7bac92e"
@@ -250,8 +261,8 @@
     },
     {
       "path": "image_lens/brief.py",
-      "bytes": 12244,
-      "sha256": "51fc65c7451a88c4dec643f737b4b77fbaf672743f2103f091eb5be662c3162d"
+      "bytes": 12311,
+      "sha256": "8b4ed6a76d531bf92daf2742d18297096e1a5d7b6c1fe421c8870c7a5c1d5108"
     },
     {
       "path": "image_lens/camera.py",
@@ -270,8 +281,8 @@
     },
     {
       "path": "image_lens/cli.py",
-      "bytes": 26416,
-      "sha256": "3975158cabb02d433c076958fca4644d237f129760eaf11bd922cd5710ed3c26"
+      "bytes": 27461,
+      "sha256": "b4e284f41021534743ceb26093f537dea92931002d4a61704b4483118dc654f1"
     },
     {
       "path": "image_lens/crowd.py",
@@ -295,8 +306,8 @@
     },
     {
       "path": "image_lens/jobs.py",
-      "bytes": 6192,
-      "sha256": "b3ec971ca2fb53ebb2a7cb5c73a8f2f54733770ef6c6ee445599fcca2ebc5b39"
+      "bytes": 6988,
+      "sha256": "fcd36992968d4dd4ca4e913d48b7ab4be1637c4d42457c1a0c5988e1c216b810"
     },
     {
       "path": "image_lens/joint_tracking.py",
@@ -305,8 +316,8 @@
     },
     {
       "path": "image_lens/look.py",
-      "bytes": 55804,
-      "sha256": "0c0cf6cf2217693081c9dc9838e390975e03d531c70da9794bd6b35c8e1fde06"
+      "bytes": 56562,
+      "sha256": "a4aebc830f4efa0c32f2495770cc887a832d57c3686669835d095fda08d3a88c"
     },
     {
       "path": "image_lens/mark.py",
@@ -360,13 +371,13 @@
     },
     {
       "path": "image_lens/redo.py",
-      "bytes": 4644,
-      "sha256": "ee5386c188527c275011dfc1c04f4f80f7ef6385aa58209cd7edfe2d49c90825"
+      "bytes": 5130,
+      "sha256": "3b761b598c76df2396e488af35ce807ac21fa1fffdd637a97eee76b3bdee5569"
     },
     {
       "path": "image_lens/run_point_tracker.py",
-      "bytes": 20462,
-      "sha256": "42ee90c3e3e241301374cb584f9f09033fd3c196ab8e55b3574155649d551c22"
+      "bytes": 20393,
+      "sha256": "f59790bc876825452c9d26b271366ae259e89eaf647f1f6924055d05d5930b69"
     },
     {
       "path": "image_lens/shot-detector-pins.json",
@@ -375,8 +386,8 @@
     },
     {
       "path": "image_lens/shot_boundaries.py",
-      "bytes": 20595,
-      "sha256": "9cb6bba2a506aaab0c0dd105f398f6c573d54320879e9c263c6791d0578c19ca"
+      "bytes": 23473,
+      "sha256": "9caaef9145d349be409db01fe76034c9ad9dd822ed423f8c4584febf17ae5d88"
     },
     {
       "path": "image_lens/source-manifest.json",
@@ -547,6 +558,26 @@
       "path": "image_lens/vendor/source/README.md",
       "bytes": 17804,
       "sha256": "214ec02decccf2b5d10477398018f7b6b69d20e2b9e16d483f130595424adabf"
+    },
+    {
+      "path": "image_lens/vendor/source/autoshot/LICENSE",
+      "bytes": 1067,
+      "sha256": "04922ee7e57da9af2a0e279be94d4b22920d2dd420c0253fa5d03b0d92f51512"
+    },
+    {
+      "path": "image_lens/vendor/source/autoshot/PROVENANCE.md",
+      "bytes": 709,
+      "sha256": "74a353abdbf0f199a665f4518b3b19779499bfce374b7e767d6d814222cf6644"
+    },
+    {
+      "path": "image_lens/vendor/source/autoshot/linear.py",
+      "bytes": 1660,
+      "sha256": "bc5eb81c94c142625435fb8b85b9ecc815c3507be67733dcfb83c12f1c79a885"
+    },
+    {
+      "path": "image_lens/vendor/source/autoshot/supernet_flattransf_3_8_8_8_13_12_0_16_60.py",
+      "bytes": 24916,
+      "sha256": "8a3fe9cf079a5020950758e67e7ddf079cfac4b3fa916844d11eba6226ff7382"
     },
     {
       "path": "image_lens/vendor/source/cotracker/__init__.py",
@@ -750,13 +781,18 @@
     },
     {
       "path": "pyproject.toml",
-      "bytes": 1234,
-      "sha256": "246de9679adc6b13cfd8cd76993490e4cc50df31d6a790de4527f2bdf04b6af0"
+      "bytes": 1420,
+      "sha256": "5c9f50bd6c4eb2c6c5fb85bc2d36ad8c50de5d8d2a0c8365896996d547a6e7aa"
     },
     {
       "path": "requirements/base.txt",
       "bytes": 191,
       "sha256": "90f9b8cc97c609e44be9016049f4af4062265dda8c78b6fe6adb9b913ede2e35"
+    },
+    {
+      "path": "requirements/cuts.txt",
+      "bytes": 103,
+      "sha256": "82561a78e0667e9ac1b40988ecf36c191d16bdf0b8e4ebe709baf164b9434dce"
     },
     {
       "path": "requirements/pose.txt",
@@ -777,6 +813,11 @@
       "path": "tests/smoke_runtime.py",
       "bytes": 4329,
       "sha256": "91b6ad9d9b2045fdcb06869ec84290a5e9d443d7c9d304f810b599e1bf8bff55"
+    },
+    {
+      "path": "tests/test_autoshot.py",
+      "bytes": 9773,
+      "sha256": "23aa82857f05f8ca743ae0c44bdf81e668b6d7a683bd6bcab5797bdaaeed5262"
     },
     {
       "path": "tests/test_body_motion.py",
@@ -825,8 +866,8 @@
     },
     {
       "path": "tests/test_look.py",
-      "bytes": 38423,
-      "sha256": "77c183dedf6a634bbabe36cc58084e1acd91a7188b18765ae2b803fc369ba7d8"
+      "bytes": 39623,
+      "sha256": "00d25a305d497e326bd434b8bc6746d91d24f3a3eb8850ba83e560a7de74807a"
     },
     {
       "path": "tests/test_mark.py",
@@ -860,8 +901,8 @@
     },
     {
       "path": "tests/test_redo.py",
-      "bytes": 7188,
-      "sha256": "8bbd903aef6db845fb3269587c9a6badf2a0f7a7ae6326fe07feb696120a2ec5"
+      "bytes": 9112,
+      "sha256": "6d850a8014927b61c2c855153a49455f8bacd3fa8e3d41bf06a8c9f327218040"
     },
     {
       "path": "tests/test_source_region.py",
