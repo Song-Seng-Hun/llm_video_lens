@@ -113,8 +113,10 @@ def dispatch(command, arguments):
         ap.add_argument('--start', type=int, default=0); ap.add_argument('--end', type=int)
         ap.add_argument('--cuts', choices=('fast','thorough'), default='fast', help='fast default; thorough unions AutoShot (full source, optional cuts deps, first-use pinned57MB download)')
         ap.add_argument('--max-seconds', type=float, default=120, help='scan/dependency/download/inference budget, >0..120')
+        ap.add_argument('--transitions',action='store_true',help='exclude unverified gradual-transition ranges; requires --cuts thorough')
         ap.add_argument('--evidence-dir'); ap.add_argument('--event-index', type=int, default=0)
         a = ap.parse_args(arguments)
+        shot_boundaries.parameters(a.cuts,a.transitions)
         source = paths.confined(a.video, exists=True, max_bytes=512*1024*1024)
         paths.confined(a.out, new=True)
         if a.event_index and not a.evidence_dir:
@@ -128,7 +130,8 @@ def dispatch(command, arguments):
             if not shot_boundaries.finite(a.max_seconds) or not 0<a.max_seconds<=120:raise ValueError('scan max-seconds must be >0..120')
             signal.setitimer(signal.ITIMER_REAL,a.max_seconds)
         scan = shot_boundaries.scan_video(source, a.start, a.end,
-                                         **(dict(cuts=a.cuts,max_seconds=a.max_seconds) if a.cuts!='fast' or a.max_seconds!=120 else {}))
+                                         **(dict(cuts=a.cuts,max_seconds=a.max_seconds) if a.cuts!='fast' or a.max_seconds!=120 else {}),
+                                         **(dict(transitions=True) if a.transitions else {}))
         if a.evidence_dir:
             scan['evidence_contact'] = shot_boundaries.render(scan, evidence, a.event_index)
         output = paths.write_json(a.out, scan)
@@ -245,10 +248,14 @@ def dispatch(command, arguments):
         ap.add_argument('--max-shots', type=int, default=look.LOOK['max_shots']); ap.add_argument('--max-seconds', type=int, default=1800)
         ap.add_argument('--max-people', type=int, default=1, help='1..8 observed people per shot; default1 keeps largest-person behavior')
         ap.add_argument('--cuts', choices=('fast','thorough'), default='fast', help='fast default; thorough unions AutoShot (optional cuts deps, first-use pinned57MB download)')
+        ap.add_argument('--transitions',action='store_true',help='exclude unverified gradual-transition ranges; requires --cuts thorough')
         from image_lens.source_region import parse_box
         ap.add_argument('--scene-box', type=parse_box, help='original input pixels X0,Y0,X1,Y1; even crop width/height')
         ap.add_argument('--peak', action='store_true', help='add the frame most unlike the start left of each onion')
-        a = models(ap.parse_args(arguments), 'detector', 'pose_model', 'checkpoint')
+        a = ap.parse_args(arguments)
+        from image_lens import shot_boundaries
+        shot_boundaries.parameters(a.cuts,a.transitions)
+        a = models(a, 'detector', 'pose_model', 'checkpoint')
         if not 1 <= a.max_shots <= 256 or not 60 <= a.max_seconds <= 7200:
             raise ValueError('--max-shots 1..256 and --max-seconds 60..7200')
         if not 1 <= a.max_people <= 8:
@@ -258,6 +265,7 @@ def dispatch(command, arguments):
         return look.run(a.video, a.detector, a.pose_model, a.checkpoint, a.out, a.max_shots, a.max_seconds,
                         **(dict(max_people=a.max_people) if a.max_people > 1 else {}),
                         **(dict(cuts=a.cuts) if a.cuts!='fast' else {}),
+                        **(dict(transitions=True) if a.transitions else {}),
                         **(dict(scene_box=a.scene_box) if a.scene_box is not None else {}))
     if command == 'pose':
         from image_lens import pose

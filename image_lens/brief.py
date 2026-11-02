@@ -39,7 +39,7 @@ def admitted_report(value, scan):
     shot_boundaries.validate(scan, tracks['job'], tracks['frames'])
     context = shot_boundaries.context(tracks)
     if context['status'] == 'requires_shot_local_retracking':
-        raise ValueError('whole-clip inference crosses a cut; motion coverage remains unknown')
+        raise ValueError('original inference overlaps a cut or transition candidate; motion coverage remains unknown')
     if report.get('shot_context') != context:
         raise ValueError('report shot context missing or changed')
     start, end = report['requested_frames']
@@ -114,7 +114,8 @@ def build(shots, reports=(), offset=0, limit=8):
         rows.append(dict(segment, boundary_before=boundary, motion_coverage='reported_intervals_only' if coverage else 'unknown_no_admitted_report',
                          report_reference_indices=coverage,
                          action=None, anatomy=None, original_ease=None,
-                         cut_candidate_before=start != scan['native_range'][0],
+                         cut_candidate_before=boundary is not None,
+                         transition_candidate_before=any(r['frames'][1]==start-1 for r in scan['transition_intervals']),
                          no_cut_is_not_proof_of_continuity=True))
     return dict(schema='image-lens.brief/1',
                 status='verified_full_source' if full else 'verified_partial_source',
@@ -133,6 +134,11 @@ def build(shots, reports=(), offset=0, limit=8):
                               omitted_segments=len(segments)-len(rows),
                               next_offset=offset+len(rows) if offset+len(rows)<len(segments) else None,
                               total_cut_candidates=len(scan['events']),
+                              transition_intervals=scan['transition_intervals'][:8],
+                              total_transition_intervals=len(scan['transition_intervals']),
+                              omitted_transition_intervals=max(0,len(scan['transition_intervals'])-8),
+                              transition_intervals_locator=str(location)+'#/transition_intervals',
+                              frame_accounting=scan['frame_accounting'],
                               omitted_native_pts_values=len(scan['native_pts_seconds']),
                               raw_coordinates_included=False, images_written=0,
                               report_reference_count=len(references),
@@ -155,6 +161,12 @@ def markdown(packet):
              f"Shots: {coverage['returned_segments']}/{coverage['total_segments']}; omitted: {coverage['omitted_segments']}; images: 0.", '',
              '| Shot | Native frames | Native PTS seconds (last frame) | Motion coverage |',
              '|---|---|---|---|']
+    if coverage['total_transition_intervals']:
+        notice=[f"Transition candidates: {coverage['total_transition_intervals']}; excluded frames: {coverage['frame_accounting']['excluded_transition']}/{coverage['frame_accounting']['total']}. Motion there is unknown, not analyzed."]
+        notice += [f"- Candidate f{r['frames'][0]}..{r['frames'][1]} / {r['start_seconds']:.6f}..{r['last_frame_seconds']:.6f}s (last frame)." for r in coverage['transition_intervals']]
+        if coverage['omitted_transition_intervals']:
+            notice.append(f"Other transition candidates: {coverage['omitted_transition_intervals']}; raw ranges: {coverage['transition_intervals_locator']}")
+        lines[6:6]=notice+['']
     for row in packet['shots']:
         lines.append(f"| {row['segment_id']} | {row['start_frame']}..{row['end_frame']} | {row['start_seconds']:.6f}..{row['last_frame_seconds']:.6f} | {row['motion_coverage']} |")
     lines += ['', 'Fresh source observations and shot-local retracking are required; single-frame shots permit inspection only.',

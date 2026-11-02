@@ -162,6 +162,8 @@ def run(shots, detector, pose_model, start=0, end=None, part=None):
             raise ValueError('source decode geometry/index mismatch')
         if abs(cap.get(cv2.CAP_PROP_POS_MSEC)/1000.-scan['native_pts_seconds'][n]) > .002:
             raise ValueError('decoder PTS differs from canonical scan')
+        if n not in segments:
+            return image,np.empty((0,4),np.float32),np.empty(0,np.float32),[]
         boxes, conf = det(image)
         diagnostics = [dict(item) for item in getattr(det, 'diagnostics', [])]
         return image, np.asarray(boxes, np.float32).reshape(-1, 4), np.asarray(conf, np.float32), diagnostics
@@ -179,11 +181,19 @@ def run(shots, detector, pose_model, start=0, end=None, part=None):
                 image, boxes, conf, diagnostics = following.result()
                 if n < end:
                     following = ahead.submit(detected, n+1)
-                if segments[n] != segment:
+                current=segments.get(n)
+                if current is None:
+                    if part and len(frames)-parted>=PART_FRAMES:
+                        part(packet(frames[parted:]));parted=len(frames)
+                    segment=None;tracker=None
+                    frames.append(dict(frame=n,pts_seconds=scan['native_pts_seconds'][n],segment_id=None,
+                                       status='excluded_transition',reason='gradual_transition_candidate',detections=0,split_boxes=0,tracks=[]))
+                    continue
+                if current != segment:
                     if part and len(frames)-parted >= PART_FRAMES:
                         part(packet(frames[parted:])); parted = len(frames)
                     # Track IDs never cross a detected cut.
-                    segment = segments[n]
+                    segment = current
                     tracker = supervision.ByteTrack(track_activation_threshold=PARAMS['track_activation'], lost_track_buffer=PARAMS['lost_track_buffer'],
                                                     minimum_matching_threshold=PARAMS['minimum_matching_threshold'], frame_rate=round(fps),
                                                     minimum_consecutive_frames=1)
@@ -356,6 +366,7 @@ def seed(pose_path, frame, job, evidence_dir, track_id=None, length=SEED['max_fr
     scan, scan_path = paths.load(packet['canonical_shots']['path'])
     if paths.sha(scan_path) != packet['canonical_shots']['sha256']:
         raise ValueError('pose shot scan changed')
+    if shot_boundaries.unsafe_overlap(scan,frame,frame):raise ValueError('seed frame is an excluded transition candidate')
     rows = {f['frame']: f for f in packet['frames']}
     if frame not in rows:
         raise ValueError('seed frame outside pose range')

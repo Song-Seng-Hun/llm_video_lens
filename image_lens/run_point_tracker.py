@@ -229,9 +229,10 @@ def main():
     images, timestamps = list(_FRAMES[1]), list(_FRAMES[2])
     shot_check=shot_api['canonical_scan'](job,timestamps,scan_packet)
     internal_events=[e for e in shot_check['events']if start<e['after_frame']<=end]
-    if internal_events:
+    unsafe_intervals=shot_api['unsafe_overlap'](shot_check,start,end)
+    if internal_events or unsafe_intervals:
         print(json.dumps(dict(status='needs_shot_split',model_loaded=False,forward_calls=0,
-                              events=internal_events,analysis_segments=shot_check['analysis_segments'])),file=sys.stderr)
+                              events=internal_events,transition_intervals=unsafe_intervals,analysis_segments=shot_check['analysis_segments'])),file=sys.stderr)
         raise ValueError('detected edit/brief-transition boundary; choose one segment and fresh source observations')
     if args.validate_only:
         print(json.dumps({'status':'valid','job':job['name'],'model_loaded':False,'forward_calls':0,

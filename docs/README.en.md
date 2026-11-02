@@ -22,7 +22,7 @@ Give it one video with people or characters in it, and for each shot (cut) it wr
 
 - **One-command summary (`look`)**: analyses a video into a per-shot motion summary (`look.md`, written in Korean) and pictures to check it against.
 - **Ask about one span (`at`)**: gathers only the evidence for a span of up to 4 s, for questions like "what happens at 18–22 s?".
-- **Shots and a shot list (`scan`, `brief`, `catalog`)**: finds cut boundaries and lists each shot with its original frame range and any missing coverage.
+- **Shots and a shot list (`scan`, `brief`, `catalog`)**: finds cut boundaries and lists each shot with its original frame range and any missing coverage. Optional `--cuts thorough --transitions` marks fade/dissolve candidate intervals and excludes them from tracking.
 - **Compare frames (`compare`, `zoom`)**: shows the difference between two frames as a picture, or a short span as dense frames.
 - **Place your own points (`grid`, `mark`)**: place, name and track points on props or parts the pose model has no name for.
 - **Stays inside the workspace**: it reads videos and writes results only in the workspace folder you give it.

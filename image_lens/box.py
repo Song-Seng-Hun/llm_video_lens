@@ -59,6 +59,10 @@ def run(video, look_dir, frame, box, checkpoint, out, end=None):
     from pathlib import Path
     root = Path(look_dir)  # mark confines shots.json; pose.json is confined below
     source = paths.confined(video, exists=True, max_bytes=512*1024*1024)
+    from image_lens import shot_boundaries
+    scan,_=paths.load(root/'shots.json');shot_boundaries.validate(scan)
+    if scan['source_sha256']!=paths.sha(source):raise ValueError('shot scan belongs to another video')
+    if shot_boundaries.unsafe_overlap(scan,frame,frame):raise ValueError('seed frame is an excluded transition candidate')
     bgr = mark._frame(source, frame); h, w = bgr.shape[:2]
     region = parse(box, w, h)
     pose, _ = paths.load(paths.confined(root/'pose.json', exists=True), max_bytes=64*1024*1024)
