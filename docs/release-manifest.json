@@ -21,7 +21,7 @@
   ],
   "manifest_self_excluded": true,
   "file_count": 172,
-  "total_bytes": 2334720,
+  "total_bytes": 2340573,
   "files": [
     {
       "path": ".gitattributes",
@@ -75,8 +75,8 @@
     },
     {
       "path": "docs/guide.md",
-      "bytes": 23544,
-      "sha256": "22e13207b5e2ca801d44ca9e746a57240b796430946bcd00f20a52b614aaefc7"
+      "bytes": 23900,
+      "sha256": "0ad149e724562d24f134b291c0b5a341b65910517a27a0eba0641d94b265355e"
     },
     {
       "path": "docs/import-provenance.json",
@@ -95,8 +95,8 @@
     },
     {
       "path": "docs/look-notes.md",
-      "bytes": 87740,
-      "sha256": "1559381a753c10d614a95d33f43952581b82cee359b1975080c2ef4091fdd64a"
+      "bytes": 91055,
+      "sha256": "c5271f46417323cd6db5566df7606944c457deff7279dd9b47692ca82297581a"
     },
     {
       "path": "docs/person-detectors.md",
@@ -376,7 +376,7 @@
     {
       "path": "image_lens/shot_boundaries.py",
       "bytes": 20595,
-      "sha256": "cb56ed9bda8eb192adb18b7e6412dfd9d7844c3c9b0c16edd8af01ce5ef2f765"
+      "sha256": "9cb6bba2a506aaab0c0dd105f398f6c573d54320879e9c263c6791d0578c19ca"
     },
     {
       "path": "image_lens/source-manifest.json",
@@ -800,8 +800,8 @@
     },
     {
       "path": "tests/test_contracts.py",
-      "bytes": 22453,
-      "sha256": "ed98df2cb60f5eac2be07692ebcaf5ddaa66f0dea13db728760a2358ff762572"
+      "bytes": 24635,
+      "sha256": "1bb393431b3dd0c38bd2e7fd2d4ecc2d5bb994a9fa237f165bb9859eacf9e11c"
     },
     {
       "path": "tests/test_crowd.py",

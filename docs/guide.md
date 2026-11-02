@@ -104,6 +104,7 @@ python -m image_lens --workspace W crowd --video clip.mp4 --out crowd-clip
 ### What it runs
 
 - `scan`, one `pose` pass, then for each shot `seed` / `prepare` / `track` / `bind` / `analyze`, seeded from pose. The first 16 shots by default; `--max-shots` goes up to 256.
+- Cut detection uses four frames of context on either side. More detected cuts can use up the default 16-shot cap earlier; choose `--max-shots` for the needed coverage (at most 256). Short fast pans/zooms can still cause false splits, and dense edit trains can be missed. See [cut evidence and limits](look-notes.md#wider-adaptive-cut-context-2026-11-02).
 - Long shots (over 160 frames) are split into windows. When half or more of a group's points stop well before the window ends, `look` treats it as a drawing change and starts a new window right after it.
 - Single-frame shots, shots without a usable pose track and short tails are skipped with a reason.
 - A failed step is recorded and the run goes on. A window that could not be tracked says "추적 결과 없음: 움직임 모름".

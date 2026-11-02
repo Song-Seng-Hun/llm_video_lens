@@ -14,7 +14,7 @@ from image_lens.paths import workspace_root
 COMPARISON_SHA256 = '430a74560012f3a335e812c02547a59b90e2b00ea7f7b6a6a4d99d55beabbe07'
 PARAMS = dict(detector='PySceneDetect.AdaptiveDetector', version='0.6.7.1',
               adaptive_threshold=3.0, min_content_val=15.0, min_scene_len=1,
-              window_width=2, max_side=192, edge_padding=2,
+              window_width=4, max_side=192, edge_padding=4,
               brief_boundary_gap=2, frame_skip=0)
 LIMITS = dict(max_frames=18000, max_seconds=600, max_pixels=8294400,
               max_file_bytes=512*1024*1024, scan_timeout_seconds=120, evidence_frames=3)

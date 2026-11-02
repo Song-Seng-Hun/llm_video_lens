@@ -99,6 +99,35 @@ class Contracts(unittest.TestCase):
         self.scan['detector_helper_sha256'] = '0'*64; paths.write_json('bad-pin.json', self.scan)
         with self.assertRaisesRegex(ValueError, 'provenance mismatch'): brief.build('bad-pin.json')
 
+    def test_actual_rapid_cut_burst_native_edges_and_short_shot_barrier(self):
+        """The actual detector must recover dense edits and flush edge cuts without merging short shots."""
+        import numpy as np
+        cases = [([0]*8+[80,160]+[240]*8,[8,9,10]),([0,240],[1]),([80,80],[])]
+        for levels,expected in cases:
+            with self.subTest(levels=levels):
+                detector = shot_boundaries.Scan()
+                for level in levels:detector.add(np.full((240,320,3),level,np.uint8))
+                cuts = detector.finish();self.assertEqual(cuts,expected)
+                if expected != [8,9,10]:continue
+                job = dict(source_video=str(self.video),source_sha256=paths.sha(self.video),width=320,height=240,
+                           fps=24.,start_frame=0,end_frame=len(levels)-1)
+                scan = shot_boundaries.assemble(job,[n/24 for n in range(len(levels))],cuts)
+                scan.update(scan_scope='full_source',source_frame_count=len(levels))
+                self.assertEqual([(s['start_frame'],s['end_frame']) for s in scan['analysis_segments']],[(0,7),(8,8),(9,9),(10,17)])
+                self.assertEqual([s['analysis_eligibility'] for s in scan['analysis_segments'][1:3]],['inspection_only_single_frame']*2)
+                self.assertTrue(all(e['kind']=='brief_transition_ambiguous' for e in scan['events']))
+                paths.write_json('burst-shots.json',scan);paths.write_json('burst-queries.json',self.query(end=17))
+                with self.assertRaisesRegex(ValueError,'crosses a detected cut'):
+                    jobs.prepare('burst-queries.json','burst-shots.json','cross.freeze.json','shot0')
+                self.assertFalse((self.root/'cross.freeze.json').exists())
+
+    def test_previous_adaptive_context_scan_is_refused(self):
+        """A cached context2 partition cannot be admitted under the new detector configuration."""
+        old = copy.deepcopy(self.scan)
+        old['parameters'] = dict(old['parameters'],window_width=2,edge_padding=2)
+        paths.write_json('old-context.json',old)
+        with self.assertRaisesRegex(ValueError,'complete shot scan'):brief.build('old-context.json')
+
     def test_outside_and_symlink_paths_refused(self):
         result = self.cli('brief', '--shots', 'shots.json', '--out', '../escaped.json')
         self.assertEqual(result.returncode, 1)

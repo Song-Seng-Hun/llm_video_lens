@@ -421,3 +421,24 @@ The two selected interiors are identical by construction; their generated analys
 Measured preprocessing+camera time across all four inputs was 1.69402 ->2.46412s wall and 4.62460 ->5.64760 CPU-s; the two copies added 31,706,856 bytes. This is one ordered pair, not a general speed estimate. Whole paired processes used 6.74009s of the 240s budget, without retries or tuning. The optional recipe is adopted for explicitly selected scenes: it recovered missing interior observations at a small measured processing cost, with a disclosed disk cost. Automatic scope choice, UI/person overlaps, neural tracking accuracy after cropping and other codecs/frame rates remain unmeasured. Existing default behavior is retained.
 
 Reuse checks stored identities and geometry; these local records are not signed attestations against coordinated rewrites. Unsupported writer frame rates may be discovered after conversion, before publication, with the partial file removed. Lossless encoding is checked against decoded BGR arrays after any intentional resize.
+
+## Wider adaptive cut context (2026-11-02)
+
+The adaptive detector now compares each content-change score with four neighbours on either side, rather than two (`window_width=4`). Matching four-frame edge padding preserves native boundary indices and flushes the last buffered decisions. A short burst of edits can otherwise raise its own comparison baseline and hide genuine boundaries. Threshold 3, minimum content 15, minimum shot 1, 192px thumbnails, every-frame processing and the two-frame ambiguity marker are unchanged. No new model, dependency, vendor code or schema is introduced.
+
+A frozen paired comparison used 33 authored synthetic sources with 84 edit boundaries and six full real sources, scoring seven pre-labelled 96-frame spans. The real reference contains eight visually annotated boundaries and is based on LLM inspection with independent spot-checks, not human ground truth or held-out validation. Six ambiguous boundary opportunities remained unscored; all raw predictions and unlabelled frames were retained.
+
+| Reference | Baseline TP/FP/FN | Wider context TP/FP/FN | Exact-boundary F1 |
+| --- | --- | --- | --- |
+| All authored synthetic |50/12/34 |63/18/21 |0.68493 ->0.76364 |
+| Fresh synthetic subset |34/6/26 |39/12/21 |0.68000 ->0.70270 |
+| Earlier pilot regressions |16/6/8 |24/6/0 |0.69565 ->0.88889 |
+| Provisional real reference |7/12/1 |8/14/0 |0.51852 ->0.53333 |
+
+The wider context recovered all eight pilot misses and one drawn-video edit, preserving all seven previously correct real-reference boundaries. Across all synthetic cases, 16 newly correct boundaries came with three previously correct boundaries lost and six new false splits. Three-frame continuous pans and zooms produced false splits at each of their three steps; weaker edits beside stronger ones and long dense edit trains remain failure cases. Minimum shot length is still one frame; a detected single-frame shot remains inspection-only.
+
+The frozen real FP count remains 14, up from 12. A later visual inspection questioned one of those two new false positives as a possible punch-in edit, similar to a pre-excluded ambiguous transition; labels and scores were not changed after evaluation. The other added split lies within a continuous spin smear. This limits any broad accuracy claim. A missed cut can carry tracking across an edit; an extra split can instead reduce readable motion/ease coverage.
+
+Measured scan time was 16.5994 ->16.6565s wall and 24.5151 ->24.5819 CPU-s across 39 full scans per recipe; raw scan JSON grew 333,056 ->353,763 bytes. This was one ordered pair with zero neural inference, not a general speed benchmark. Native frames, PTS, dimensions and source hashes matched across all 39 sources. Actual downstream look/tracker inference was not rerun.
+
+**Shot-cap coverage:** more detected boundaries consume `look`'s default 16-shot cap sooner. A post-hoc diagnostic of the same full scans moved the last frame in the first 16 segments from 247 to 207 for one AI clip and 520 to 353 for one drawn clip. This is a scan diagnostic, not an executed look result. Choose `--max-shots` for the needed coverage; the default and time budget are unchanged. Cached scans and tracking freezes from the previous configuration must be regenerated because exact parameters and helper pins change.
