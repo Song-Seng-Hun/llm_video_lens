@@ -22,7 +22,7 @@
   ],
   "manifest_self_excluded": true,
   "file_count": 186,
-  "total_bytes": 2488597,
+  "total_bytes": 2488975,
   "files": [
     {
       "path": ".gitattributes",
@@ -371,8 +371,8 @@
     },
     {
       "path": "image_lens/pose.py",
-      "bytes": 32345,
-      "sha256": "6f7f52d30de8d5bada0c2ff3269766b231889b2709bd799bb9f029eb2b9f8a62"
+      "bytes": 32723,
+      "sha256": "251a95adabd299904070561148adeac124aebfc76d15fd0e40f5808de5ff3e61"
     },
     {
       "path": "image_lens/redo.py",
