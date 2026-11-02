@@ -66,9 +66,14 @@ def run(look_dir, name, detector, pose_model, checkpoint, out, max_seconds=1800)
     video = paths.confined(record['source_video'], exists=True, max_bytes=512*1024*1024)
     if not paths.sha(video) == record['source_sha256'] == before['source_sha256']:
         raise ValueError('look run, its pose.json and the video on disk differ; redo needs the video that look saw')
+    region = None
+    if record.get('source_region') is not None:
+        from image_lens import source_region
+        region = source_region.validate(video,record['source_region'])
     now = person_models.resolve(detector)['kind']
     result = look.run(video, detector, pose_model, checkpoint, out, max_seconds=max_seconds, frames=(first, last),
-                      redo=dict(look=root.name, window=name, detector=now, was=kind(before), boxes=REDO['picture']))
+                      redo=dict(look=root.name, window=name, detector=now, was=kind(before), boxes=REDO['picture']),
+                      **(dict(source_region=region) if region is not None else {}))
     after, _ = paths.load(paths.confined(Path(out)/'pose.json', exists=True), max_bytes=64*1024*1024)
     boxes(video, before, after, picks(first, last), Path(out)/REDO['picture'])
     return dict(result, window=name, frames=[first, last], detector=now, was=kind(before), boxes=str(Path(out)/REDO['picture']))

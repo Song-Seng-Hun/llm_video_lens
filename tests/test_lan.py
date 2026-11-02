@@ -3,6 +3,7 @@ import hashlib
 import http.client
 import json
 import os
+import shutil
 import socket
 import ssl
 import subprocess
@@ -24,7 +25,8 @@ if cmd == 'look':
     if a[a.index('--max-shots')+1] == '13':
         print(json.dumps(dict(status='failed', error_type='ValueError', error='no shots'))); sys.exit(1)
     os.makedirs(out)
-    open(os.path.join(out, 'look.md'), 'w').write('# look\n- shot-0000 window\n')
+    open(os.path.join(out, 'look.md'), 'w').write('# look\n- shot-0000 window\n' +
+        ('scene_box='+a[a.index('--scene-box')+1]+'\n' if '--scene-box' in a else ''))
     open(os.path.join(out, 'frame-sheet-1.jpg'), 'wb').write(b'\xff\xd8fake')
     open(os.path.join(out, 'steps.log'), 'w').write('not listed\n')
     print(json.dumps(dict(status='written', output=out, shots=1, windows=1, errors=0, elapsed_seconds=0.1)))
@@ -47,6 +49,25 @@ def private(path, text):
 
 
 class Lan(unittest.TestCase):
+    def test_signed_node_scene_box_forwarding_and_default_absence(self):
+        """The actual Node signer/query/server argv route must preserve an optional crop exactly."""
+        node = shutil.which('node')
+        if node is None:raise unittest.SkipTest('Node unavailable for optional client forwarding check')
+        d = Path(self.tmp.name);video = d/'node-input.mp4';video.write_bytes(VIDEO)
+        config = dict(host='127.0.0.1',port=self.port,client='claude-window',key_path=self.cfg_raw['clients']['claude-window'],ca_path=self.cfg_raw['cert'])
+        cfg = private(d/'node-client.json',json.dumps(config))
+        for extra in (['--scene-box','4,6,52,38'],[]):
+            result = subprocess.run([node,str(REPO/'lan/image-lens-client.mjs'),'look',str(video),*extra],
+                                    env=dict(os.environ,IMAGE_LENS_CLIENT_CONFIG=cfg),capture_output=True,text=True,timeout=20)
+            self.assertEqual(result.returncode,0,result.stderr+result.stdout)
+            reply = json.loads(result.stdout);self.assertEqual(reply['http_status'],202)
+            job = self.finished(reply['response']['id']);self.assertEqual(job['state'],'done')
+            status,text,_ = self.call('GET',f"/jobs/{job['id']}/files/look.md");self.assertEqual(status,200)
+            if extra:self.assertIn(b'scene_box=4,6,52,38',text)
+            else:self.assertNotIn(b'scene_box=',text)
+        for box in ('0,0,3,4','-1,0,3,4','0,0,4.0,4'):
+            self.assertEqual(self.call('POST','/look?scene_box='+box,VIDEO)[0],400)
+
     @classmethod
     def setUpClass(cls):
         cls.tmp = tempfile.TemporaryDirectory(); d = Path(cls.tmp.name)

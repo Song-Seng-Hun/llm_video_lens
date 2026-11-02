@@ -15,7 +15,7 @@ import { join, basename, dirname } from 'node:path';
 
 const USAGE = `usage:
   image-lens-client status
-  image-lens-client look <video> [--name LABEL] [--max-shots N] [--wait] [--out NEW_DIR]
+  image-lens-client look <video> [--name LABEL] [--max-shots N] [--scene-box X0,Y0,X1,Y1] [--wait] [--out NEW_DIR]
   image-lens-client job <job_id> [--wait] [--out NEW_DIR]
   image-lens-client jobs
   image-lens-client get <job_id> <file name> --out <new file>
@@ -122,7 +122,7 @@ async function main() {
     const k = args[i].slice(2);
     if (k in flags) usage(`--${k} given twice`);
     if (k === 'wait') flags.wait = true;
-    else if (['name', 'max-shots', 'out'].includes(k) && i + 1 < args.length) flags[k] = args[++i];
+    else if (['name', 'max-shots', 'scene-box', 'out'].includes(k) && i + 1 < args.length) flags[k] = args[++i];
     else usage(`unknown flag --${k}`);
   }
   const [cmd, a, b] = pos, c = config();
@@ -133,6 +133,12 @@ async function main() {
     if (!existsSync(a)) usage(`no such file ${a}`);
     const q = [`name=${encodeURIComponent(flags.name ?? basename(a))}`];
     if (flags['max-shots']) q.push(`max_shots=${encodeURIComponent(flags['max-shots'])}`);
+    if ('scene-box' in flags) {
+      const box = flags['scene-box'], v = box.split(',').map(Number);
+      if (!/^[0-9]+,[0-9]+,[0-9]+,[0-9]+$/.test(box) || !v.every(Number.isSafeInteger)
+          || v[2] <= v[0] || v[3] <= v[1] || (v[2]-v[0])%2 || (v[3]-v[1])%2) usage('invalid --scene-box; integer bounds and even dimensions required');
+      q.push(`scene_box=${encodeURIComponent(box)}`);
+    }
     const r = await call(c, 'POST', `/look?${q.join('&')}`, a);
     if (r.status !== 202 || !flags.wait) return finish(r);
     return showJob(c, r.body.id, true, flags.out);

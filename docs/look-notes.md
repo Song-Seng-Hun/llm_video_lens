@@ -402,3 +402,22 @@ In a fixed paired CPU comparison against the initial full-similarity version, ca
 Measured camera/correction time was 7.770 to 7.792s in one ordered pair; this is not a speed benchmark. Synthetic matcher calls increased 1086 to 1098, with no new models or dependencies. The 240-frame path is a direct camera stress test: numerical reports use correctly pinned 160/80-frame native packet slices and references 0/160, preserving the production 160-frame cap. Continuous report events across the split were not tested. Analytic point trajectories do not establish real-person accuracy, physical camera attribution or correctness across styles; the new pans share one textured world. The earlier adoption's 4px FAIL remains historical evidence; these are separate follow-up results. Behavior beyond 240 frames and real slow-stroke ease correctness remain unmeasured.
 
 Reference selection takes the first fit that passes the existing guards; it does not rank accepted retained and adjacent fits by quality. Accuracy on adversarial repetitive textures was not isolated in these controls. With the fallback gate open, a failed retained fit can add one match attempt before the last-frame fit (global + retained + last versus global + last); long unmatchable stretches were not separately profiled. The measured cost above remains specific to the frozen control set.
+
+## Explicit analysis region (2026-11-02)
+
+`look --scene-box X0,Y0,X1,Y1` selects a native input rectangle before the existing scan/pose/tracker/camera pipeline. It creates one verified lossless copy of the decoded BGR crop (after any intentional size reduction); source identity and the raw-only pixel-centre inverse map are recorded. This adds no automatic UI/scene segmentation and no regional camera matrix. A character overlapping player controls may have no useful disjoint rectangle. See [usage and codec/timing limits](guide.md#a-video-region-inside-a-player-or-layout).
+
+One frozen paired check used four authored 32-frame 24fps sources (854x480). Two had a 574x400 selected interior with fixed outer content; the other two used no region (global pan / actor-only motion). All 496 inside point-frame slots per recipe were retained, including unknowns. Exterior 496 slots were excluded scope, never credited as corrected successes. These are analytic coordinate probes, not pose/tracker accuracy labels.
+
+| Input | Known inside slots, full -> region recipe | p95 error on known positions, full -> region recipe |
+| --- | --- | --- |
+| Sparse outer UI |124/124 ->124/124 |0.16956 ->0.15764px |
+| Textured outer UI |104/124 ->124/124 |4.91620 ->0.15764px |
+| Global pan, no region |124/124 ->124/124 |0.13633 ->0.13633px |
+| Actor only, no region |124/124 ->124/124 |0.01207 ->0.01207px |
+
+The two selected interiors are identical by construction; their generated analysis files are byte-identical. Their authored 40px own-motion endpoint stayed within 0.06345px. All decoded crop pixels, 32 frame indices, 24fps timestamps, parent hashes and raw maps matched. The two no-region controls had exactly identical numeric output. No neural inference or real-video accuracy comparison was run. CLI/scan-to-pose/redo/header routing and signed Node/LAN forwarding were checked separately using the existing fake-pipeline/localhost fixtures.
+
+Measured preprocessing+camera time across all four inputs was 1.69402 ->2.46412s wall and 4.62460 ->5.64760 CPU-s; the two copies added 31,706,856 bytes. This is one ordered pair, not a general speed estimate. Whole paired processes used 6.74009s of the 240s budget, without retries or tuning. The optional recipe is adopted for explicitly selected scenes: it recovered missing interior observations at a small measured processing cost, with a disclosed disk cost. Automatic scope choice, UI/person overlaps, neural tracking accuracy after cropping and other codecs/frame rates remain unmeasured. Existing default behavior is retained.
+
+Reuse checks stored identities and geometry; these local records are not signed attestations against coordinated rewrites. Unsupported writer frame rates may be discovered after conversion, before publication, with the partial file removed. Lossless encoding is checked against decoded BGR arrays after any intentional resize.

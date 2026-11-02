@@ -441,6 +441,7 @@ class App:
         args = ["look", "--video", job["upload"], "--out", out, "--detector", self.cfg["detector"],
                 "--pose-model", self.cfg["pose_model"], "--checkpoint", self.cfg["checkpoint"],
                 "--max-shots", str(job["max_shots"]), "--max-seconds", str(int(self.limits["look_seconds"]))]
+        if job.get("scene_box") is not None:args += ["--scene-box",job["scene_box"]]
         code, result, _ = self.run_cli(args, self.limits["look_seconds"] + self.limits["kill_grace"])
         if code is None:
             job.update(state="failed", error=dict(code="timeout", message="look ran past its wall budget"))
@@ -628,7 +629,7 @@ class Handler(BaseHTTPRequestHandler):
                                             max_body=app.limits["max_body"], retention_days=app.limits["retention_days"]))
         if path == "/look":
             self.need(method, "POST")
-            return self.look(app, client, self.query(query, ("name", "max_shots")), cl)
+            return self.look(app, client, self.query(query, ("name", "max_shots", "scene_box")), cl)
         if path == "/jobs":
             self.need(method, "GET")
             mine = sorted((j for j in app.jobs.values() if j["client"] == client), key=lambda j: -j["created"])
@@ -677,6 +678,13 @@ class Handler(BaseHTTPRequestHandler):
             raise HttpError("invalid_argument", "max_shots must be an integer")
         if not 1 <= max_shots <= 256:
             raise HttpError("invalid_argument", "max_shots must be 1..256")
+        scene_box = q.get("scene_box")
+        if scene_box is not None:
+            if not re.fullmatch(r'[0-9]+,[0-9]+,[0-9]+,[0-9]+',scene_box):
+                raise HttpError("invalid_argument", "scene_box requires integer X0,Y0,X1,Y1")
+            x0,y0,x1,y1 = map(int,scene_box.split(','))
+            if x1 <= x0 or y1 <= y0 or (x1-x0)%2 or (y1-y0)%2:
+                raise HttpError("invalid_argument", "scene_box requires nonempty even dimensions")
         if cl == 0:
             raise HttpError("invalid_video")
         if cl > app.limits["max_body"]:
@@ -686,6 +694,7 @@ class Handler(BaseHTTPRequestHandler):
         jid = secrets.token_hex(16)
         job = dict(id=jid, client=client, name=name, state="uploading", created=app.clock(), bytes=cl,
                    max_shots=max_shots, upload_sha256=self.body_sha256)
+        if scene_box is not None:job["scene_box"] = scene_box
         app.reserve(job)
         part = os.path.join(app.uploads, jid + ".part")
         try:

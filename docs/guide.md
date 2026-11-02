@@ -73,6 +73,22 @@ python -m image_lens --workspace W look --video clip.mp4 --out look-clip
 
 Model paths come from `<workspace>/models.json` (see [Model paths](#model-paths)) or from `--detector`, `--pose-model` and `--checkpoint`. Exact limits and the checks behind them are in [look notes](look-notes.md).
 
+### A video region inside a player or layout
+
+Inspect an original frame and choose the region containing the movement you need:
+
+```sh
+python -m image_lens --workspace W look --video clip.mp4 --scene-box 140,40,714,440 --out look-region
+```
+
+`--scene-box X0,Y0,X1,Y1` uses original-input pixels, with right/bottom excluded. Width and height must be even; invalid or out-of-frame rectangles are refused. Keep the whole movement and every person you need inside the rectangle. Only that region is analyzed. This is explicit input selection: it cannot separate UI drawn over a person or recover anything outside the crop.
+
+The new output directory holds `source-region.avi`, encoded losslessly from the decoded BGR frames after the crop and optional size reduction. Size reduction is intentional resampling; this does not preserve the source codec’s native YUV representation. The original is retained. FFmpeg-backed OpenCV with FFV1 and verifiable constant frame timing is required; VFR/unknown timing, an FPS the AVI writer cannot preserve (including 30000/1001fps in the checked runtime), unavailable lossless encoding, timeout or a copy exceeding 512 MiB is refused. Writer FPS incompatibility may be detected after conversion; the failed partial copy is removed. Crop conversion and verification add processing time and disk space. Frame indices remain those of the input. Cut detection now sees only the selected content, so its cuts may differ from a full-frame run.
+
+`look.md`, `look-full.md`, `focus` and `at` carry the region notice. Pixel distances and raw coordinates refer to the analysis copy. `look.json.source_video` names that actual copy; `source_region` binds its hash/geometry to the parent's hash/geometry and records a pixel-centre mapping for **raw analysis coordinates only**. Camera-corrected and body-relative coordinates keep their own reference and basis.
+
+`redo` reuses the bound analysis copy without cropping twice and validates the retained parent and analysis files. Region metadata is a local processing record, not signed provenance. Reuse checks referenced file identities, geometry and map consistency; it does not authenticate deliberately rewritten records or repeat the pixel comparison performed during creation. For independent `zoom`, `grid`, `box` or `mark` commands, use the actual `source_video` from `look.json` and coordinates in that copy. The full original remains available for inspecting excluded context.
+
 ### More than one person: run crowd first
 
 `look` follows only the largest person in each shot unless `--max-people` (1–8) says otherwise. When a clip may show several people, check first:
