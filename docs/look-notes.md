@@ -362,7 +362,7 @@ Follow-up: `box` and `mark` draw against the subject too, on look's rule. The ce
 ## redo: one window with another detector (2026-11-01)
 
 - A whole look with the SAM3 bundle took 892 s on the 39 s clip B (1170 frames), so a clip past about 80 s runs out of look's 1800 s, and it lost 129 track-present frames elsewhere on that clip (Codex-mac, PR78). So HumanArt stays the default and SAM3 is used per window.
-- `redo` passes the window's frames to the pose child (`--start/--end`) and cuts the scan's shots to them (`look.clip`); the whole-clip frame sheets are left to the first look. Seeding, tracking and pictures are look's own.
+- `redo` passes the window's frames to the pose child (as its frame range on stdin; it opens its models during the scan) and cuts the scan's shots to them (`look.clip`); the whole-clip frame sheets are left to the first look. Seeding, tracking and pictures are look's own.
 - Clip B shot-0000-w0 (f0..29) with the SAM3 bundle: 33 s in all. HumanArt's box cut the head top off and took in the player UI under the figure; the SAM3 box holds the head and stops above the UI on f0, f14 and f29. Inside the redo the window split in two (f0..11, f12..29) where many points dropped at once, as look does.
 
 

@@ -281,6 +281,7 @@ def dispatch(command, arguments):
         ap.add_argument('--start', type=int, default=0); ap.add_argument('--end', type=int)
         ap.add_argument('--max-seconds', type=int, default=300)
         ap.add_argument('--parts-dir', help="new directory for packets of whole-shot runs, each announced on stdout as it is written (look's pose child)")
+        ap.add_argument('--wait', action='store_true', help="open the models, then read 'START END MAX_SECONDS' from stdin before reading --shots (look's pose child starts during the scan); --max-seconds bounds the wait")
         a = models(ap.parse_args(arguments), 'detector', 'pose_model')
         paths.confined(a.out, new=True)
         part = None
@@ -296,7 +297,18 @@ def dispatch(command, arguments):
         if hasattr(signal, 'SIGALRM'):
             signal.signal(signal.SIGALRM, lambda *_: (_ for _ in ()).throw(TimeoutError('pose wall budget exhausted')))
             signal.alarm(a.max_seconds)
-        result = pose.run(str(paths.confined(a.shots, exists=True)), a.detector, a.pose_model, a.start, a.end, part)
+        loaded = None
+        if a.wait:
+            loaded = pose.load(a.detector, a.pose_model)
+            words = sys.stdin.readline().split()
+            if len(words) != 3 or not all(w.isdigit() for w in words):
+                raise ValueError('pose child needs START END MAX_SECONDS on stdin')
+            a.start, a.end, seconds = map(int, words)
+            if not 1 <= seconds <= 1800:
+                raise ValueError('wall budget must be 1..1800 seconds')
+            if hasattr(signal, 'SIGALRM'):
+                signal.alarm(seconds)
+        result = pose.run(str(paths.confined(a.shots, exists=True)), a.detector, a.pose_model, a.start, a.end, part, loaded)
         # Compact: indented keypoints are ~4x larger and would hit the 64 MiB read cap on long clips.
         output = paths.write(a.out, json.dumps(result, ensure_ascii=False, allow_nan=False, separators=(',', ':'))+'\n')
         return dict(status='written', output=str(output), frames=len(result['frames']), flagged_frames=len(result['flags']['frames']),

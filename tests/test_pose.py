@@ -215,4 +215,29 @@ class CoremlCache(unittest.TestCase):
             self.assertEqual(pose._coreml_cache('pose'), str(cache/pose.MODELS['pose'][1]))
             self.assertEqual(sorted(p.name for p in cache.iterdir()), sorted(d for _, d in pose.MODELS.values()))
 
+
+class Wait(unittest.TestCase):
+    def test_the_waiting_child_opens_the_models_before_reading_its_range(self):
+        """look's pose child: models first, then START END MAX_SECONDS from stdin; anything else fails before posing."""
+        import io, signal, tempfile
+        from unittest.mock import patch
+        from image_lens import cli, paths
+        self.addCleanup(signal.alarm, 0)  # dispatch arms the pose budget
+        self.addCleanup(paths.configure, paths.workspace_root())
+        with tempfile.TemporaryDirectory(dir=REPO/'workspace') as d:
+            paths.configure(d)
+            (Path(d)/'shots.json').write_text('{}')
+            order = []
+            def run(shots, detector, pose_model, start, end, part, loaded):
+                order.append(('run', start, end, loaded)); return dict(frames=[], flags=dict(frames=[]), elapsed_seconds=0)
+            arguments = ['--shots', str(Path(d)/'shots.json'), '--detector', 'det', '--pose-model', 'pose', '--max-seconds', '60', '--wait']
+            with patch.object(pose, 'load', side_effect=lambda *a: order.append('load') or 'models'), patch.object(pose, 'run', side_effect=run), \
+                 patch.object(sys, 'stdin', io.StringIO('3 9 60\n')):
+                cli.dispatch('pose', arguments+['--out', str(Path(d)/'pose.json')])
+            self.assertEqual(order, ['load', ('run', 3, 9, 'models')])
+            for line in ('', '3 9\n', '3 9 0\n'):
+                with patch.object(pose, 'load'), patch.object(pose, 'run', side_effect=AssertionError('posed')), \
+                     patch.object(sys, 'stdin', io.StringIO(line)), self.assertRaises(ValueError):
+                    cli.dispatch('pose', arguments+['--out', str(Path(d)/f'pose-{len(line)}.json')])
+
 if __name__ == '__main__': unittest.main()
