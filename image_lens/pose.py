@@ -142,12 +142,13 @@ def run(shots, detector, pose_model, start=0, end=None, part=None, loaded=None):
     end = last if end is None else end
     if type(start) is not int or type(end) is not int or not 0 <= start <= end <= last or end-start+1 > PARAMS['max_frames']:
         raise ValueError('bounded native range required')
+    import os
     import time
     import cv2
     import numpy as np
     import onnxruntime
     import supervision
-    started = time.monotonic()
+    started = time.monotonic(); parent = os.getppid()
     selection, models, det, estimator = loaded or load(detector, pose_model)
     # RTMW-l 384 scores run about 6.2x the earlier RTMW 256x192 ones at every quantile (seven clips, 90k body joints), so they
     # are divided back to the 0..1 scale every score threshold was calibrated on.
@@ -255,6 +256,10 @@ def run(shots, detector, pose_model, start=0, end=None, part=None, loaded=None):
         with ThreadPoolExecutor(1) as ahead:
             following = ahead.submit(chunk, start)
             for lo in range(start, end+1, POSE_CHUNK):
+                # A parent killed outright (SIGKILL, OOM) cannot stop this child, which runs in its own session; it
+                # would pose on to its wall budget for nobody, so it stops at the next chunk once it is orphaned.
+                if os.getppid() != parent:
+                    raise SystemExit('pose: parent process exited')
                 rows, tries, requests, x, places = following.result()
                 if lo+POSE_CHUNK <= end:
                     following = ahead.submit(chunk, lo+POSE_CHUNK)
