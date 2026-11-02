@@ -177,8 +177,9 @@ def path(video, start, end, person=None):
     When the seed has enough background features, only that background may establish the camera path: a failed
     background fit stays unknown, rather than borrowing the moving subject's full-frame fit.
     Frames are matched to the start frame. When one does not match and the last matched frame is CAMERA['rekey_px'] or
-    more away, it is matched to that frame instead and the steps are chained, so a pan stays known after the start
-    frame has left the view (clip D 70-100 s: a 680 px pan at 23.35 s was unknown). A chained step needs matches over
+    more away, that frame becomes a retained local reference. Later frames under that same gate try it before the
+    last matched frame; only a successful replacement adds another chained step. A direct start-frame match clears the local reference,
+    so a pan stays known after the start frame has left the view. A chained step needs matches over
     CAMERA['chain_spread'] of the frame (ORB leaves a 31 px border, so about .94 is the most at 1920 px): frame to frame, a big figure over a still layout moves as one piece and read
     as the camera (clip A 2.76 s: 50 px, really 0; the figure spans about 70% of the width).
     A frame's value depends only on the frames before it, so the last path is kept and a shorter or equal request from
@@ -226,7 +227,7 @@ def _path(video, start, end, person=None):
     matcher = cv2.BFMatcher(cv2.NORM_HAMMING, crossCheck=True)
     size = (window[0].shape[1],window[0].shape[0]) if window else None
     result = CameraPath(reference=start, size=size, native_range=[start,end], source=dict(video=str(video)))
-    start_ref = last = None
+    start_ref = last = local_ref = None
     for i, (n, gray) in enumerate(zip(range(start, end+1), grays)):
         here = [kind[i] for kind in kinds]
         if start_ref is None:
@@ -238,11 +239,19 @@ def _path(video, start, end, person=None):
             M = _step(cv2, np, matcher, base, keys, desc, gray.shape)
             if M is not None:
                 found = (M, start_ref); break
-        if found is None and last is not start_ref and last[2] >= CAMERA['rekey_px']:
-            for (keys, desc), base in zip(here, last[0]):
-                M = _step(cv2, np, matcher, base, keys, desc, gray.shape, CAMERA['chain_spread'])
-                if M is not None:
-                    found = (M, last); break
+        if found is not None:
+            local_ref = None
+        elif last is not start_ref and last[2] >= CAMERA['rekey_px']:
+            references = [local_ref] if local_ref is not None else []
+            if last is not local_ref:
+                references.append(last)
+            for reference in references:
+                for (keys, desc), base in zip(here, reference[0]):
+                    M = _step(cv2, np, matcher, base, keys, desc, gray.shape, CAMERA['chain_spread'])
+                    if M is not None:
+                        found = (M, reference); local_ref = reference; break
+                if found is not None:
+                    break
         if found is None:
             continue
         total = np.vstack([found[0], [0, 0, 1]]) @ found[1][1]

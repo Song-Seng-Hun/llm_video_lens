@@ -18,6 +18,34 @@ def similarity(scale=1., angle=0., shift=(0.,0.), centre=(320.,240.)):
 
 
 class Similarity(unittest.TestCase):
+    def test_retained_fallback_reference_survives_gaps_and_resets_on_global_recovery(self):
+        """Avoid adjacent-fit accumulation; existing rekey test covers only one fallback step."""
+        import cv2
+        source=[np.full((480,640,3),n,np.uint8) for n in range(10)];calls=[]
+        # Small-image translations. Adjacent fits can drift despite a usable retained reference.
+        shifts={(0,1):15.,(1,2):15.,(1,3):30.,(2,3):16.,(3,4):15.,
+                (3,6):45.,(4,6):31.,(0,7):105.,(7,8):15.,(7,9):30.,(8,9):16.}
+        class ORB:
+            def detectAndCompute(self,gray,mask):return [],np.array([[int(gray[0,0])]],np.uint8)
+        def step(cv2,np,matcher,base,keys,desc,shape,*spread):
+            a,b=int(base[1][0,0]),int(desc[0,0]);calls.append((a,b,bool(spread)))
+            return similarity(shift=(shifts[a,b],0.))[:2] if (a,b) in shifts else None
+        with patch('image_lens.frames.window',return_value=source),patch.object(cv2,'ORB_create',return_value=ORB()),patch.object(camera,'_step',side_effect=step):
+            result=camera._path('unused',0,9)
+        self.assertEqual(calls,[(0,1,False),(0,2,False),(1,2,True),(0,3,False),(1,3,True),
+                              (0,4,False),(1,4,True),(3,4,True),(0,5,False),(3,5,True),(4,5,True),
+                              (0,6,False),(3,6,True),(0,7,False),(0,8,False),(7,8,True),(0,9,False),(7,9,True)])
+        self.assertEqual(sorted(result),[0,1,2,3,4,6,7,8,9])
+        for n,matrix in result.items():
+            np.testing.assert_allclose(matrix,similarity(shift=(30.*n,0.)),atol=1e-9)
+        # A retained fit cannot bypass the old admission after returning near the origin.
+        calls.clear();shifts={(0,1):15.,(1,2):-10.,(1,3):15.}
+        with patch('image_lens.frames.window',return_value=source[:4]),patch.object(cv2,'ORB_create',return_value=ORB()),patch.object(camera,'_step',side_effect=step):
+            result=camera._path('unused',0,3)
+        self.assertEqual(calls,[(0,1,False),(0,2,False),(1,2,True),(0,3,False)])
+        self.assertEqual(sorted(result),[0,1,2])
+        np.testing.assert_allclose(result[2],similarity(shift=(10.,0.)),atol=1e-9)
+
     def test_subwindow_body_basis_has_one_explicit_reference(self):
         from tests.test_body_motion import packet
         import cv2
