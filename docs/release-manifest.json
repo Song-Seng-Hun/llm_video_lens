@@ -20,8 +20,8 @@
     "historical experiment outputs"
   ],
   "manifest_self_excluded": true,
-  "file_count": 168,
-  "total_bytes": 2292323,
+  "file_count": 170,
+  "total_bytes": 2302587,
   "files": [
     {
       "path": ".gitattributes",
@@ -40,8 +40,8 @@
     },
     {
       "path": "README.md",
-      "bytes": 17445,
-      "sha256": "a8d293d27dca41cd2dbef413eb66d3cf946405d6a138c557f502bc98ecde9328"
+      "bytes": 17640,
+      "sha256": "678249e29ae9625a7405f79d1c5562ed1b62fced1bcbea62b58320e1e4df3e15"
     },
     {
       "path": "assets/banner-dark.svg",
@@ -75,8 +75,8 @@
     },
     {
       "path": "docs/guide.md",
-      "bytes": 19339,
-      "sha256": "2465c44c10a1b8be2e3dc3bd5b34488f5c37ce6b31789cc9a6df581b6ecdaf48"
+      "bytes": 20252,
+      "sha256": "f57fdd60c8e6958589dfda45c80b903525a1070ce5f28e85f27742df4533d989"
     },
     {
       "path": "docs/import-provenance.json",
@@ -270,8 +270,13 @@
     },
     {
       "path": "image_lens/cli.py",
-      "bytes": 23492,
-      "sha256": "870704e84447e650154a9b7803c7fb38ab2e34241f91c0452dedf094b4528fbf"
+      "bytes": 24136,
+      "sha256": "4bd7722bac2d341b8e0d14790bf2a2109241e6b76e96a87199c44bfa4b56622c"
+    },
+    {
+      "path": "image_lens/crowd.py",
+      "bytes": 6122,
+      "sha256": "f877811526200eef1fec727a8216842fe0854a6e0e7a4aa46da9250739265d53"
     },
     {
       "path": "image_lens/digest.py",
@@ -350,8 +355,8 @@
     },
     {
       "path": "image_lens/pose.py",
-      "bytes": 27782,
-      "sha256": "9ce2d4c5793a0b33ff57a2ba461a670594e9b4cb3b4243448ab2ae02b86843c3"
+      "bytes": 27966,
+      "sha256": "537bbd4354fb01cb635f801956136b2c13d30a557c5a4dbff6b1ac776a5821c0"
     },
     {
       "path": "image_lens/redo.py",
@@ -792,6 +797,11 @@
       "path": "tests/test_contracts.py",
       "bytes": 22453,
       "sha256": "ed98df2cb60f5eac2be07692ebcaf5ddaa66f0dea13db728760a2358ff762572"
+    },
+    {
+      "path": "tests/test_crowd.py",
+      "bytes": 2206,
+      "sha256": "e6d4dfc8fe4e342d9457f710f5802fe4df94c5c08068c09c072d2f58ed8e2d84"
     },
     {
       "path": "tests/test_digest.py",

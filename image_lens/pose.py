@@ -83,6 +83,21 @@ def _detector_class():
     return ScoredYOLOX
 
 
+def person_detector(selection):
+    """Person boxes for one BGR image, det(image) -> (boxes, scores), for a person_models.resolve() selection."""
+    import onnxruntime
+    if selection['kind'] != 'humanart':
+        return person_models.create(selection)
+    det = _detector_class()(str(selection['path']), model_input_size=tuple(PARAMS['det_input']), score_thr=PARAMS['det_score'],
+                            nms_thr=PARAMS['det_nms'], backend='onnxruntime', device='cpu')
+    det.session = onnxruntime.InferenceSession(str(selection['path']), providers=[
+        ('CoreMLExecutionProvider', dict(ModelFormat='MLProgram', RequireStaticInputShapes='1', ModelCacheDirectory=_coreml_cache('detector'))),
+        'CPUExecutionProvider'])
+    if det.session.get_providers() != ['CoreMLExecutionProvider', 'CPUExecutionProvider']:
+        raise ValueError('unexpected execution provider')
+    return det
+
+
 def run(shots, detector, pose_model, start=0, end=None, part=None):
     """Pose packet for start..end. With `part`, look's pose child also hands over packets for runs of whole shots as
     they finish (track IDs and flags never cross a cut, so a part reads the same as that range of the whole)."""
@@ -110,16 +125,7 @@ def run(shots, detector, pose_model, start=0, end=None, part=None):
     # input. Clip B, 390 frames: 104 -> 11 ms a frame, the same box count on every frame, boxes within 0.01 px of CPU.
     # The compiled CoreML models are kept per pinned model hash (fresh process: pose 2.0 -> 0.1 s, detector 0.5 -> 0.1 s,
     # the same outputs). The pose session is rtmlib's 'mps' one (CoreML default options) plus the cache.
-    if selection['kind'] == 'humanart':
-        det = _detector_class()(str(models['detector']), model_input_size=tuple(PARAMS['det_input']), score_thr=PARAMS['det_score'],
-                                nms_thr=PARAMS['det_nms'], backend='onnxruntime', device='cpu')
-        det.session = onnxruntime.InferenceSession(str(models['detector']), providers=[
-            ('CoreMLExecutionProvider', dict(ModelFormat='MLProgram', RequireStaticInputShapes='1', ModelCacheDirectory=_coreml_cache('detector'))),
-            'CPUExecutionProvider'])
-        if det.session.get_providers() != ['CoreMLExecutionProvider', 'CPUExecutionProvider']:
-            raise ValueError('unexpected execution provider')
-    else:
-        det = person_models.create(selection)
+    det = person_detector(selection)
     estimator = RTMPose(str(models['pose']), model_input_size=tuple(PARAMS['pose_input']), to_openpose=False, backend='onnxruntime', device='cpu')
     estimator.session = onnxruntime.InferenceSession(str(models['pose']), providers=[
         ('CoreMLExecutionProvider', dict(ModelCacheDirectory=_coreml_cache('pose'))), 'CPUExecutionProvider'])

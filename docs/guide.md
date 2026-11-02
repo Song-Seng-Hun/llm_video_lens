@@ -73,6 +73,18 @@ python -m image_lens --workspace W look --video clip.mp4 --out look-clip
 
 Model paths come from `<workspace>/models.json` (see [Model paths](#model-paths)) or from `--detector`, `--pose-model` and `--checkpoint`. Exact limits and the checks behind them are in [look notes](look-notes.md).
 
+### More than one person: run crowd first
+
+`look` follows only the largest person in each shot unless `--max-people` (1–8) says otherwise. When a clip may show several people, check first:
+
+```sh
+python -m image_lens --workspace W crowd --video clip.mp4 --out crowd-clip
+```
+
+- `crowd` runs only the person detector, on one frame every 0.5 s (`--every`), and writes `crowd.jpg`: the four frames with the most boxes, at least 2 s apart, each box numbered. A 110 s 1080p clip took about 4 s.
+- Look at `crowd.jpg` and count the people yourself. The count is rough: two people overlapping can share one box, and close-up eyes, posters or drawn figures can get boxes. `crowd.json` holds the count for every checked frame and `suggested_max_people`, the largest count capped at 8.
+- Then run `look --max-people N` with your own count. The cap is per shot, so a shot with fewer people only tracks the people it has.
+
 ### What it runs
 
 - `scan`, one `pose` pass, then for each shot `seed` / `prepare` / `track` / `bind` / `analyze`, seeded from pose. The first 16 shots by default; `--max-shots` goes up to 256.
