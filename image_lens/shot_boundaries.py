@@ -216,6 +216,7 @@ def _scan_video(path,start,end,cuts,deadline,transitions=False):
     if path.is_symlink() or not path.resolve().is_relative_to(workspace_root()) or not path.is_file() or path.stat().st_size>LIMITS['max_file_bytes']:
         raise ValueError('bounded task-local regular video required')
     path=path.resolve();pin=sha(path)
+    stream=None
     cap=(cv2.VideoCapture(str(path),cv2.CAP_FFMPEG,[cv2.CAP_PROP_N_THREADS,4]) if cuts=='thorough' else cv2.VideoCapture(str(path)))
     try:
         width,height,count=(int(cap.get(v))for v in [cv2.CAP_PROP_FRAME_WIDTH,cv2.CAP_PROP_FRAME_HEIGHT,cv2.CAP_PROP_FRAME_COUNT]);fps=cap.get(cv2.CAP_PROP_FPS)
@@ -224,6 +225,9 @@ def _scan_video(path,start,end,cuts,deadline,transitions=False):
         if cuts=='thorough' and (start!=0 or end!=count-1):raise ValueError('thorough cuts require a full-source scan; partial ranges are unsupported')
         if type(start)is not int or type(end)is not int or not 0<=start<end<count or end-start+1>LIMITS['max_frames'] or (end-start)/fps>LIMITS['max_seconds']:raise ValueError('bounded native scan interval required')
         scan=Scan();times=[];rgb=[]
+        if cuts=='thorough':
+            from image_lens import autoshot
+            stream=autoshot.Stream(pin,deadline)  # runs each AutoShot window as soon as its frames are decoded
         for n in range(end+1):
             if time.monotonic()>=deadline:raise TimeoutError('shot scan budget')
             ok,im=cap.read()
@@ -233,7 +237,7 @@ def _scan_video(path,start,end,cuts,deadline,transitions=False):
             t=cap.get(cv2.CAP_PROP_POS_MSEC)/1000.
             if not finite(t) or t<0 or times and t<=times[-1]:raise ValueError('nonincreasing/nonfinite decoder PTS')
             times.append(t);scan.add(im)
-            if cuts=='thorough':rgb.append(cv2.cvtColor(cv2.resize(im,(48,27),interpolation=cv2.INTER_LINEAR),cv2.COLOR_BGR2RGB))
+            if cuts=='thorough':rgb.append(cv2.cvtColor(cv2.resize(im,(48,27),interpolation=cv2.INTER_LINEAR),cv2.COLOR_BGR2RGB));stream.feed(rgb[-1])
         if end==count-1:
             ok,_=cap.read()
             if ok:raise ValueError('decoder frame count disagrees; no scan published')
@@ -241,8 +245,7 @@ def _scan_video(path,start,end,cuts,deadline,transitions=False):
         found=scan.finish();temporal=None
         if cuts=='thorough':
             import numpy as np
-            from image_lens import autoshot
-            temporal=autoshot.predict(np.stack(rgb),pin,deadline);temporal['adaptive_cuts']=list(found)
+            temporal=stream.finish();temporal['adaptive_cuts']=list(found)
             found=sorted(set(found)|set(autoshot.validate(temporal,len(times),pin)))
         if sha(path)!=pin:raise ValueError('source changed during shot scan')
         gradual=None;unsafe=[]
@@ -256,7 +259,9 @@ def _scan_video(path,start,end,cuts,deadline,transitions=False):
         if temporal is not None:result['temporal']=temporal
         result.update(scan_scope='full_source' if start==0 and end==count-1 else 'partial_source',source_frame_count=count)
         validate(result);return result
-    finally:cap.release()
+    finally:
+        cap.release()
+        if stream is not None:stream.close()
 
 def canonical_scan(job,times,cached=None):
     """One full-source context. Uncached direct legacy calls are fast-only; frozen runs require their reference."""

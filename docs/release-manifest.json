@@ -22,7 +22,7 @@
   ],
   "manifest_self_excluded": true,
   "file_count": 182,
-  "total_bytes": 2454575,
+  "total_bytes": 2456943,
   "files": [
     {
       "path": ".gitattributes",
@@ -246,8 +246,8 @@
     },
     {
       "path": "image_lens/autoshot.py",
-      "bytes": 8174,
-      "sha256": "58397d17c712220e1e22cdfba245cc6d3d84b01442e1acca288bf64d8b3040ea"
+      "bytes": 10037,
+      "sha256": "c6b438217b6cc1f196e28d4f0ef704329a3f0efc55c324ae947f0e3978c8d65e"
     },
     {
       "path": "image_lens/body_motion.py",
@@ -391,8 +391,8 @@
     },
     {
       "path": "image_lens/shot_boundaries.py",
-      "bytes": 26869,
-      "sha256": "ee0dd44b82fd18af5704235a3f45942bb8baa474101d767776962b4cd68cecf0"
+      "bytes": 27072,
+      "sha256": "a0cb0e6a823db95f401eaa6d91aed2b8a78cb0810cf0707b618ae15684465ddc"
     },
     {
       "path": "image_lens/source-manifest.json",
@@ -821,8 +821,8 @@
     },
     {
       "path": "tests/test_autoshot.py",
-      "bytes": 9773,
-      "sha256": "23aa82857f05f8ca743ae0c44bdf81e668b6d7a683bd6bcab5797bdaaeed5262"
+      "bytes": 10076,
+      "sha256": "c8c55272f402dbd6edadf682c54598b76d70df67ca5d828a0071076fea08f410"
     },
     {
       "path": "tests/test_body_motion.py",
@@ -861,8 +861,8 @@
     },
     {
       "path": "tests/test_gradual_transitions.py",
-      "bytes": 16555,
-      "sha256": "bd23b2f83c98c474e98f5214006bddd03886245679a1ecd294b38ab492f29578"
+      "bytes": 16554,
+      "sha256": "a8a8ecb0ee7dc7ed93e7eff1e60ae09632da1ac4631e28dff08de96b9887027b"
     },
     {
       "path": "tests/test_joint_tracking.py",
