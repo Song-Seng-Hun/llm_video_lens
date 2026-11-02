@@ -105,6 +105,8 @@ python -m image_lens --workspace W crowd --video clip.mp4 --out crowd-clip
 
 ### Reading look.md
 
+**Check the points first.** Before reading any text or JSON numbers, open `onion-sheet-N.jpg`. In each window, the spacing chart on the right names the points drawn as coloured trails (`elbow-l`, `move-b`, …). Check that each trail sits on the body part it is named for. In the README dancer onion, the `elbow-l` trail sits on the chest and the `move-b` trail sits beside the shin, yet both still carry full distances and speeds. A trail on the background, on another part or on another person means that point slipped. For that window, read the lines it appears in (direction, distance, speed, ease) and its numbers in `look.json` / `*.report.json` as unknown. Unnamed points (`move-a`…) only need to be on the body. `look.md` repeats this check as its first line, and `image-lens --help` and `look --help` give the same order.
+
 At the top, **먼저 확인할 곳** lists up to four spans where the tool itself is least sure: overlapping person boxes, lost tracks or poses, frames with no pose (so missing from the text) and runs of short cuts. Each has dense frames in `check-sheet-N.jpg`. Spans not listed can be wrong too: two people merged into one box (18–22 s of one test clip) was not caught, so read the frame sheets as well.
 
 Below it, each window line starts with the shot framing (전신, 무릎 위, 상반신, 얼굴 클로즈업) and then says:

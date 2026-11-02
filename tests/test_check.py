@@ -170,6 +170,27 @@ class Describe(unittest.TestCase):
         shot['windows'] = [window(60, 79)]
         self.assertNotIn('mark로', digest.markdown(dict(source_video='v.mp4', shots=[shot], check=[]), dict(fps=25, source_frame_count=100), 'look-full.md'))
 
+    # README dancer onion: elbow-l's trail on the chest, move-b's beside the shin; the reader must see that before the numbers.
+    def test_point_check_comes_before_the_numbers(self):
+        shot = dict(segment_id='shot-0000', frames=[0, 99], seconds=[0, 4.], skipped=[], errors=[], windows=[window(0, 19)])
+        record = dict(source_video='v.mp4', shots=[shot], check=[])
+        lines = digest.markdown(dict(record, onion_sheets=['onion-sheet-1.jpg']), dict(fps=25, source_frame_count=100), 'look-full.md').splitlines()
+        at = next(i for i, line in enumerate(lines) if line.startswith('먼저 점 위치 확인'))
+        self.assertLess(at, next(i for i, line in enumerate(lines) if line.startswith('읽는 법')))
+        self.assertIn('onion-sheet-1.jpg', lines[at]); self.assertIn('JSON 수치는 버리고', lines[at])
+        self.assertNotIn('먼저 점 위치 확인', digest.markdown(record, dict(fps=25, source_frame_count=100), 'look-full.md'))
+
+    def test_help_gives_the_reading_order(self):
+        import contextlib, io
+        from image_lens import cli
+        for argv in (['--help'], ['look', '--help']):
+            out = io.StringIO()
+            with contextlib.redirect_stdout(out), self.assertRaises(SystemExit):
+                cli.main(argv) if argv[0] == '--help' else cli.dispatch('look', ['--help'])
+            text = out.getvalue()
+            self.assertIn('onion-sheet-N.jpg', text); self.assertIn('elbow-l', text)
+            self.assertLess(text.index('onion-sheet-N.jpg'), text.index('look.json'))
+
     def test_old_look_json_reads_the_net_shift(self):
         self.assertEqual(digest.camera(dict(net=[0., 30.], frames=12), 10), '카메라 아래 30px')
         self.assertIsNone(digest.camera(dict(net=[2., 0.], frames=12), 10))
