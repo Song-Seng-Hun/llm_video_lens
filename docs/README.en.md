@@ -164,6 +164,15 @@ A person set the direction and AI agents built this project together. What to bu
 - CoTracker source and checkpoint are for noncommercial use only. SAM3 follows the SAM License; research that uses it must acknowledge SAM3.
 - No model weights are in the repository. The SAM3 upload (mlx-community) says apache-2.0, but the weights follow the original's (facebook/sam3) SAM License.
 
+## Agent skills
+
+The [`skills/`](../skills/) folder holds skills (`SKILL.md` in the Agent Skills format) so AI agents can use the tool right away.
+
+- [`llm-video-lens`](../skills/llm-video-lens/SKILL.md): run `look`, `at`, `box`, `redo` and the rest on this Mac, and the order and cautions for reading the results
+- [`image-lens-remote`](../skills/image-lens-remote/SKILL.md): use it from a Windows PC on the same network through the [LAN API](../lan/README.md)
+
+Install by copying the whole folder: `~/.claude/skills/` (or a project's `.claude/skills/`) for Claude Code, `~/.codex/skills/` for Codex.
+
 ## More
 
 - [Full guide](guide.md): every command and option, the full way to read `look.md`, output files, the brief format, jobs and tracking, pose seeds

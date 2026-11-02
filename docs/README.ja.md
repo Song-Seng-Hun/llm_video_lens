@@ -164,6 +164,15 @@ python -m image_lens --workspace W redo --look W/look --window shot-0000-w0 --de
 - CoTracker のソースとチェックポイントは非商用利用のみです。SAM3 は SAM License に従い、研究で使う場合は SAM3 を明記する必要があります。
 - モデルの重みはリポジトリに含まれていません。SAM3 の重みはアップロード先（mlx-community）では apache-2.0 と書かれていますが、元（facebook/sam3）の SAM License に従います。
 
+## エージェント用スキル
+
+AI エージェントがすぐにこのツールを使えるよう、[`skills/`](../skills/) フォルダーにスキル（Agent Skills 形式の `SKILL.md`）を置いています。
+
+- [`llm-video-lens`](../skills/llm-video-lens/SKILL.md)：この Mac で `look`・`at`・`box`・`redo` などを直接実行し、結果を読む順番と注意点
+- [`image-lens-remote`](../skills/image-lens-remote/SKILL.md)：同じネットワークの Windows PC から [LAN API](../lan/README.md) で使う
+
+フォルダーごとコピーしてインストールします。Claude Code は `~/.claude/skills/`（またはプロジェクトの `.claude/skills/`）、Codex は `~/.codex/skills/` に置きます。
+
 ## もっと見る
 
 詳しい文書は英語です。

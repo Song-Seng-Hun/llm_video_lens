@@ -17,7 +17,7 @@ Nothing here is installed. No LaunchAgent, firewall rule, certificate or key is 
 | `image-lens-client.mjs` | Windows client (Node 22, no dependencies) |
 | `api.example.json` | Example config (`~/.image-lens/api.json`, mode 0600) |
 | `com.image-lens.lan-api.plist.template` | LaunchAgent **template** |
-| `skill/image-lens-remote/SKILL.md` | Skill for the Windows AIs |
+| [`../skills/image-lens-remote/SKILL.md`](../skills/image-lens-remote/SKILL.md) | Skill for the Windows AIs (kept with the other agent skills in `skills/`) |
 
 Tests: `tests/test_lan.py` (127.0.0.1 test mode, throwaway certificate, fake image_lens CLI). Run them under both
 Pythons: `/usr/bin/python3 -B -m unittest tests.test_lan` and the runtime python.
