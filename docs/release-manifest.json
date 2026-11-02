@@ -22,7 +22,7 @@
   ],
   "manifest_self_excluded": true,
   "file_count": 182,
-  "total_bytes": 2464427,
+  "total_bytes": 2466898,
   "files": [
     {
       "path": ".gitattributes",
@@ -41,8 +41,8 @@
     },
     {
       "path": "README.md",
-      "bytes": 17769,
-      "sha256": "185440195e234b942c45d07a99c4d3767bac4675c4a6ff94e273c48366116805"
+      "bytes": 18318,
+      "sha256": "24e1d05e4b0e2f7641aec1b0e383e8afb0878909b70d25b7c283bcd9e069459c"
     },
     {
       "path": "assets/banner-dark.svg",
@@ -66,13 +66,13 @@
     },
     {
       "path": "docs/README.en.md",
-      "bytes": 15269,
-      "sha256": "2d85c7910ceb9379f586cd4b70d72a69d30627ed01a28a53551eb64ad29e1538"
+      "bytes": 15796,
+      "sha256": "3a6f986f445f74369d0544da80d224ff108a380ae0e210545f060f4e1472c6e5"
     },
     {
       "path": "docs/README.ja.md",
-      "bytes": 18606,
-      "sha256": "8c767151f62e81a42f4e7a891fc89f089451d980a750c870661409169788a88d"
+      "bytes": 19249,
+      "sha256": "a561af365cff391af82f2b64a2b773862803b68dc698ac2bdef200be270af34e"
     },
     {
       "path": "docs/guide.md",
@@ -106,8 +106,8 @@
     },
     {
       "path": "docs/provenance.md",
-      "bytes": 3974,
-      "sha256": "0f53be77a8f705c8dd5df7b80ef556c1527a46348a2c97a86132d05059ad24ae"
+      "bytes": 4726,
+      "sha256": "ea9b37be21efe6d6f1e54d451585d3f4087b32a6509784f67181d3379d306223"
     },
     {
       "path": "docs/verification.md",

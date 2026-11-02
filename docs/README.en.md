@@ -29,13 +29,13 @@ Give it one video with people or characters in it, and for each shot (cut) it wr
 
 ## Quick start
 
-1. With Python 3.11 or later, install the dependencies (checked on macOS Apple Silicon with Python 3.12). `look` uses both pose estimation and point tracking, so it needs both sets.
+1. With Python 3.11 or later, install the dependencies (checked on macOS Apple Silicon with Python 3.12). `look` uses both pose estimation and point tracking, so it needs both sets. Install `requirements/cuts.txt` (Torch) too only if you use `--cuts thorough`, which finds additional cuts.
 
    ```sh
    pip install -r requirements/pose.txt -r requirements/tracking.txt
    ```
 
-2. Get the three model files yourself: person detection (YOLOX HumanArt, ONNX), whole-body pose (RTMW 133 keypoints, ONNX) and point tracking (a CoTracker checkpoint). They are not in the repository and are never downloaded for you. Person detection can be switched to DeepGHS for drawn figures or to the SAM3 bundle ([Models and licenses](#models-and-licenses), [detector choice and pinned files](person-detectors.md)).
+2. Get the three model files yourself: person detection (YOLOX HumanArt, ONNX), whole-body pose (RTMW 133 keypoints, ONNX) and point tracking (a CoTracker checkpoint). They are not in the repository and are never downloaded for you. The one exception: on first use, `--cuts thorough` downloads the AutoShot weights (57 MB) from a pinned address and checks their hash ([additional cuts](guide.md#optional-additional-cuts)). Person detection can be switched to DeepGHS for drawn figures or to the SAM3 bundle ([Models and licenses](#models-and-licenses), [detector choice and pinned files](person-detectors.md)).
 3. Copy the video into the workspace folder (by default `workspace/` in the repository), and write the model paths in `workspace/models.json`.
 
    ```json
@@ -157,6 +157,7 @@ A person set the direction and AI agents built this project together. What to bu
 | RTMW-l 384, 133 keypoints (ONNX, bring your own) | whole-body pose | weight license not established |
 | [CoTracker](https://github.com/facebookresearch/co-tracker) (source in `image_lens/vendor/source`, checkpoint bring your own) | point tracking | CC-BY-NC 4.0 |
 | [PySceneDetect](https://www.scenedetect.com/) (in `image_lens/vendor/shot-detector`) | finding cuts | BSD 3-Clause |
+| [AutoShot](https://github.com/wentaozhu/AutoShot) (source in `image_lens/vendor/source/autoshot`; weights downloaded on first `--cuts thorough`) | additional cut candidates (optional) | source MIT; weights license unverified |
 | rtmlib detector postprocess (`pose.py`) · ONNX Runtime · MLX | running the models | Apache-2.0 · MIT · MIT |
 
 - The project's own code and documents are [MIT](../LICENSE). Vendored code keeps its own terms.

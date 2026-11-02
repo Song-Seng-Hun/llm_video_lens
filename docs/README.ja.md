@@ -29,13 +29,13 @@ LLM Video Lens はそれを助ける補助ツールです。フレーム間の�
 
 ## クイックスタート
 
-1. Python 3.11 以上で依存パッケージをインストールします（macOS Apple Silicon の Python 3.12 で検証）。`look` は姿勢推定と点の追跡を両方使うので、2 つのセットがどちらも必要です。
+1. Python 3.11 以上で依存パッケージをインストールします（macOS Apple Silicon の Python 3.12 で検証）。`look` は姿勢推定と点の追跡を両方使うので、2 つのセットがどちらも必要です。カットをより多く探す `--cuts thorough` を使うときだけ、`requirements/cuts.txt`（Torch）もインストールします。
 
    ```sh
    pip install -r requirements/pose.txt -r requirements/tracking.txt
    ```
 
-2. モデルファイルを 3 つ自分で用意します。人物検出（YOLOX HumanArt、ONNX）、全身の姿勢（RTMW 133 キーポイント、ONNX）、点の追跡（CoTracker のチェックポイント）です。リポジトリには入っておらず、自動でダウンロードもしません。人物検出は、絵柄向けの DeepGHS や SAM3 バンドルに切り替えることもできます（[使用モデルとライセンス](#使用モデルとライセンス)、[検出器の選び方と固定ファイル一覧](person-detectors.md)）。
+2. モデルファイルを 3 つ自分で用意します。人物検出（YOLOX HumanArt、ONNX）、全身の姿勢（RTMW 133 キーポイント、ONNX）、点の追跡（CoTracker のチェックポイント）です。リポジトリには入っておらず、自動でダウンロードもしません。例外として、`--cuts thorough` は初回に AutoShot の重み（57MB）を固定のアドレスからダウンロードし、ハッシュを確認します（[カットの追加検出](guide.md#optional-additional-cuts)）。人物検出は、絵柄向けの DeepGHS や SAM3 バンドルに切り替えることもできます（[使用モデルとライセンス](#使用モデルとライセンス)、[検出器の選び方と固定ファイル一覧](person-detectors.md)）。
 3. 作業スペースのフォルダー（既定はリポジトリ内の `workspace/`）に動画をコピーし、`workspace/models.json` にモデルのパスを書きます。
 
    ```json
@@ -157,6 +157,7 @@ python -m image_lens --workspace W redo --look W/look --window shot-0000-w0 --de
 | RTMW-l 384、133 キーポイント（ONNX、自分で用意） | 全身の姿勢 | 重みのライセンスは未確認 |
 | [CoTracker](https://github.com/facebookresearch/co-tracker)（ソースは `image_lens/vendor/source` に同梱、チェックポイントは自分で用意） | 点の追跡 | CC-BY-NC 4.0 |
 | [PySceneDetect](https://www.scenedetect.com/)（`image_lens/vendor/shot-detector` に同梱） | カットの検出 | BSD 3-Clause |
+| [AutoShot](https://github.com/wentaozhu/AutoShot)（`image_lens/vendor/source/autoshot` にソース同梱、重みは `--cuts thorough` の初回にダウンロード） | カット候補の追加（任意） | ソースは MIT、重みのライセンスは未確認 |
 | rtmlib の検出器後処理（`pose.py`）・ONNX Runtime・MLX | モデルの実行 | Apache-2.0・MIT・MIT |
 
 - このプロジェクトのコードと文書は [MIT](../LICENSE) です。同梱の外部コードはそれぞれの条件に従います。

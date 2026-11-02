@@ -31,13 +31,13 @@ LLM Video Lens는 이를 돕는 보조 도구입니다. 프레임 사이의 움�
 
 ## 빠른 시작
 
-1. Python 3.11 이상에서 필요한 패키지를 설치합니다(macOS Apple Silicon, Python 3.12에서 검증). `look`은 자세 추정과 점 추적을 함께 쓰므로 두 패키지 목록을 모두 설치해야 합니다.
+1. Python 3.11 이상에서 필요한 패키지를 설치합니다(macOS Apple Silicon, Python 3.12에서 검증). `look`은 자세 추정과 점 추적을 함께 쓰므로 두 패키지 목록을 모두 설치해야 합니다. 컷을 더 찾는 `--cuts thorough`를 쓸 때만 `requirements/cuts.txt`(Torch)도 설치합니다.
 
    ```sh
    pip install -r requirements/pose.txt -r requirements/tracking.txt
    ```
 
-2. 모델 파일 세 개를 직접 준비합니다. 사람 검출(YOLOX HumanArt, ONNX), 전신 자세(RTMW 133 키포인트, ONNX), 점 추적(CoTracker 체크포인트)입니다. 저장소에 들어 있지 않고, 자동으로 내려받지도 않습니다. 사람 검출은 그림체용 DeepGHS나 SAM3 묶음으로 바꿀 수도 있습니다([사용 모델과 라이선스](#사용-모델과-라이선스), [모델 선택과 고정 파일 목록](docs/person-detectors.md)).
+2. 모델 파일 세 개를 직접 준비합니다. 사람 검출(YOLOX HumanArt, ONNX), 전신 자세(RTMW 133 키포인트, ONNX), 점 추적(CoTracker 체크포인트)입니다. 저장소에 들어 있지 않고, 자동으로 내려받지도 않습니다. 예외로 `--cuts thorough`는 처음 쓸 때 AutoShot 가중치(57MB)를 고정된 주소에서 내려받고 해시를 확인합니다([컷 더 찾기](docs/guide.md#optional-additional-cuts)). 사람 검출은 그림체용 DeepGHS나 SAM3 묶음으로 바꿀 수도 있습니다([사용 모델과 라이선스](#사용-모델과-라이선스), [모델 선택과 고정 파일 목록](docs/person-detectors.md)).
 3. 작업 공간 폴더(기본값은 저장소 안의 `workspace/`)에 영상을 복사하고, `workspace/models.json`에 모델 경로를 적습니다.
 
    ```json
@@ -159,6 +159,7 @@ python -m image_lens --workspace W redo --look W/look --window shot-0000-w0 --de
 | RTMW-l 384 133 키포인트 (ONNX, 직접 준비) | 전신 자세 | 가중치 라이선스 확인 안 됨 |
 | [CoTracker](https://github.com/facebookresearch/co-tracker) (`image_lens/vendor/source`에 소스 포함, 체크포인트는 직접 준비) | 점 추적 | CC-BY-NC 4.0 |
 | [PySceneDetect](https://www.scenedetect.com/) (`image_lens/vendor/shot-detector`에 포함) | 장면 전환 찾기 | BSD 3-Clause |
+| [AutoShot](https://github.com/wentaozhu/AutoShot) (`image_lens/vendor/source/autoshot`에 소스 포함, 가중치는 `--cuts thorough` 첫 사용 때 내려받음) | 컷 후보 더하기 (선택) | 소스 MIT, 가중치 라이선스 확인 안 됨 |
 | rtmlib 검출기 후처리 (`pose.py`) · ONNX Runtime · MLX | 모델 실행 | Apache-2.0 · MIT · MIT |
 
 - 이 프로젝트의 코드와 문서는 [MIT](LICENSE)입니다. 함께 들어 있는 외부 코드는 각자의 조건을 따릅니다.
