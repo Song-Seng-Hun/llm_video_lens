@@ -52,11 +52,14 @@ def boxes(video, before, after, numbers, out):
         raise ValueError('picture write failed')
 
 
-def run(look_dir, name, detector, pose_model, checkpoint, out, max_seconds=1800):
+def run(look_dir, name, detector, pose_model, checkpoint, out, max_seconds=1800, *, inference_resolution=None):
     from pathlib import Path
     from image_lens import look, person_models
     root = Path(look_dir)
     record, _ = paths.load(paths.confined(root/'look.json', exists=True), max_bytes=64*1024*1024)
+    from image_lens.run_point_tracker import spatial_shape
+    saved_resolution=spatial_shape(record)
+    resolution=saved_resolution if inference_resolution is None else spatial_shape(dict(inference_resolution=inference_resolution))
     first, last = window(record, name)
     sid, _, index = name.rpartition('-w')
     done = next(shot for shot in record['shots'] if shot['segment_id'] == sid)['windows'][int(index)]
@@ -80,6 +83,7 @@ def run(look_dir, name, detector, pose_model, checkpoint, out, max_seconds=1800)
         scan,_=paths.load(root/'shots.json');shot_boundaries.validate(scan)
         if scan['parameters']!=record.get('cut_parameters') or scan['parameters']['cuts']!=cuts or scan['parameters']['transitions']!=transitions:raise ValueError('redo cut policy provenance mismatch')
     result = look.run(video, detector, pose_model, checkpoint, out, max_seconds=max_seconds, frames=(first, last),
+                      inference_resolution=list(resolution),
                       redo=dict(look=root.name, window=name, detector=now, was=kind(before), boxes=REDO['picture']),
                       **(dict(cuts=cuts) if cuts!='fast' else {}),
                       **(dict(transitions=True) if transitions else {}),

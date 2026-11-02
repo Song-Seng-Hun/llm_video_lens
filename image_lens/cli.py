@@ -5,6 +5,8 @@ from pathlib import Path
 import sys
 from image_lens import paths
 
+TRACKING_RESOLUTIONS = {'standard':(384,512),'detail':(576,768)}
+
 COMMANDS = ('look', 'scan', 'compare', 'brief', 'catalog', 'pose', 'seed', 'bind', 'prepare', 'validate', 'track', 'analyze', 'grid', 'mark', 'box', 'redo', 'focus', 'zoom', 'crowd', 'at')
 
 
@@ -206,10 +208,12 @@ def dispatch(command, arguments):
         ap.add_argument('--detector', required=True, help='pinned detector: HumanArt/DeepGHS .onnx or the SAM3 bundle directory')
         ap.add_argument('--pose-model', help='default: models.json'); ap.add_argument('--checkpoint', help='default: models.json')
         ap.add_argument('--out', required=True, help='new output directory inside the workspace'); ap.add_argument('--max-seconds', type=int, default=1800)
+        ap.add_argument('--tracking-resolution',choices=TRACKING_RESOLUTIONS,help='omit to inherit saved look; standard384x512 or detail576x768 raw tracking input')
         a = models(ap.parse_args(arguments), 'pose_model', 'checkpoint')
         if not 60 <= a.max_seconds <= 7200:
             raise ValueError('--max-seconds 60..7200')
-        return redo.run(a.look, a.window, a.detector, a.pose_model, a.checkpoint, a.out, a.max_seconds)
+        return redo.run(a.look, a.window, a.detector, a.pose_model, a.checkpoint, a.out, a.max_seconds,
+                        **(dict(inference_resolution=list(TRACKING_RESOLUTIONS[a.tracking_resolution])) if a.tracking_resolution is not None else {}))
     if command == 'focus':
         from image_lens import digest
         ap = parser(command, 'Print one shot of a look run in full detail (look-full.md).')
@@ -246,6 +250,7 @@ def dispatch(command, arguments):
         ap.add_argument('--pose-model', help='default: models.json'); ap.add_argument('--checkpoint', help='default: models.json')
         ap.add_argument('--out', required=True, help='new output directory inside the workspace')
         ap.add_argument('--max-shots', type=int, default=look.LOOK['max_shots']); ap.add_argument('--max-seconds', type=int, default=1800)
+        ap.add_argument('--tracking-resolution',choices=TRACKING_RESOLUTIONS,default='standard',help='standard384x512 default or slower detail576x768 raw tracking input')
         ap.add_argument('--max-people', type=int, default=1, help='1..8 observed people per shot; default1 keeps largest-person behavior')
         ap.add_argument('--cuts', choices=('fast','thorough'), default='fast', help='fast default; thorough unions AutoShot (optional cuts deps, first-use pinned57MB download)')
         ap.add_argument('--transitions',action='store_true',help='exclude unverified gradual-transition ranges; requires --cuts thorough')
@@ -264,6 +269,7 @@ def dispatch(command, arguments):
         onion.PEAK['draw'] = a.peak
         return look.run(a.video, a.detector, a.pose_model, a.checkpoint, a.out, a.max_shots, a.max_seconds,
                         **(dict(max_people=a.max_people) if a.max_people > 1 else {}),
+                        **(dict(inference_resolution=list(TRACKING_RESOLUTIONS[a.tracking_resolution])) if a.tracking_resolution!='standard' else {}),
                         **(dict(cuts=a.cuts) if a.cuts!='fast' else {}),
                         **(dict(transitions=True) if a.transitions else {}),
                         **(dict(scene_box=a.scene_box) if a.scene_box is not None else {}))
@@ -301,10 +307,12 @@ def dispatch(command, arguments):
         ap.add_argument('--pose', required=True); ap.add_argument('--frame', type=int, required=True)
         ap.add_argument('--job', required=True, help='job name prefix; one job per group: <job>-head, -arms, -legs')
         ap.add_argument('--track'); ap.add_argument('--length', type=int, default=160)
+        ap.add_argument('--tracking-resolution',choices=TRACKING_RESOLUTIONS,default='standard',help='standard384x512 default or detail576x768 raw tracking input')
         ap.add_argument('--out', required=True); ap.add_argument('--evidence-dir', required=True, help='new dir for one marked crop per seed')
         a = ap.parse_args(arguments)
         paths.confined(a.out, new=True)
-        packet = pose.seed(str(paths.confined(a.pose, exists=True, max_bytes=64*1024*1024)), a.frame, a.job, a.evidence_dir, a.track, a.length)
+        packet = pose.seed(str(paths.confined(a.pose, exists=True, max_bytes=64*1024*1024)), a.frame, a.job, a.evidence_dir, a.track, a.length,
+                           **(dict(inference_resolution=list(TRACKING_RESOLUTIONS[a.tracking_resolution])) if a.tracking_resolution!='standard' else {}))
         return dict(status='written', output=str(paths.write_json(a.out, packet)),
                     jobs={j['name']: [p['point_id'] for p in j['points']] for j in packet['jobs']},
                     frames=[packet['jobs'][0]['start_frame'], packet['jobs'][0]['end_frame']],
