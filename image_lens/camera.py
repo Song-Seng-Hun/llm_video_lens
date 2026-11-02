@@ -173,9 +173,8 @@ def _step(cv2, np, matcher, base, keys, desc, shape, spread_min=CAMERA['min_spre
 
 def path(video, start, end, person=None):
     """CameraPath of native reference→frame similarities; unmatched frames are left out.
-    With `person` (the main person's box on the start frame) a frame is matched on the background around it first.
-    When the seed has enough background features, only that background may establish the camera path: a failed
-    background fit stays unknown, rather than borrowing the moving subject's full-frame fit.
+    With `person` (the main person's box on the start frame), only features outside its padded box may establish the
+    camera path. Missing or failed background support stays unknown; the moving subject cannot replace that evidence.
     Frames are matched to the start frame. When one does not match and the last matched frame is CAMERA['rekey_px'] or
     more away, that frame becomes a retained local reference. Later frames under that same gate try it before the
     last matched frame; only a successful replacement adds another chained step. A direct start-frame match clears the local reference,
@@ -208,22 +207,19 @@ def _path(video, start, end, person=None):
     grays = [cv2.cvtColor(cv2.resize(bgr, None, fx=CAMERA['scale'], fy=CAMERA['scale']), cv2.COLOR_BGR2GRAY) for bgr in window]
     # ORB per frame is independent and gives the same points from a fresh detector, so it runs in threads (clip B
     # window: 0.14 -> 0.02 s); matching and RANSAC stay in frame order.
-    # A big textured figure over a plain room takes most of the 2000 points, and its moves outvote the background
-    # (3D dance clip, fixed camera: 101 of 130 frames unknown); with the person masked out the room alone gives
-    # 300-900 agreeing matches at 0-1 px. Use the whole frame only when the seed background has too few features;
-    # once a background was admitted, a failed fit must not promote the moving figure to a camera estimate.
+    # A textured figure can outvote a plain background. An explicit person box therefore excludes its features even
+    # when little background remains: a coherent turn of the figure is not independent evidence of camera rotation.
     def detect(mask):
         with ThreadPoolExecutor(8) as pool:
             return list(pool.map(lambda gray: cv2.ORB_create(CAMERA['features']).detectAndCompute(gray, mask), grays))
-    kinds = [detect(None)]
     if person is not None and grays:
         h, w = grays[0].shape; x0, y0, x1, y1 = person; px, py = CAMERA['person_pad']*(x1-x0), CAMERA['person_pad']*(y1-y0)
         mask = np.full((h, w), 255, np.uint8)
         mask[max(0, int((y0-py)*CAMERA['scale'])):max(0, int((y1+py)*CAMERA['scale'])),
              max(0, int((x0-px)*CAMERA['scale'])):max(0, int((x1+px)*CAMERA['scale']))] = 0
-        background = detect(mask)
-        if len(background[0][0]) >= CAMERA['background_features']:
-            kinds = [background]
+        kinds = [detect(mask)]
+    else:
+        kinds = [detect(None)]
     matcher = cv2.BFMatcher(cv2.NORM_HAMMING, crossCheck=True)
     size = (window[0].shape[1],window[0].shape[0]) if window else None
     result = CameraPath(reference=start, size=size, native_range=[start,end], source=dict(video=str(video)))

@@ -21,6 +21,32 @@ def pan_video(path, frames=40, step=20):
 
 
 class Path_(unittest.TestCase):
+    def test_foreground_fit_cannot_replace_missing_background_evidence(self):
+        """A turning figure on blank background is not camera evidence; true background rotation/zoom still fits."""
+        import cv2
+        import numpy as np
+        from unittest.mock import patch
+        rng = np.random.default_rng(73)
+        texture = cv2.GaussianBlur(rng.integers(0, 255, (480, 640, 3), dtype=np.uint8), (3, 3), 0)
+        figure = np.full_like(texture, 128); figure[80:430, 70:570] = texture[80:430, 70:570]
+        for kind in ('figure', 'rotation', 'zoom'):
+            with self.subTest(kind=kind):
+                source = []; truth = None
+                for n in range(16):
+                    truth = cv2.getRotationMatrix2D((320, 240), -.4*n if kind!='zoom' else 0, 1+.012*n if kind=='zoom' else 1)
+                    source.append(cv2.warpAffine(figure if kind=='figure' else texture, truth, (640, 480), borderValue=(128,128,128)))
+                person = [70,80,570,430] if kind=='figure' else [240,180,400,300]
+                with patch('image_lens.frames.window', return_value=source):
+                    found = camera._path('authored', 0, 15, person)
+                if kind == 'figure':
+                    self.assertEqual(set(found), {0})
+                    self.assertTrue(camera.describe(found,0,15,24)['unknown'])
+                else:
+                    self.assertEqual(len(found),16)
+                    for xy in ((0.,0.),(640.,0.),(640.,480.),(0.,480.)):
+                        expected = truth[:,:2]@np.asarray(xy)+truth[:,2]
+                        self.assertLess(math.dist(camera.apply(found[15],xy),expected),3.)
+
     def test_a_pan_longer_than_the_view_stays_known(self):
         with tempfile.TemporaryDirectory(dir=REPO/'workspace') as d:
             video = Path(d)/'pan.avi'; pan_video(video)
