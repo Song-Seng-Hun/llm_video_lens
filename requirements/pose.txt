@@ -3,3 +3,7 @@
 onnxruntime==1.23.2
 rtmlib==0.0.16
 supervision==0.26.1
+# rtmlib and supervision require opencv-python (rtmlib also opencv-contrib-python)
+# without a version, which would install OpenCV 5 over the pinned 4.12 cv2.
+opencv-python==4.12.0.88
+opencv-contrib-python==4.12.0.88

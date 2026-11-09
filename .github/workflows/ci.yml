@@ -1,0 +1,32 @@
+name: CI
+
+# Runs the unit tests on macOS with Apple Silicon and Python 3.12, the setup
+# the README says the tools were validated on, with the packages its quick
+# start installs (pose + tracking, which include base). No model files are
+# downloaded.
+on:
+  push:
+    branches: [master]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    runs-on: macos-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: requirements/*.txt
+      - run: python -m pip install -r requirements/pose.txt -r requirements/tracking.txt
+      - run: python -B -m unittest discover -s tests -v
