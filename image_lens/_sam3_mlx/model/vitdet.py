@@ -26,7 +26,7 @@ def init_t_xy(
 ) -> Tuple[mx.array, mx.array]:
     t = mx.arange(end_x * end_y, dtype=mx.float32)
     t_x = (t % end_x).astype(mx.float32)
-    t_y = mx.divide(t, end_x).astype(mx.float32)
+    t_y = mx.floor_divide(t, end_x).astype(mx.float32)  # upstream torch: rounding_mode='floor'
     return t_x * scale + offset, t_y * scale + offset
 
 def compute_axial_cis(

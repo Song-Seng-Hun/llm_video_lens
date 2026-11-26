@@ -6,6 +6,7 @@ PINS = {
     'humanart': (101400344, '3dea6513388889f0fff4b77bf7a26013600321b9eb9ceb0e9a400a82572f5f23'),
     'deepghs': (44583231, '6da88929438cd442e31e45ff4f934dd2d7eb9cf7a423c22885d650ee52550f90'),
     'sam3': (3402867661, '0ad4c3f42ecf706c4cda63cf58d621699491ed65012b3999284ea370984f7173'),
+    'sam3.1': (1745546848, '9ba99c92703c2e8b4f47de2d34a539bb8e18923049e238b780d70dbe6368eb03'),
     'tokenizer': (1356917, '924691ac288e54409236115652ad4aa250f48203de50a9e4722a6ecd48d6804a'),
 }
 DEEPGHS_RECIPE = dict(input=[640, 640], color='RGB', resize='PIL bicubic stretch', scale='1/255',
@@ -15,6 +16,11 @@ DEEPGHS_RECIPE = dict(input=[640, 640], color='RGB', resize='PIL bicubic stretch
 SAM3_RECIPE = dict(prompt='person', input=[1008, 1008], confidence_strictly_above=.5,
                    boxes='native xyxy clipped to frame', coverage='DeepGHS zero positive-area intersection with every original SAM3 box',
                    masks='no pixel filtering', strict_checkpoint=True, inactive_neck_keys=22, generated_buffers=5)
+SAM31_FILE = 'sam3.1_multiplex_fp16.safetensors'
+# Comfy-Org SAM 3.1 repack: detector.* only, fused q/k/v split, fp16 upcast to fp32; tracker.* and the
+# 36 tracker-neck tensors unused; 38 constructor values (5 above + 32 RoPE tables + unused text_projection).
+SAM31_RECIPE = dict(SAM3_RECIPE, checkpoint='Comfy-Org SAM 3.1 multiplex fp16 repack, detector.* only',
+                    inactive_neck_keys=36, generated_buffers=38)
 
 
 def _asset(path, key):
@@ -30,16 +36,22 @@ def resolve(path):
     """Validate every selected asset before any model/runtime import or construction."""
     path = Path(path).expanduser().absolute()
     paths._no_symlinks(path)
-    if path.is_dir() or (path.is_file() and path.stat().st_size == PINS['sam3'][0]):
-        weight = path/'model.safetensors' if path.is_dir() else path
-        primary = _asset(weight, 'sam3')
+    sizes = {PINS['sam3'][0]: 'sam3', PINS['sam3.1'][0]: 'sam3.1'}
+    if path.is_dir() or (path.is_file() and path.stat().st_size in sizes):
+        if path.is_dir():
+            # A bundle holds SAM3 model.safetensors or (e.g. hard-linked) the SAM 3.1 file.
+            variant = 'sam3.1' if (path/SAM31_FILE).is_file() and not (path/'model.safetensors').exists() else 'sam3'
+            weight = path/(SAM31_FILE if variant == 'sam3.1' else 'model.safetensors')
+        else:
+            weight, variant = path, sizes[path.stat().st_size]
+        primary = _asset(weight, variant)
         tokenizer = _asset(weight.parent/'bpe_simple_vocab_16e6.txt.gz', 'tokenizer')
         supplement = _asset(weight.parent/'anime-person.onnx', 'deepghs')
-        return dict(kind='sam3-deepghs', **primary, primary='sam3', supplement=supplement, tokenizer=tokenizer,
+        return dict(kind='sam3-deepghs', **primary, primary=variant, variant=variant, supplement=supplement, tokenizer=tokenizer,
                     source_commit='9eacae749049e2b864fe63f90f3dd17c689bee03',
-                    model_revision='b72a14d8127e17e6f2a3d2e075bbbf4307ba146e',
+                    model_revision='b72a14d8127e17e6f2a3d2e075bbbf4307ba146e' if variant == 'sam3' else None,
                     supplement_revision='e39c744c22432ad01f91dd254fe2b02c8d878b8c',
-                    recipe=dict(SAM3_RECIPE, supplement=DEEPGHS_RECIPE))
+                    recipe=dict(SAM31_RECIPE if variant == 'sam3.1' else SAM3_RECIPE, supplement=DEEPGHS_RECIPE))
     if not path.is_file():
         raise ValueError('pinned HumanArt/DeepGHS ONNX or SAM3 local bundle required')
     size = path.stat().st_size
@@ -135,7 +147,8 @@ class Sam3Coverage:
         import mlx.core as mx
         from image_lens._sam3_mlx.model_builder import build_sam3_image_model
         from image_lens._sam3_mlx.model.sam3_image_processor import Sam3Processor
-        model = build_sam3_image_model(checkpoint_path=selection['path'], bpe_path=selection['tokenizer']['path'])
+        model = build_sam3_image_model(checkpoint_path=selection['path'], bpe_path=selection['tokenizer']['path'],
+                                       variant=selection.get('variant', 'sam3'))
         self.processor = Sam3Processor(model, resolution=1008, confidence_threshold=.5)
         self.supplement = DeepGHS(selection['supplement']['path'])
         self.runtime = dict(mlx=mx.__version__, mlx_device=str(mx.default_device()))
