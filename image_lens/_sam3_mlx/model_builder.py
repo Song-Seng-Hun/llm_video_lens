@@ -62,19 +62,19 @@ def _create_vit_backbone(compile_mode=None):
         compile_mode=compile_mode,
     )
 
-def _create_vit_neck(position_encoding, vit_backbone, enable_inst_interactivity=False):
+def _create_vit_neck(position_encoding, vit_backbone, enable_inst_interactivity=False, scale_factors=(4.0, 2.0, 1.0, 0.5)):
     """Create ViT neck for feature pyramid."""
     return Sam3DualViTDetNeck(
         position_encoding=position_encoding,
         d_model=256,
-        scale_factors=[4.0, 2.0, 1.0, 0.5],
+        scale_factors=list(scale_factors),
         trunk=vit_backbone,
         add_sam2_neck=enable_inst_interactivity,
     )
 
-def _create_vl_backbone(vit_neck, text_encoder):
+def _create_vl_backbone(vit_neck, text_encoder, scalp=1):
     """Create visual-language backbone."""
-    return SAM3VLBackbone(visual=vit_neck, text=text_encoder, scalp=1)
+    return SAM3VLBackbone(visual=vit_neck, text=text_encoder, scalp=scalp)
 
 def _create_transformer_encoder() -> TransformerEncoderFusion:
     """Create transformer encoder with its layer."""
@@ -250,7 +250,8 @@ def _create_text_encoder(bpe_path: str) -> VETextEncoder:
 
 def _create_vision_backbone(
     compile_mode=None,
-    enable_inst_interactivity=True
+    enable_inst_interactivity=True,
+    scale_factors=(4.0, 2.0, 1.0, 0.5),
 ) -> Sam3DualViTDetNeck:
 
     position_encoding = _create_position_encoding(precompute_resolution=1008)
@@ -259,7 +260,8 @@ def _create_vision_backbone(
     vit_neck: Sam3DualViTDetNeck = _create_vit_neck(
         position_encoding,
         vit_backbone,
-        enable_inst_interactivity=enable_inst_interactivity
+        enable_inst_interactivity=enable_inst_interactivity,
+        scale_factors=scale_factors,
     )
     return vit_neck
 
@@ -284,21 +286,61 @@ def _sanitize_conv_layout(model, weights):
     return weights
 
 
-def load_checkpoint(model, checkpoint_path):
+SAM31_TRACKER_NECKS = ('backbone.vision_backbone.interactive_convs.', 'backbone.vision_backbone.propagation_convs.')
+
+
+def _sam31_weights(raw):
+    """Comfy-Org SAM 3.1 repack -> this MLX detector's keys.
+
+    Keeps detector.* only (tracker.* is the video tracker), strips the prefix, splits fused
+    PyTorch in_proj q/k/v rows and upcasts fp16 to fp32. Same rule as ComfyUI's SAM3 loader."""
+    weights = {}
+    for key, value in raw.items():
+        if key.startswith('tracker.'):
+            continue
+        if not key.startswith('detector.'):
+            raise ValueError('Unexpected SAM3.1 checkpoint key')
+        key = key[len('detector.'):]
+        value = value.astype(mx.float32)
+        if key.endswith(('.in_proj_weight', '.in_proj_bias')):
+            base, suffix = key.rsplit('.in_proj_', 1)
+            if value.shape[0] % 3:
+                raise ValueError('Unexpected SAM3.1 fused attention shape')
+            d = value.shape[0]//3
+            for i, name in enumerate(('query_proj', 'key_proj', 'value_proj')):
+                weights[f'{base}.{name}.{suffix}'] = value[i*d:(i+1)*d]
+        else:
+            weights[key] = value
+    return weights
+
+
+def load_checkpoint(model, checkpoint_path, variant='sam3'):
     """Exact audited checkpoint contract; no missing learned tensors are accepted."""
     from mlx.utils import tree_flatten
     expected = dict(tree_flatten(model.parameters()))
-    weights = _sanitize_conv_layout(model, mx.load(str(checkpoint_path)))
+    raw = mx.load(str(checkpoint_path))
     generated = {'backbone.language_backbone.encoder.attn_mask'} | {
         'backbone.vision_backbone.position_encoding.cache.' + str((n, n))
         for n in (31, 63, 126, 252)}
-    inactive = set()
-    for i in range(4):
-        layers = ['conv_1x1', 'conv_3x3'] + (
-            ['dconv_2x2_0', 'dconv_2x2_1'] if i == 0 else ['dconv_2x2'] if i == 1 else [])
-        for layer in layers:
-            for suffix in ('weight', 'bias'):
-                inactive.add(f'backbone.vision_backbone.sam2_convs.{i}.{layer}.{suffix}')
+    if variant == 'sam3.1':
+        weights = _sam31_weights(raw)
+        # Not stored in the 3.1 repack: RoPE tables are recomputed by the constructor (ComfyUI
+        # drops them too); text_projection only feeds the pooled text vector, which SAM3 discards.
+        generated |= {k for k in expected if k.endswith('.attn.freqs_cis')}
+        generated.add('backbone.language_backbone.encoder.text_projection')
+        inactive = {k for k in weights if k.startswith(SAM31_TRACKER_NECKS)}
+    elif variant == 'sam3':
+        weights = raw
+        inactive = set()
+        for i in range(4):
+            layers = ['conv_1x1', 'conv_3x3'] + (
+                ['dconv_2x2_0', 'dconv_2x2_1'] if i == 0 else ['dconv_2x2'] if i == 1 else [])
+            for layer in layers:
+                for suffix in ('weight', 'bias'):
+                    inactive.add(f'backbone.vision_backbone.sam2_convs.{i}.{layer}.{suffix}')
+    else:
+        raise ValueError('Unknown SAM3 checkpoint variant')
+    weights = _sanitize_conv_layout(model, weights)
     missing = set(expected) - set(weights)
     extra = set(weights) - set(expected)
     mismatch = [k for k in set(expected) & set(weights)
@@ -316,27 +358,35 @@ def load_checkpoint(model, checkpoint_path):
             if not bool(mx.all(value == causal).item()):
                 raise ValueError('SAM3 causal buffer differs')
         elif not bool(mx.all(mx.isfinite(value)).item()):
-            raise ValueError('Nonfinite SAM3 position buffer')
+            raise ValueError('Nonfinite SAM3 generated buffer')
         weights[key] = value
     model.load_weights(list(weights.items()), strict=True)
     mx.eval(model.parameters())
 
 
-def build_sam3_image_model(*, bpe_path, checkpoint_path):
-    """Build only the pinned local image model. Download/conversion paths are absent."""
+def build_sam3_image_model(*, bpe_path, checkpoint_path, variant='sam3'):
+    """Build only the pinned local image model. Download paths are absent.
+
+    variant 'sam3': mlx-community SAM3 image weights, four FPN levels with the last dropped (scalp=1).
+    variant 'sam3.1': Comfy-Org SAM 3.1 multiplex repack, whose detector neck has exactly those
+    three levels (4x, 2x, 1x) and no scalp, so the detector sees the same feature pyramid."""
     if bpe_path is None or checkpoint_path is None:
         raise ValueError('Explicit local SAM3 checkpoint and vocabulary required')
     compile = False
     enable_inst_interactivity = False
     enable_segmentation = True
 
+    if variant not in ('sam3', 'sam3.1'):
+        raise ValueError('Unknown SAM3 checkpoint variant')
+    sam31 = variant == 'sam3.1'
     vision_encoder = _create_vision_backbone(
-        compile_mode=compile, enable_inst_interactivity=enable_inst_interactivity
+        compile_mode=compile, enable_inst_interactivity=enable_inst_interactivity,
+        scale_factors=(4.0, 2.0, 1.0) if sam31 else (4.0, 2.0, 1.0, 0.5),
     )
 
     text_encoder = _create_text_encoder(bpe_path)
 
-    backbone = _create_vl_backbone(vision_encoder, text_encoder)
+    backbone = _create_vl_backbone(vision_encoder, text_encoder, scalp=0 if sam31 else 1)
 
     transformer = _create_sam3_transformer()
 
@@ -358,7 +408,7 @@ def build_sam3_image_model(*, bpe_path, checkpoint_path):
         dot_prod_scoring=dot_product_scoring
     )
 
-    load_checkpoint(model, f"{checkpoint_path}")
+    load_checkpoint(model, f"{checkpoint_path}", variant=variant)
 
     model.eval()
 
