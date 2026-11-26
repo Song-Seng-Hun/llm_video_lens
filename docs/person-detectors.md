@@ -6,7 +6,7 @@ The existing `--detector` argument on `pose` and `look`, or `models.json`'s `det
 | --- | --- | --- |
 | HumanArt | existing pinned `.onnx` file | Existing fast HumanArt/CoreML path, unchanged |
 | DeepGHS illustration detector | pinned `.onnx` file | RGB, PIL bicubic stretch640², /255 CHW, confidence >.3, inclusive pixel-area NMS .5, native resize/round/clip; CPU four threads |
-| SAM3 + DeepGHS coverage | bundle directory, or its `model.safetensors` | SAM3 prompt `person`, resolution1008, score >.5, native clipped boxes; add only DeepGHS proposals having zero positive-area intersection with **every original SAM3 box** |
+| SAM3 + DeepGHS coverage | bundle directory, or its SAM3 / SAM 3.1 weight file | SAM3 prompt `person`, resolution1008, score >.5, native clipped boxes; add only DeepGHS proposals having zero positive-area intersection with **every original SAM3 box** |
 
 SAM3 keeps the original image pixels for downstream pose. No mask filter or extra NMS is applied. Supplement proposals do not veto one another after the fixed DeepGHS NMS. This rule recovers disjoint missed subjects; it cannot recover a missed person whose rectangle overlaps a primary person box. The existing RTMW pose estimator, split heuristic, ByteTrack IDs, shot resets and geometry remain the downstream path.
 
@@ -21,15 +21,18 @@ python -m image_lens --workspace W pose --shots shots.json --detector /models/sa
 
 `look` accepts the same detector argument. Its tracking dependencies and checkpoint are also required. Keep normal model paths in `models.json` unless explicitly switching recipes.
 
-The SAM3 bundle must contain these three external files:
+The SAM3 bundle must contain three external files: one weight file (either row below) plus vocabulary and DeepGHS. With both weight files present, `model.safetensors` wins.
 
 | File | Bytes | SHA256 |
 | --- | ---: | --- |
-| `model.safetensors` | 3402867661 | `0ad4c3f42ecf706c4cda63cf58d621699491ed65012b3999284ea370984f7173` |
+| `model.safetensors` (SAM3, MLX) | 3402867661 | `0ad4c3f42ecf706c4cda63cf58d621699491ed65012b3999284ea370984f7173` |
+| `sam3.1_multiplex_fp16.safetensors` (Comfy-Org SAM 3.1; hard link allowed) | 1745546848 | `9ba99c92703c2e8b4f47de2d34a539bb8e18923049e238b780d70dbe6368eb03` |
 | `bpe_simple_vocab_16e6.txt.gz` | 1356917 | `924691ac288e54409236115652ad4aa250f48203de50a9e4722a6ecd48d6804a` |
 | `anime-person.onnx` | 44583231 | `6da88929438cd442e31e45ff4f934dd2d7eb9cf7a423c22885d650ee52550f90` |
 
 All selected file sizes/SHA256 values are checked before heavy model imports. Symlinks, unknown models and incomplete bundles fail explicitly. A standalone SAM3 file resolves the other two required assets beside it. No weights, vocabulary, media or wheels are included in the package.
+
+SAM 3.1 uses the file's `detector.*` tensors only (fused q/k/v split, fp16 upcast). Its detector weights differ from SAM3; on the 9-frame labelled pilot (13 people) SAM3 found 13 and SAM 3.1 found 12 (one pair merged into one box), both with no false positives.
 
 Asset provenance: SAM3 [checkpoint revision](https://huggingface.co/mlx-community/sam3-image/tree/b72a14d8127e17e6f2a3d2e075bbbf4307ba146e), [MLX source/tokenizer revision](https://github.com/Deekshith-Dade/mlx_sam3/tree/9eacae749049e2b864fe63f90f3dd17c689bee03); DeepGHS [checkpoint revision](https://huggingface.co/deepghs/anime_person_detection/tree/e39c744c22432ad01f91dd254fe2b02c8d878b8c), file `person_detect_v1.3_s/model.onnx`. Obtain assets under their applicable terms. The vendored SAM3 implementation is covered by the separate [Meta custom SAM license](../image_lens/_sam3_mlx/LICENSE), not the enclosing project's MIT license; acknowledge SAM3 in research as required. See [adaptations/provenance](../image_lens/_sam3_mlx/PROVENANCE.md). The publisher declares Python >=3.13; the measured local compatibility variant used Python3.12/MLX0.32.4.
 
